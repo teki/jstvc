@@ -2,7 +2,8 @@
     http://www.z80.info/decoding.htm
 */
 
-var fs = require("fs");
+var n_fs = require("fs");
+var n_buffer = require("buffer");
 
 function toHex8(x) {
     var s = x.toString(16).toUpperCase();
@@ -232,6 +233,125 @@ function decodeZ80(buffer, idx) {
 	}
 
 	return ["- " + toHex8(opcode), idx];
+}
+
+var MMU = {
+    _u0: Uint8Array(new ArrayBuffer(16384)),
+    _u1: Uint8Array(new ArrayBuffer(16384)),
+    _u2: Uint8Array(new ArrayBuffer(16384)),
+    _u3: Uint8Array(new ArrayBuffer(16384)),
+//    _cart: Uint8Array(new ArrayBuffer(16384)),
+    _sys: null,
+    _ext: new n_buffer.Buffer(16384),
+    _vid: Uint8Array(new ArrayBuffer(16384)),
+    _map: [MMU._sys, MMU._u1, MMU._u2, MMU._u3],
+    _mapVal: 0,
+    
+    reset: function() {
+        var i;
+        for(i=0; i<MMU._u0.length; i++) MMU._u0[i] = 0;
+        for(i=0; i<MMU._u1.length; i++) MMU._u1[i] = 0;
+        for(i=0; i<MMU._u2.length; i++) MMU._u2[i] = 0;
+        for(i=0; i<MMU._u3.length; i++) MMU._u3[i] = 0;
+        for(i=0; i<MMU._cart.length; i++) MMU._cart[i] = 0;
+        for(i=0; i<MMU._ext.length; i++) MMU._ext[i] = 0;
+        
+        var ext = n_fs.readFileSync("TVC_EXT.ROM");
+        ext.copy(MMU._ext);
+        
+        MMU._sys = n_fs.readFileSync("TVC_SYS.ROM");
+        
+        
+    },
+    
+    setMap: function(val) {
+        if (val == MMU._mapVal) return;
+
+        // page 3
+        var page3 = (val & 0xc0) >> 6;
+        if (page3 == 0) MMU._map[3] = MMU._cart;
+        else if (page3 == 1) MMU._map[3] = MMU._sys;
+        else if (page3 == 2) MMU._map[3] = MMU._u3;
+        else MMU._map[3] = MMU._ext;
+        // page 2
+        if (val & 0x20) MMU._map[2] = MMU._u2;
+        else MMU._map[2] = MMU._vid;
+        // page 1 is always u1
+        // page 0
+        var page0 = (val & 0xc0) >> 6;
+        
+        
+        
+        _map[3] = [MMU._cart, 
+        if (
+            b7-b6: 3: 00 CART, 01 SYS, 10 U3, 11 EXT
+    b5   : 2: 0 VID, 1 U2
+    b4-b3: 0: 00 SYS, 01 CART, 10 U0
+    b2   : 1: 1 U1
+    b1-b0: --
+    },
+    getMap: function() {
+    },
+    
+    write8: function(addr, val) {
+        addr = addr & 0xFFFF;
+        val = val & 0xFF;
+        var mapIdx = addr >>> 14;
+        var block = MMU._map[mapIdx];
+        if (block === MMU._sys || block === MMU._ext)
+            return;
+        block[addr & 0x3FFF] = val;
+    },
+    write16: function(addr, val) {
+        MMU.write8(addr, val >>> 8);
+        MMU.wtire8(addr+1, val & 0xFF);
+    },
+    read8: function(addr) {
+        addr = addr & 0xFFFF;    
+        var mapIdx = addr >>> 14;
+        return MMU._map[mapIdx][addr & 0x3FFF];
+    },
+    read16: function(addr) {
+        return (MMU.read8(addr) << 8) | MMU.read8(addr+1);
+    }
+};
+
+var Z80 = {
+    _mmu: MMU,
+    _clock: 0,
+    _r: {
+        A: 0,
+        B: 0,
+        C: 0,
+        D: 0,
+        E: 0,
+        F: 0,
+        H: 0,
+        L: 0,
+        SP: 0,
+        PC: 0,
+        
+        IX: 0,
+        IY: 0,
+        I: 0,
+        R: 0,
+
+        getBC: function() { return (Z80._r.B << 8) | Z80._r.C;},
+        setBC: function(val) { Z80._r.B = (val >>> 8);  Z80._r.C = val & 0xFF;},
+        getDE: function() { return (Z80._r.D << 8) | Z80._r.E;},
+        setDE: function(val) { Z80._r.D = (val >>> 8);  Z80._r.E = val & 0xFF;},
+        getHL: function() { return (Z80._r.H << 8) | Z80._r.L;},
+        setHL: function(val) { Z80._r.H = (val >>> 8);  Z80._r.L = val & 0xFF;},
+    },
+    
+    step: function() {
+        
+    },
+        
+    0: function() {
+        //nop
+        
+    }
 }
 /*
 function printZ80(buffer, idx) {
