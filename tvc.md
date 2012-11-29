@@ -38,9 +38,86 @@
     pic end: line 268
     
     
+    PAL standard: http://martin.hinner.info/vga/pal.html
+        50 VSYNC / sec
+        625 HSYNC / sec
+        line period:  64us
+        line 6 is the first visible and 310 is the last visible
+        
+    Video imp:
+        tvc: 240 lines
+        screen:
+            64us line period
+            312.5*2 lines (2 fields)  20ms/64us = 312.5
+            305 visible lines in the first field
+            first visible line ~28, with ~266 visible lines
+        impl:
+            312.5 lines => 312.5 * 64us = 20ms = 25fps
+            bg color by default
+            64us per line / 320ns per cpu tick = 200 cpu ticks per line
+            drawn line: 640ns*64 = 40.96us = 128 cpu ticks
+            12us is not visible from the line, 52us remains, center it: start at 18us
+            
+            line timing in cpu ticks:
+                38 nothing
+                18 border
+                128 image
+                16 border
+            pic timing (lines):
+                1-5 nothing
+                6-35 border
+                36 - 275 image
+                276-310 border
+                311-312.5 nothing
+            
+            
+        
+        
+        
+    
+# PORTS
+    -: not used
+    +: other functions
+    00H     7-5-3-1-    W       Border color
+    01H     76543210    W       Printer data
+    02H     76543---    W       Memory mapping
+    03H     ++--3210    W       Keyboard (row)
+    03H     76--++++    W       Extended RAM/ROM mapping
+    04H     76543210    W       Sound freq low
+    05H     ++++3210    W       Sound freq high
+    05H     ++54++++    W       Sound oscillator, Sount IT, enable/disable
+    05H     76++++++    W       Tape motor
+    06H     +-++++10    W       Video mode (color count)
+    06H     +-5432++    W       Sound amp
+    06H     7-++++++    W       Printer ack
+    07H     --------    W       cursor/sound IT clear
+    08H-0BH unused
+    0CH                 W       Video mapping (64k+)
+    0DH-0FH same as 0CH
+    10H-4FH extension card addresses
+    50H     --------    R/W     Tape data out
+    51H-57H same as 50H
+    58H     76543210    R       Keyboard state (column read)
+    58H     7-------    W       Extension card 0 IT clear
+    59H     +++43210    R       Pending IT requests
+    59H     765+++++    R       7: printer ack, 6: black/white, 5: tape data in
+    59H     7-------    W       Extension card 1 IT clear
+    5AH     76543210    R       Extension card identifier
+    5AH     7-------    W       Extension card 2 IT clear
+    5BH     --------    R       Sound oscillator reset
+    5BH     7-------    W       Extension card 3 IT clear
+    5CH-5FH same as 58H-5BH
+    60H-63H -6-4-2-0    W       Plaette registers
+    64H-6FH same as 60H-63H
+    70H-71H 76543210    R/W     6845 CRTC register
+    72H-7FH same as 70H-71H
+    80H-9FH reserved for carts
+    A0H-FFH unused
+    
+    
 
 # CPU
-    Clock: 3.125 MHz (50/16)
+    Clock: 3.125 MHz (50/16), 1 tick = 320ns
     HALT: wait for interrupt
     Interrupt:
         IFF1, IFF2
