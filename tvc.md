@@ -117,6 +117,7 @@
     
 
 # CPU
+    Instr table: http://www.z80.info/z80sean.txt
     Clock: 3.125 MHz (50/16), 1 tick = 320ns
     HALT: wait for interrupt
     Interrupt:
