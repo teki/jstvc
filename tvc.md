@@ -107,7 +107,7 @@
     5BH     --------    R       Sound oscillator reset
     5BH     7-------    W       Extension card 3 IT clear
     5CH-5FH same as 58H-5BH
-    60H-63H -6-4-2-0    W       Plaette registers
+    60H-63H -6-4-2-0    W       Palette registers
     64H-6FH same as 60H-63H
     70H-71H 76543210    R/W     6845 CRTC register
     72H-7FH same as 70H-71H
