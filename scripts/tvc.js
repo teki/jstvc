@@ -124,12 +124,30 @@ MMU.prototype.dasm = function(addr, lines, prefix) {
 };
 
 ////////////////////////////////////////////
+// VID
+////////////////////////////////////////////
+function VID(mmu) {
+    this._mmu = mmu;
+    this._clock = 0;
+    this._palette = [0,0,0,0];
+}
+
+VID.prototype.setPalette = function(idx, color) {
+    this._palette[idx] = color;
+};
+
+VID.prototype.getPalette = function(idx) {
+    return this._palette[idx];
+};
+
+////////////////////////////////////////////
 // TVC
 ////////////////////////////////////////////
 function TVC() {
     var TVCthis = this;
     this._clock = 0;
     this._mmu = new MMU();
+    this._vid = new VID(this._mmu);
     this._z80 = new z80.Z80(this._mmu, function(addr, val) {
         TVCthis.writePort(addr, val);
     }, function(addr) {
@@ -147,10 +165,14 @@ TVC.prototype.run = function() {
 
 TVC.prototype.writePort = function(addr, val) {
     console.log("OUT (" + toHex8(addr) + "), " + toHex8(val));
-    if (addr == 2) {
+    if (addr == 0x02) {
         this._mmu.setMap(val);
         return;
     }
+    else if (addr >= 0x60 && addr <= 0x63) {
+        this._vid.setPalette(addr-0x60, val);
+        return;
+    } 
     throw ("unhandled port write");
 };
 
