@@ -19,6 +19,84 @@
     b1-b0: --
 
 # VIDEO
+    chacarcter tick = 2 cpu ticks
+    kezdoertekek: [ 99, 64, 75, 50, 77, 2, 60, 66, 0, 3, 3, 3, 0, 0, 14, 255, 0, 0 ]
+    registers:
+        R0 w karakterutem
+            x-1
+            karakter utemek egy tv-soron belul (sor elorefutes+vissza)
+            default: 99 => 100 karakterutem == 64us == PAL sorido
+        R1 w karakterutem
+            sorelorefutas karaktereinek szama = lathato karakterek
+            nem lehet kisebb  R0-nal
+            default: 64 => 64 byte per sor
+        R2 w karakterutem
+            x-1
+            szinkronjel kezdete a sorelofutas kezdetetol merve
+            nem lehet kisebb  R0-nal
+            default: 75 => 76
+        R3 w vvvvhhhh
+            v/h szinkronjelek szelessege
+            v: tv-sorutemben, 0 => 16 sor
+            h: karakterekben, 0 => tilos
+            default: h:2 karakter semmi, v:3 sor semmi
+        R4 w -6543210 karaktersorutem
+            x-1
+            kepelorefutas + kepvisszafutas karaktersorainak osszege
+            default: 77 => 78 => 78 * 4 = 312 ami majdnem 312.5
+        R5 w ---43210 tv-sorutem
+            kiegeszito regiszter R4-hez
+            tv-sorok szama: (R4 + 1) * tv-sorok szama egy karaktersorban + R5
+        R6 w -6543210 karaktersorutem
+            hasznos kep (sorelorefutas) karaktersorainak szama
+            kisebbnek kell lennie mint R4
+            default: 60 => 60 * 4 = 240
+        R7 w -6543210 karaktersorutem
+            x-1
+            H-sync kezdete - kep vege a sorelorefutas kezdetetol
+            default: 66
+        R8 w megjelenites modja, idozites
+            default: 0
+            nem valtott soros, nincs kesleltetes, throw ha vmi mas jon
+            modok: progressive, interlace1, interlace2
+        R9 w ---43210 tv-sorutem
+            progressive: x-1
+            interlace1: x-1 / ciklus (duplaja lesz a megjelenes, mert 2 felkep van)
+            interlace2: x-2
+            default: 3 => 4 sor
+        R10 w -BP43210
+            cursor villogo + kezdopozicio regiszter
+            bit 5,6: type
+                00 nem villogo
+                01 nincs cursor
+                10 16 felfrissites
+                11 32 felfrissites
+            bit 4-0: cursor tetejenek tv-sor pozicija a karaktersoron belul
+            default: 3 => nem villogo, 3. tv sor
+        R11 w ---43210 tv-sorutem
+            cursor utolso soranak regisztere
+            karaktersoron belul a cursor utolso tv-sora
+            default: 3
+        R12,R13 rw
+            kep kezdete a memoriaban
+            R12: --543210   address high
+            R13: 76543210   address low
+            (a minuszok nullak olvasaskor)
+            default: 3,0 => 0x300
+        R14,R15 rw
+            cursor karakter pozicio
+            R41: --543210   pozicio high
+            R15: 76543210   pozicio low
+            default: 0,14
+        R16, R17 r
+            fenyceruza
+            
+            
+                
+            
+            
+
+
     240 lines
     width: 64 bytes (512, 256, 128 pixels)
     240*64 = 15360 bytes

@@ -405,17 +405,31 @@ define(function() {
         0x04: function() { // INC B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = add8(this._s.B, 1);
+            this._s.B = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, false);
         },
         0x05: function() { // DEC B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.B, 1);
+            this._s.B = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, true);
         },
         0x06: function() { // LD B,n
             this._op_t = 7;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.B = this._mmu.r8(this._s.getPC(1));
         },
         0x07: function() { // RLCA
             this._op_t = 4;
@@ -447,17 +461,31 @@ define(function() {
         0x0C: function() { // INC C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = add8(this._s.C, 1);
+            this._s.C = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, false);
         },
         0x0D: function() { // DEC C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.C, 1);
+            this._s.C = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, true);
         },
         0x0E: function() { // LD C,n
             this._op_t = 7;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.C = this._mmu.r8(this._s.getPC(1));
         },
         0x0F: function() { // RRCA
             this._op_t = 4;
@@ -465,9 +493,20 @@ define(function() {
             throw ("not implemented");
         },
         0x10: function() { // DJNZ (PC+e)
-            this._op_t = 0; // 8_13;
-            this._op_m = 0; // 2_3;
-            throw ("not implemented");
+            var offset;
+            var res = sub8(this._s.B, 1);
+            this._s.B = res.val;
+            if (res.z) {
+                this._op_t = 8;
+                this._op_m = 2;
+            }
+            else
+            {
+                this._op_t = 13;
+                this._op_m = 0;
+                offset = toS8(this._mmu.r8(this._s.getPC(1)));
+                this._s.setPC(this._s.getPC(2+offset));
+            }
         },
         0x11: function() { // LD DE,nn
             this._op_t = 10;
@@ -487,17 +526,31 @@ define(function() {
         0x14: function() { // INC D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = add8(this._s.D, 1);
+            this._s.D = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, false);
         },
         0x15: function() { // DEC D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.D, 1);
+            this._s.D = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, true);
         },
         0x16: function() { // LD D,n
             this._op_t = 7;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.D = this._mmu.r8(this._s.getPC(1));
         },
         0x17: function() { // RLA
             this._op_t = 4;
@@ -527,17 +580,31 @@ define(function() {
         0x1C: function() { // INC E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = add8(this._s.E, 1);
+            this._s.E = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, false);
         },
         0x1D: function() { // DEC E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.E, 1);
+            this._s.E = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, true);
         },
         0x1E: function() { // LD E,n
             this._op_t = 7;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.E = this._mmu.r8(this._s.getPC(1));
         },
         0x1F: function() { // RRA
             this._op_t = 4;
@@ -575,17 +642,31 @@ define(function() {
         0x24: function() { // INC H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = add8(this._s.H, 1);
+            this._s.H = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, false);
         },
         0x25: function() { // DEC H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.H, 1);
+            this._s.H = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, true);
         },
         0x26: function() { // LD H,n
             this._op_t = 7;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.H = this._mmu.r8(this._s.getPC(1));
         },
         0x27: function() { // DAA
             this._op_t = 4;
@@ -615,17 +696,31 @@ define(function() {
         0x2C: function() { // INC L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = add8(this._s.L, 1);
+            this._s.L = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, false);
         },
         0x2D: function() { // DEC L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.L, 1);
+            this._s.L = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, true);
         },
         0x2E: function() { // LD L,n
             this._op_t = 7;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.L = this._mmu.r8(this._s.getPC(1));
         },
         0x2F: function() { // CPL
             this._op_t = 4;
@@ -696,12 +791,26 @@ define(function() {
         0x3C: function() { // INC A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = add8(this._s.A, 1);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, false);
         },
         0x3D: function() { // DEC A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, 1);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.s,
+                F_Z, res.z,
+                F_H, res.h,
+                F_PV, res.pv,
+                F_N, true);
         },
         0x3E: function() { // LD A,n
             this._op_t = 7;
@@ -716,242 +825,236 @@ define(function() {
         0x40: function() { // LD B,B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
         },
         0x41: function() { // LD B,C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.B = this._s.C;
         },
         0x42: function() { // LD B,D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.B = this._s.D;
         },
         0x43: function() { // LD B,E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.B = this._s.E;
         },
         0x44: function() { // LD B,H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.B = this._s.H;
         },
         0x45: function() { // LD B,L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.B = this._s.L;
         },
         0x46: function() { // LD B,(HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            this._s.B = this._mmu.r8(this._s.getHL());
         },
         0x47: function() { // LD B,A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.B = this._s.A;
         },
         0x48: function() { // LD C,B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.C = this._s.B;
         },
         0x49: function() { // LD C,C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
         },
         0x4A: function() { // LD C,D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.C = this._s.D;
         },
         0x4B: function() { // LD C,E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.C = this._s.E;
         },
         0x4C: function() { // LD C,H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.C = this._s.H;
         },
         0x4D: function() { // LD C,L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.C = this._s.L;
         },
         0x4E: function() { // LD C,(HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            this._s.C = this._mmu.r8(this._s.getHL());
         },
         0x4F: function() { // LD C,A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.C = this._s.A;
         },
         0x50: function() { // LD D,B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.D = this._s.B;
         },
         0x51: function() { // LD D,C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.D = this._s.C;
         },
         0x52: function() { // LD D,D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
         },
         0x53: function() { // LD D,E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.D = this._s.E;
         },
         0x54: function() { // LD D,H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.D = this._s.H;
         },
         0x55: function() { // LD D,L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.D = this._s.L;
         },
         0x56: function() { // LD D,(HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            this._s.D = this._mmu.r8(this._s.getHL());
         },
         0x57: function() { // LD D,A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.D = this._s.A;
         },
         0x58: function() { // LD E,B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.E = this._s.B;
         },
         0x59: function() { // LD E,C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.E = this._s.C;
         },
         0x5A: function() { // LD E,D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.E = this._s.D;
         },
         0x5B: function() { // LD E,E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
         },
         0x5C: function() { // LD E,H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.E = this._s.H;
         },
         0x5D: function() { // LD E,L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.E = this._s.L;
         },
         0x5E: function() { // LD E,(HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            this._s.E = this._mmu.r8(this._s.getHL());
         },
         0x5F: function() { // LD E,A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.E = this._s.A;
         },
         0x60: function() { // LD H,B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.H = this._s.B;
         },
         0x61: function() { // LD H,C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.H = this._s.C;
         },
         0x62: function() { // LD H,D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.H = this._s.D;
         },
         0x63: function() { // LD H,E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.H = this._s.E;
         },
         0x64: function() { // LD H,H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
         },
         0x65: function() { // LD H,L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.H = this._s.L;
         },
         0x66: function() { // LD H,(HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            this._s.H = this._mmu.r8(this._s.getHL());
         },
         0x67: function() { // LD H,A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.H = this._s.A;
         },
         0x68: function() { // LD L,B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.L = this._s.B;
         },
         0x69: function() { // LD L,C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.L = this._s.C;
         },
         0x6A: function() { // LD L,D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.L = this._s.D;
         },
         0x6B: function() { // LD L,E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.L = this._s.E;
         },
         0x6C: function() { // LD L,H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.L = this._s.H;
         },
         0x6D: function() { // LD L,L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
         },
         0x6E: function() { // LD L,(HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            this._s.L = this._mmu.r8(this._s.getHL());
         },
         0x6F: function() { // LD L,A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.L = this._s.A;
         },
         0x70: function() { // LD (HL),B
             this._op_t = 7;
@@ -996,42 +1099,41 @@ define(function() {
         0x78: function() { // LD A,B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = this._s.B;
         },
         0x79: function() { // LD A,C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = this._s.C;
         },
         0x7A: function() { // LD A,D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = this._s.D;
         },
         0x7B: function() { // LD A,E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = this._s.E;
         },
         0x7C: function() { // LD A,H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = this._s.H;
         },
         0x7D: function() { // LD A,L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = this._s.L;
         },
         0x7E: function() { // LD A,(HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            this._s.A = this._mmu.r8(this._s.getHL());
         },
         0x7F: function() { // LD A,A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
         },
         0x80: function() { // ADD A,B
             this._op_t = 4;

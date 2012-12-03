@@ -130,6 +130,9 @@ function VID(mmu) {
     this._mmu = mmu;
     this._clock = 0;
     this._palette = [0,0,0,0];
+    this._regIdx = 0;
+    this._reg = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+    this._mode = 0; // 00: 2, 01: 4, 1x: 16 color
 }
 
 VID.prototype.setPalette = function(idx, color) {
@@ -140,6 +143,40 @@ VID.prototype.getPalette = function(idx) {
     return this._palette[idx];
 };
 
+VID.prototype.setReg = function(val) {
+    this._reg[this._regIdx] = val;
+    console.log(this._reg);
+};
+
+VID.prototype.getReg = function() {
+    return this._reg[this._regIdx];
+};
+
+VID.prototype.setRegIdx = function(idx) {
+    if (idx < 0 || idx > 17) return;
+    this._regIdx = idx;
+};
+
+VID.prototype.getRegIdx = function() {
+    return this._regIdx;
+};
+
+VID.prototype.setMode = function(mode) {
+    this._mode = mode;
+}
+
+////////////////////////////////////////////
+// VID
+////////////////////////////////////////////
+function AUD() {
+    this._clock = 0;
+    this._amp = 0;
+}
+
+AUD.prototype.setAmp = function(val) {
+    this._amp = val;
+}
+
 ////////////////////////////////////////////
 // TVC
 ////////////////////////////////////////////
@@ -148,6 +185,7 @@ function TVC() {
     this._clock = 0;
     this._mmu = new MMU();
     this._vid = new VID(this._mmu);
+    this._aud = new AUD();
     this._z80 = new z80.Z80(this._mmu, function(addr, val) {
         TVCthis.writePort(addr, val);
     }, function(addr) {
@@ -164,13 +202,30 @@ TVC.prototype.run = function() {
 };
 
 TVC.prototype.writePort = function(addr, val) {
+    var val1, val2, val3;
     console.log("OUT (" + toHex8(addr) + "), " + toHex8(val));
     if (addr == 0x02) {
         this._mmu.setMap(val);
         return;
     }
+    else if (addr == 0x06) {
+        val1 = val & 0x80; // Printer ack
+        val2 = (val >>> 2) & 0x0F; // Sound amp
+        val3 = val & 0x03; // video mode
+        this._vid.setMode(val3);
+        this._aud.setAmp(val2);
+        return;
+    } 
     else if (addr >= 0x60 && addr <= 0x63) {
         this._vid.setPalette(addr-0x60, val);
+        return;
+    } 
+    else if (addr == 0x70) {
+        this._vid.setRegIdx(val);
+        return;
+    } 
+    else if (addr == 0x71) {
+        this._vid.setReg(val);
         return;
     } 
     throw ("unhandled port write");
