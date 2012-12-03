@@ -47,12 +47,12 @@ MMU.prototype.init = function() {
     // for(i=0; i<this._cart.length; i++) this._cart[i] = 0;
     for (i = 0; i < this._ext.length; i++) this._ext[i] = 0;
 
-    var ext = n_fs.readFileSync("TVC_EXT.ROM");
+    var ext = n_fs.readFileSync("../TVC_EXT.ROM");
     for (i = 0; i < ext.length; i++) this._ext[0x2000 + i] = ext[i];
 
     if (this._ext[0x3000] != 0x3e) throw ("ext is not properly initialized!");
 
-    this._sys = n_fs.readFileSync("TVC_SYS.ROM");
+    this._sys = n_fs.readFileSync("../TVC_SYS.ROM");
     this.setMap(0);
 };
 MMU.prototype.reset = function() {
@@ -215,19 +215,19 @@ TVC.prototype.writePort = function(addr, val) {
         this._vid.setMode(val3);
         this._aud.setAmp(val2);
         return;
-    } 
+    }
     else if (addr >= 0x60 && addr <= 0x63) {
         this._vid.setPalette(addr-0x60, val);
         return;
-    } 
+    }
     else if (addr == 0x70) {
         this._vid.setRegIdx(val);
         return;
-    } 
+    }
     else if (addr == 0x71) {
         this._vid.setReg(val);
         return;
-    } 
+    }
     throw ("unhandled port write");
 };
 
