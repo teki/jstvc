@@ -47,12 +47,12 @@ MMU.prototype.init = function() {
     // for(i=0; i<this._cart.length; i++) this._cart[i] = 0;
     for (i = 0; i < this._ext.length; i++) this._ext[i] = 0;
 
-    var ext = n_fs.readFileSync("../TVC_EXT.ROM");
+    var ext = n_fs.readFileSync("TVC_EXT.ROM");
     for (i = 0; i < ext.length; i++) this._ext[0x2000 + i] = ext[i];
 
     if (this._ext[0x3000] != 0x3e) throw ("ext is not properly initialized!");
 
-    this._sys = n_fs.readFileSync("../TVC_SYS.ROM");
+    this._sys = n_fs.readFileSync("TVC_SYS.ROM");
     this.setMap(0);
 };
 MMU.prototype.reset = function() {

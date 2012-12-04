@@ -81,7 +81,7 @@ define(function() {
         oz = opcode & 0x07; // 3 bits
         op = oy >>> 1; // 2 bits
         oq = oy & 1; // 1 bits
-        console.log(toHex8(opcode), ox, oy, oz, op, oq);
+        //console.log(toHex8(opcode), ox, oy, oz, op, oq);
 
         // process
         if (prefix1 == 0xCB) {
@@ -298,7 +298,22 @@ define(function() {
             else this.F &= (~arguments[i] & 0xFF);
         }
     };
+    Z80State.prototype.updateF = function(flagMap) {
+        var fLookUp = {F_S: 0x80,F_Z: 0x40,F_5: 0x20,F_H: 0x10,F_3: 0x08,
+            F_PV: 0x04, F_N: 0x02, F_C: 0x01};
+        var FBit, k;
+        for (k in flagMap) {
+            if (k == "val") continue;
+            FBit = fLookUp[k];
+            if (flagMap[k]) this.F |= FBit;
+            else this.F &= (~FBit & 0xFF);
+        }
+    };
 
+    Z80State.prototype.getF = function(flag) {
+        return (this._s.F & flag) !== 0;
+    }
+    
     function toS8(val) {
         if (val & 0x80) return -1 * (0x80 - (val & 0x7f));
         return val;
@@ -315,12 +330,12 @@ define(function() {
 
         return {
             val: res8,
-            s: (res8 & 0x80) !== 0,
-            z: res8 === 0,
-            h: ((Cin >>> 4) & 1) !== 0,
-            pv: ((Cin >>> 7) ^ Cout) !== 0,
-            n: false,
-            c: res > 0xFF
+            F_S: (res8 & 0x80) !== 0,
+            F_Z: res8 === 0,
+            F_H: ((Cin >>> 4) & 1) !== 0,
+            F_PV: ((Cin >>> 7) ^ Cout) !== 0,
+            F_N: false,
+            F_C: res > 0xFF
         };
     }
 
@@ -330,8 +345,63 @@ define(function() {
         if (!Cin) Cin = 1;
         else Cin = 0;
         res = add8(val1, (~val2) & 0xFF, Cin);
-        res.c = !res.c;
+        res.F_C = !res.F_C;
+        res.F_N = true;
         return res;
+    }
+
+    function shlc8(val, Cin) {  // copy into C
+        var Cout = (val & 0x80) >> 7;
+        var res = ((val << 1) | Cout) & 0xFF;
+        return {
+            val: res,
+            F_S: (res & 0x80) == 0x80,
+            F_Z: res === 0,
+            F_H: false,
+            F_PV: !(res & 1),
+            F_N: false,
+            F_C: Cout
+        };
+        
+    }
+    function shl8(val, Cin) {   // shift through C
+        var Cout = (val & 0x80) >> 7;
+        var res = ((val << 1) | Cin) & 0xFF;
+        return {
+            val: res,
+            F_S: (res & 0x80) == 0x80,
+            F_Z: res === 0,
+            F_H: false,
+            F_PV: !(res & 1),
+            F_N: false,
+            F_C: Cout
+        };
+    }
+    function shrc8(val, Cin) {  // copy into C
+        var Cout = val & 1;
+        var res = ((val >>> 1) | (Cout << 7)) & 0xFF;
+        return {
+            val: res,
+            F_S: (res & 0x80) == 0x80,
+            F_Z: res === 0,
+            F_H: false,
+            F_PV: !(res & 1),
+            F_N: false,
+            F_C: Cout
+        };
+    }
+    function shr8(val, Cin) {   // shift through C
+        var Cout = val & 1;
+        var res = ((val >>> 1) | (Cin << 7)) & 0xFF;
+        return {
+            val: res,
+            F_S: (res & 0x80) == 0x80,
+            F_Z: res === 0,
+            F_H: false,
+            F_PV: !(res & 1),
+            F_N: false,
+            F_C: Cout
+        };
     }
 
     Z80State.prototype.init = function() {
@@ -431,10 +501,10 @@ define(function() {
             var res = add8(this._s.B, 1);
             this._s.B = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, false);
         },
         0x05: function() { // DEC B
@@ -443,10 +513,10 @@ define(function() {
             var res = sub8(this._s.B, 1);
             this._s.B = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, true);
         },
         0x06: function() { // LD B,n
@@ -457,7 +527,9 @@ define(function() {
         0x07: function() { // RLCA
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = shlc8(this._s.A, this._s.getf(F_C));
+            this._s.A = res.val;
+            this._s.setF(F_H, false, F_N, false, F_C, res.c);
         },
         0x08: function() { // EX AF,AF’
             this._op_t = 4;
@@ -487,10 +559,10 @@ define(function() {
             var res = add8(this._s.C, 1);
             this._s.C = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, false);
         },
         0x0D: function() { // DEC C
@@ -499,10 +571,10 @@ define(function() {
             var res = sub8(this._s.C, 1);
             this._s.C = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, true);
         },
         0x0E: function() { // LD C,n
@@ -519,7 +591,7 @@ define(function() {
             var offset;
             var res = sub8(this._s.B, 1);
             this._s.B = res.val;
-            if (res.z) {
+            if (res.F_Z) {
                 this._op_t = 8;
                 this._op_m = 2;
             }
@@ -552,10 +624,10 @@ define(function() {
             var res = add8(this._s.D, 1);
             this._s.D = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, false);
         },
         0x15: function() { // DEC D
@@ -564,10 +636,10 @@ define(function() {
             var res = sub8(this._s.D, 1);
             this._s.D = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, true);
         },
         0x16: function() { // LD D,n
@@ -607,10 +679,10 @@ define(function() {
             var res = add8(this._s.E, 1);
             this._s.E = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, false);
         },
         0x1D: function() { // DEC E
@@ -619,10 +691,10 @@ define(function() {
             var res = sub8(this._s.E, 1);
             this._s.E = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, true);
         },
         0x1E: function() { // LD E,n
@@ -669,10 +741,10 @@ define(function() {
             var res = add8(this._s.H, 1);
             this._s.H = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, false);
         },
         0x25: function() { // DEC H
@@ -681,10 +753,10 @@ define(function() {
             var res = sub8(this._s.H, 1);
             this._s.H = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, true);
         },
         0x26: function() { // LD H,n
@@ -731,10 +803,10 @@ define(function() {
             var res = add8(this._s.L, 1);
             this._s.L = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, false);
         },
         0x2D: function() { // DEC L
@@ -743,10 +815,10 @@ define(function() {
             var res = sub8(this._s.L, 1);
             this._s.L = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, true);
         },
         0x2E: function() { // LD L,n
@@ -845,10 +917,10 @@ define(function() {
             var res = add8(this._s.A, 1);
             this._s.A = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, false);
         },
         0x3D: function() { // DEC A
@@ -857,10 +929,10 @@ define(function() {
             var res = sub8(this._s.A, 1);
             this._s.A = res.val;
             this._s.setF(
-                F_S, res.s,
-                F_Z, res.z,
-                F_H, res.h,
-                F_PV, res.pv,
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
                 F_N, true);
         },
         0x3E: function() { // LD A,n
@@ -1643,32 +1715,44 @@ define(function() {
         0xCB00: function() { // RLC B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shlc8(this._s.B, this._s.getf(F_C));
+            this._s.B = res.val;
+            this._s.updateF(res);
         },
         0xCB01: function() { // RLC C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shlc8(this._s.C, this._s.getf(F_C));
+            this._s.C = res.val;
+            this._s.updateF(res);
         },
         0xCB02: function() { // RLC D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shlc8(this._s.D, this._s.getf(F_C));
+            this._s.D = res.val;
+            this._s.updateF(res);
         },
         0xCB03: function() { // RLC E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shlc8(this._s.E, this._s.getf(F_C));
+            this._s.E = res.val;
+            this._s.updateF(res);
         },
         0xCB04: function() { // RLC H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shlc8(this._s.H, this._s.getf(F_C));
+            this._s.H = res.val;
+            this._s.updateF(res);
         },
         0xCB05: function() { // RLC L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shlc8(this._s.L, this._s.getf(F_C));
+            this._s.L = res.val;
+            this._s.updateF(res);
         },
         0xCB06: function() { // RLC (HL)
             this._op_t = 15;
@@ -1678,7 +1762,9 @@ define(function() {
         0xCB07: function() { // RLC A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shlc8(this._s.A, this._s.getf(F_C));
+            this._s.A = res.val;
+            this._s.updateF(res);
         },
         0xCB08: function() { // RRC B
             this._op_t = 8;
@@ -5679,8 +5765,8 @@ define(function() {
             bc--;
             this._s.setBC(bc);
             this._s.setF(
-            F_S, res.s,
-            F_Z, res.z,
+            F_S, res.F_S,
+            F_Z, res.F_Z,
             F_N, true,
             F_PV, (bc === 0));
         },
