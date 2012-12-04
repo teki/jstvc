@@ -28,8 +28,9 @@ function MMU() {
     this._u1 = new Uint8Array(16384);
     this._u2 = new Uint8Array(16384);
     this._u3 = new Uint8Array(16384);
-    // this._cart = Uint8Array(new ArrayBuffer(16384));
     this._sys = [];
+    //this._cart = Uint8Array(new ArrayBuffer(16384));
+    this._cart = this._sys;
     this._ext = new Uint8Array(16384);
     this._vid = new Uint8Array(16384);
     this._map = [];
@@ -63,20 +64,22 @@ MMU.prototype.setMap = function(val) {
 
     // page 3
     var page3 = (val & 0xc0) >> 6;
-    if (page3 === 0) this._map[3] = this._sys; // this._cart;
-    else if (page3 == 1) this._map[3] = this._sys;
-    else if (page3 == 2) this._map[3] = this._u3;
-    else this._map[3] = this._ext;
+    this._map[3] = [this._cart, this._sys, this._u3, this._ext][page3];
+    
     // page 2
-    if (val & 0x20) this._map[2] = this._u2;
-    else this._map[2] = this._vid;
+    if (val & 0x20)
+        this._map[2] = this._u2;
+    else
+        this._map[2] = this._vid;
+    
     // page 1 is always u1
+    this._map[1] = this._u1;
+
     // page 0
     var page0 = (val & 0x18) >> 3;
-    if (page0 === 0) this._map[0] = this._sys;
-    else if (page0 == 1) this._map[0] = this._sys; // this._cart;
-    else if (page0 == 2) this._map[0] = this._u0;
-    else throw "do not know";
+    this._map[0] = [this._sys, this._cart, this._u0, undefined][page0];
+    if (page0 === 3)
+        throw "do not know";
 };
 MMU.prototype.getMap = function() {
     return this._mapVal;
@@ -87,6 +90,8 @@ MMU.prototype.w8 = function(addr, val) {
     var mapIdx = addr >>> 14;
     var block = this._map[mapIdx];
     if (block === this._sys || block === this._ext) return;
+    if (!block)
+        throw("invalid block: " + toHex16(addr) + " mapIdx:" + mapIdx + " mapping: " + this._map);
     block[addr & 0x3FFF] = val;
 };
 MMU.prototype.w16 = function(addr, val) {

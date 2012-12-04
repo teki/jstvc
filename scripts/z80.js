@@ -551,7 +551,7 @@ define(function() {
         0x0B: function() { // DEC BC
             this._op_t = 6;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.setBC(this._s.getBC()-1);
         },
         0x0C: function() { // INC C
             this._op_t = 4;
@@ -671,7 +671,7 @@ define(function() {
         0x1B: function() { // DEC DE
             this._op_t = 6;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.setDE(this._s.getDE()-1);
         },
         0x1C: function() { // INC E
             this._op_t = 4;
@@ -795,7 +795,7 @@ define(function() {
         0x2B: function() { // DEC HL
             this._op_t = 6;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.setHL(this._s.getHL()-1);
         },
         0x2C: function() { // INC L
             this._op_t = 4;
@@ -862,18 +862,35 @@ define(function() {
         },
         0x34: function() { // INC (HL)
             this._op_t = 11;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 1;
+            var HL = this._s.getHL();
+            var res = add8(this._mmu.r8(HL), 1);
+            this._mmu.w8(HL, res.val);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, false);
         },
         0x35: function() { // DEC (HL)
             this._op_t = 11;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 1;
+            var HL = this._s.getHL();
+            var res = sub8(this._mmu.r8(HL), 1);
+            this._mmu.w8(HL, res.val);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true);
         },
         0x36: function() { // LD (HL),n
             this._op_t = 10;
             this._op_m = 2;
             var val = this._mmu.r8(this._s.getPC(1));
+            console.log("HL: " + toHex16(this._s.getHL()));
             this._mmu.w8(this._s.getHL(), val);
         },
         0x37: function() { // SCF
@@ -909,7 +926,7 @@ define(function() {
         0x3B: function() { // DEC SP
             this._op_t = 6;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.setSP(this._s.getSP()-1);
         },
         0x3C: function() { // INC A
             this._op_t = 4;
@@ -4870,6 +4887,7 @@ define(function() {
             this._op_t = 10;
             this._op_m = 1;
             this._s.setHL(this.pop16());
+            console.log("POP HL: " + toHex16(this._s.getHL()));
         },
         0xE2: function() { // JP	PO,nn
             this._op_t = 0;
@@ -4897,6 +4915,7 @@ define(function() {
         0xE5: function() { // PUSH	HL
             this._op_t = 11;
             this._op_m = 1;
+            console.log("PUSH HL: " + toHex16(this._s.getHL()));
             this.push16(this._s.getHL());
         },
         0xE6: function() { // AND	n
@@ -4931,9 +4950,11 @@ define(function() {
             throw ("not implemented");
         },
         0xEB: function() { // EX	DE,HL
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 4;
+            this._op_m = 1;
+            var DE = this._s.getDE();
+            this._s.setDE(this._s.getHL());
+            this._s.setHL(DE);
         },
         0xEC: function() { // CALL	PE,nn
             if (this._s.F & F_PV) {
@@ -5841,9 +5862,23 @@ define(function() {
             throw ("not implemented");
         },
         0xEDB0: function() { // LDIR
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            var DE = this._s.getDE(),
+                HL = this._s.getHL(),
+                BC = this._s.getBC();
+            this._mmu.w8(DE, this._mmu.r8(HL));
+            this._s.setDE(DE+1);
+            this._s.setHL(HL+1);
+            BC--;
+            this._s.setBC(BC);
+            this._s.setF(F_H, false, F_PV, false, F_N, false);
+            if (BC === 0) {  // finish
+                this._op_t = 16;
+                this._op_m = 2;
+            }
+            else {
+                this._op_t = 21;
+                this._op_m = 0; // repeat this instruction
+            }
         },
         0xEDB1: function() { // CPIR
             this._op_t = 0;
