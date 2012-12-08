@@ -311,7 +311,7 @@ define(function() {
     };
 
     Z80State.prototype.getF = function(flag) {
-        return (this._s.F & flag) !== 0;
+        return (this.F & flag) !== 0;
     }
     
     function toS8(val) {
@@ -527,9 +527,9 @@ define(function() {
         0x07: function() { // RLCA
             this._op_t = 4;
             this._op_m = 1;
-            var res = shlc8(this._s.A, this._s.getf(F_C));
+            var res = shlc8(this._s.A, this._s.getF(F_C));
             this._s.A = res.val;
-            this._s.setF(F_H, false, F_N, false, F_C, res.c);
+            this._s.setF(F_H, false, F_N, false, F_C, res.F_C);
         },
         0x08: function() { // EX AF,AF’
             this._op_t = 4;
@@ -585,7 +585,9 @@ define(function() {
         0x0F: function() { // RRCA
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = shrc8(this._s.A, this._s.getF(F_C));
+            this._s.A = res.val;
+            this._s.setF(F_H, false, F_N, false, F_C, res.F_C);
         },
         0x10: function() { // DJNZ (PC+e)
             var offset;
@@ -727,8 +729,9 @@ define(function() {
         },
         0x22: function() { // LD (nn),HL
             this._op_t = 16;
-            this._op_m = 5;
-            throw ("not implemented");
+            this._op_m = 3;
+            var addr = this._mmu.r16(this._s.getPC(1));
+            this._mmu.w16(addr, this._s.getHL());
         },
         0x23: function() { // INC HL
             this._op_t = 6;
@@ -1358,42 +1361,107 @@ define(function() {
         0x90: function() { // SUB B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.B);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0x91: function() { // SUB C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.C);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0x92: function() { // SUB D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.D);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0x93: function() { // SUB E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.E);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0x94: function() { // SUB H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.H);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0x95: function() { // SUB L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.L);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0x96: function() { // SUB (HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            var rhs = this._mmu.r8(this._s.getHL());
+            var res = sub8(this._s.A, rhs);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0x97: function() { // SUB A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.A);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0x98: function() { // SBC A,B
             this._op_t = 4;
@@ -1438,42 +1506,99 @@ define(function() {
         0xA0: function() { // AND B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A & this._s.B) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, true,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xA1: function() { // AND C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A & this._s.C) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, true,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xA2: function() { // AND D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A & this._s.D) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, true,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xA3: function() { // AND E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A & this._s.E) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, true,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xA4: function() { // AND H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A & this._s.H) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, true,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xA5: function() { // AND L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A & this._s.L) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, true,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xA6: function() { // AND (HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            var rhs = this._mmu.r8(this._s.getHL());
+            this._s.A = (this._s.A & rhs) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, true,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xA7: function() { // AND A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A & this._s.A) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, true,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xA8: function() { // XOR B
             this._op_t = 4;
@@ -1574,32 +1699,74 @@ define(function() {
         0xB0: function() { // OR B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A | this._s.B) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, false,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xB1: function() { // OR C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A | this._s.C) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, false,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xB2: function() { // OR D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A | this._s.D) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, false,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xB3: function() { // OR E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A | this._s.E) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, false,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xB4: function() { // OR H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A | this._s.H) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, false,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xB5: function() { // OR L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.A = (this._s.A | this._s.L) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, false,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xB6: function() { // OR (HL)
             this._op_t = 7;
@@ -1609,47 +1776,110 @@ define(function() {
         0xB7: function() { // OR A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, false,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xB8: function() { // CP B
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.B);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xB9: function() { // CP C
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.C);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xBA: function() { // CP D
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.D);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xBB: function() { // CP E
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.E);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xBC: function() { // CP H
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.H);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xBD: function() { // CP L
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.L);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xBE: function() { // CP (HL)
             this._op_t = 7;
-            this._op_m = 2;
-            throw ("not implemented");
+            this._op_m = 1;
+            var rhs = this._mmu.r8(this._s.getHL());
+            var res = sub8(this._s.A, rhs);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xBF: function() { // CP A
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = sub8(this._s.A, this._s.A);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xC0: function() { // RET NZ
             if (this._s.F & F_Z) {
@@ -3098,9 +3328,18 @@ define(function() {
             this.push16(this._s.getDE());
         },
         0xD6: function() { // SUB	n
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 7;
+            this._op_m = 2;
+            var rhs = this._mmu.r8(this._s.getPC(1));
+            var res = sub8(this._s.A, rhs);
+            this._s.A = res.val;
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xD7: function() { // RST	10H
             this._op_t = 0;
@@ -3119,9 +3358,17 @@ define(function() {
             }
         },
         0xD9: function() { // EXX
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 4;
+            this._op_m = 1;
+            var BC = this._s.getBC(),
+                DE = this._s.getDE(),
+                HL = this._s.getHL();
+            this._s.setBC(this._s.BCa);
+            this._s.setDE(this._s.DEa);
+            this._s.setHL(this._s.HLa);
+            this._s.BCa = BC;
+            this._s.DEa = DE;
+            this._s.HLa = HL;
         },
         0xDA: function() { // JP	C,nn
             this._op_t = 0;
@@ -3129,9 +3376,9 @@ define(function() {
             throw ("not implemented");
         },
         0xDB: function() { // IN	A,(n)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 11;
+            this._op_m = 2;
+            this._s.A = this._in(this._mmu.r8(this._s.getPC(1)));
         },
         0xDC: function() { // CALL	C,nn
             if (this._s.F & F_C) {
@@ -8104,9 +8351,17 @@ define(function() {
             throw ("not implemented");
         },
         0xFE: function() { // CP	n
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 7;
+            this._op_m = 2;
+            var rhs = this._mmu.r8(this._s.getPC(1));
+            var res = sub8(this._s.A, rhs);
+            this._s.setF(
+                F_S, res.F_S,
+                F_Z, res.F_Z,
+                F_H, res.F_H,
+                F_PV, res.F_PV,
+                F_N, true,
+                F_C, res.F_C);
         },
         0xFF: function() { // RST	38H
             this._op_t = 0;
