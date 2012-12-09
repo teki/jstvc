@@ -19,9 +19,68 @@
     b1-b0: --
 
 # VIDEO
-    chacarcter tick = 2 cpu ticks
-    kezdoertekek: [ 99, 64, 75, 50, 77, 2, 60, 66, 0, 3, 3, 3, 0, 0, 14, 255, 0, 0 ]
-    registers:
+    Resources:
+        * Amstard infos:
+            http://www.grimware.org/doku.php/documentations/devices/crtc
+            http://www.cpcwiki.eu/index.php/CRTC
+    TVC scpecific
+        * chacarcter tick = 2 cpu ticks
+        * kezdoertekek:
+            * [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ]
+            * [ 63, 40, 4B, 32, 4D, 02, 60, 3C, 00, 03, 03, 03, 00, 00, 0E, FF , 00, 00 ]
+            
+        240 lines
+        width: 64 bytes (512, 256, 128 pixels)
+        240*64 = 15360 bytes
+        IRGB colors
+        3 modes: 2 colors (mapped to IRGB),4 (mapped to IRGB), 16 (IRGB)
+        3 clocks: 12.5MHz, 6.25MHz, 3.125MHz
+        plaetta register: 4 * 4bits (for 2 and 4 clolor modes)
+        border register: 4 bit
+        A byte is read in every 640ns.
+        
+        prev border end, line, border beg, line back
+        
+        line back: 25.26us
+        line: 640ns * 64 = 40.96us
+        
+        
+        pic end: line 268
+        
+        
+        PAL standard: http://martin.hinner.info/vga/pal.html
+            50 VSYNC / sec
+            625 HSYNC / sec
+            line period:  64us
+            line 6 is the first visible and 310 is the last visible
+            
+        Video imp:
+            tvc: 240 lines
+            screen:
+                64us line period
+                312.5*2 lines (2 fields)  20ms/64us = 312.5
+                305 visible lines in the first field
+                first visible line ~28, with ~266 visible lines
+            impl:
+                312.5 lines => 312.5 * 64us = 20ms = 25fps
+                bg color by default
+                64us per line / 320ns per cpu tick = 200 cpu ticks per line
+                drawn line: 640ns*64 = 40.96us = 128 cpu ticks
+                12us is not visible from the line, 52us remains, center it: start at 18us
+                
+                line timing in cpu ticks:
+                    38 nothing
+                    18 border
+                    128 image
+                    16 border
+                pic timing (lines):
+                    1-5 nothing
+                    6-35 border
+                    36 - 275 image
+                    276-310 border
+                    311-312.5 nothing
+       
+    Registers:
         R0 w karakterutem
             x-1
             karakter utemek egy tv-soron belul (sor elorefutes+vissza)
@@ -91,68 +150,6 @@
         R16, R17 r
             fenyceruza
             
-            
-                
-            
-            
-
-
-    240 lines
-    width: 64 bytes (512, 256, 128 pixels)
-    240*64 = 15360 bytes
-    IRGB colors
-    3 modes: 2 colors (mapped to IRGB),4 (mapped to IRGB), 16 (IRGB)
-    3 clocks: 12.5MHz, 6.25MHz, 3.125MHz
-    plaetta register: 4 * 4bits (for 2 and 4 clolor modes)
-    border register: 4 bit
-    A byte is read in every 640ns.
-    
-    prev border end, line, border beg, line back
-    
-    line back: 25.26us
-    line: 640ns * 64 = 40.96us
-    
-    
-    pic end: line 268
-    
-    
-    PAL standard: http://martin.hinner.info/vga/pal.html
-        50 VSYNC / sec
-        625 HSYNC / sec
-        line period:  64us
-        line 6 is the first visible and 310 is the last visible
-        
-    Video imp:
-        tvc: 240 lines
-        screen:
-            64us line period
-            312.5*2 lines (2 fields)  20ms/64us = 312.5
-            305 visible lines in the first field
-            first visible line ~28, with ~266 visible lines
-        impl:
-            312.5 lines => 312.5 * 64us = 20ms = 25fps
-            bg color by default
-            64us per line / 320ns per cpu tick = 200 cpu ticks per line
-            drawn line: 640ns*64 = 40.96us = 128 cpu ticks
-            12us is not visible from the line, 52us remains, center it: start at 18us
-            
-            line timing in cpu ticks:
-                38 nothing
-                18 border
-                128 image
-                16 border
-            pic timing (lines):
-                1-5 nothing
-                6-35 border
-                36 - 275 image
-                276-310 border
-                311-312.5 nothing
-            
-            
-        
-        
-        
-    
 # PORTS
     -: not used
     +: other functions
@@ -195,40 +192,12 @@
     
 
 # CPU
-    Instr table: http://www.z80.info/z80sean.txt
-    Clock: 3.125 MHz (50/16), 1 tick = 320ns
-    HALT: wait for interrupt
-    Interrupt:
-        IFF1, IFF2
-        Maskable:
-            PC -> (SP)
-            PC = irq routine
-            RETI ( reload PC )
-        NMI:
-            PC -> (SP)
-            PC = (66H)
-            RETN ( reload PC )
-        IM 0: opcode from bus
-        IM 1: (38H)
-        IM 2: address from bus, then JP (I << 8 + address) [not used by TVC]
-    Reset:
-        IFF1, IFF2 = 0
-        IM 0
-        R = 0
-        I = 0
-    Reqisters:
-        F: S Z Y H X P/V N C
-            S: Set if the 2-complement value is negative. It's simply a copy of the most signi¯cant bit.
-            Z: Set if the result is zero.
-            Y: A copy of bit 5 of the result.
-            H: The half-carry of an addition/subtraction (from bit 3 to 4). Needed for BCD correction with DAA.
-            X: A copy of bit 3 of the result.
-            P: This can either be the parity of the result (PF), or the 2-compliment signed overflow (VF): set if 2-compliment value doesn't fit in the register.
-            N: Shows whether the last operation was an addition (0) or an subtraction (1). This information is needed for DAA.
-            C: The carry flag, set if there was a carry after the most significant bit.
-        I: interrupt table address upper half
-        R: 7 bit counter, increment on each op
-        SP: stack pointer, decreases on write, increases on read
-        
+    Resources:
+        * instr table: http://www.z80.info/z80sean.txt
+        * testing info: http://www.worldofspectrum.org/forums/showthread.php?t=41704
+        * interrupt handling: http://www.nvg.ntnu.no/sinclair/faq/tech_z80.html
     
+    TVC specific:
+        * clock: 3.125 MHz (50/16), 1 tick = 320ns
+
     
