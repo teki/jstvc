@@ -2376,322 +2376,322 @@ define(function() {
         0xCB40: function() { // BIT 0,B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.B & 1) === 0, F_H, true, F_N, false);
         },
         0xCB41: function() { // BIT 0,C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.C & 1) === 0, F_H, true, F_N, false);
         },
         0xCB42: function() { // BIT 0,D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.D & 1) === 0, F_H, true, F_N, false);
         },
         0xCB43: function() { // BIT 0,E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.E & 1) === 0, F_H, true, F_N, false);
         },
         0xCB44: function() { // BIT 0,H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.H & 1) === 0, F_H, true, F_N, false);
         },
         0xCB45: function() { // BIT 0,L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.L & 1) === 0, F_H, true, F_N, false);
         },
         0xCB46: function() { // BIT 0,(HL)
             this._op_t = 12;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 2;
+            this._s.setF(F_Z, (this._mmu.r8(this._s.getHL()) & 1) === 0, F_H, true, F_N, false);
         },
         0xCB47: function() { // BIT 0,A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.A & 1) === 0, F_H, true, F_N, false);
         },
         0xCB48: function() { // BIT 1,B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.B & 2) === 0, F_H, true, F_N, false);
         },
         0xCB49: function() { // BIT 1,C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.C & 2) === 0, F_H, true, F_N, false);
         },
         0xCB4A: function() { // BIT 1,D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.D & 2) === 0, F_H, true, F_N, false);
         },
         0xCB4B: function() { // BIT 1,E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.E & 2) === 0, F_H, true, F_N, false);
         },
         0xCB4C: function() { // BIT 1,H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.H & 2) === 0, F_H, true, F_N, false);
         },
         0xCB4D: function() { // BIT 1,L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.L & 2) === 0, F_H, true, F_N, false);
         },
         0xCB4E: function() { // BIT 1,(HL)
             this._op_t = 12;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 2;
+            this._s.setF(F_Z, (this._mmu.r8(this._s.getHL()) & 2) === 0, F_H, true, F_N, false);
         },
         0xCB4F: function() { // BIT 1,A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.A & 2) === 0, F_H, true, F_N, false);
         },
         0xCB50: function() { // BIT 2,B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.B & 4) === 0, F_H, true, F_N, false);
         },
         0xCB51: function() { // BIT 2,C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.C & 4) === 0, F_H, true, F_N, false);
         },
         0xCB52: function() { // BIT 2,D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.D & 4) === 0, F_H, true, F_N, false);
         },
         0xCB53: function() { // BIT 2,E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.E & 4) === 0, F_H, true, F_N, false);
         },
         0xCB54: function() { // BIT 2,H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.H & 4) === 0, F_H, true, F_N, false);
         },
         0xCB55: function() { // BIT 2,L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.L & 4) === 0, F_H, true, F_N, false);
         },
         0xCB56: function() { // BIT 2,(HL)
             this._op_t = 12;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 2;
+            this._s.setF(F_Z, (this._mmu.r8(this._s.getHL()) & 4) === 0, F_H, true, F_N, false);
         },
         0xCB57: function() { // BIT 2,A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.A & 4) === 0, F_H, true, F_N, false);
         },
         0xCB58: function() { // BIT 3,B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.B & 8) === 0, F_H, true, F_N, false);
         },
         0xCB59: function() { // BIT 3,C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.C & 8) === 0, F_H, true, F_N, false);
         },
         0xCB5A: function() { // BIT 3,D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.D & 8) === 0, F_H, true, F_N, false);
         },
         0xCB5B: function() { // BIT 3,E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.E & 8) === 0, F_H, true, F_N, false);
         },
         0xCB5C: function() { // BIT 3,H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.H & 8) === 0, F_H, true, F_N, false);
         },
         0xCB5D: function() { // BIT 3,L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.L & 8) === 0, F_H, true, F_N, false);
         },
         0xCB5E: function() { // BIT 3,(HL)
             this._op_t = 12;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 2;
+            this._s.setF(F_Z, (this._mmu.r8(this._s.getHL()) & 8) === 0, F_H, true, F_N, false);
         },
         0xCB5F: function() { // BIT 3,A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.A & 8) === 0, F_H, true, F_N, false);
         },
         0xCB60: function() { // BIT 4,B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.B & 16) === 0, F_H, true, F_N, false);
         },
         0xCB61: function() { // BIT 4,C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.C & 16) === 0, F_H, true, F_N, false);
         },
         0xCB62: function() { // BIT 4,D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.D & 16) === 0, F_H, true, F_N, false);
         },
         0xCB63: function() { // BIT 4,E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.E & 16) === 0, F_H, true, F_N, false);
         },
         0xCB64: function() { // BIT 4,H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.H & 16) === 0, F_H, true, F_N, false);
         },
         0xCB65: function() { // BIT 4,L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.L & 16) === 0, F_H, true, F_N, false);
         },
         0xCB66: function() { // BIT 4,(HL)
             this._op_t = 12;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 2;
+            this._s.setF(F_Z, (this._mmu.r8(this._s.getHL()) & 16) === 0, F_H, true, F_N, false);
         },
         0xCB67: function() { // BIT 4,A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.A & 16) === 0, F_H, true, F_N, false);
         },
         0xCB68: function() { // BIT 5,B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.B & 32) === 0, F_H, true, F_N, false);
         },
         0xCB69: function() { // BIT 5,C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.C & 32) === 0, F_H, true, F_N, false);
         },
         0xCB6A: function() { // BIT 5,D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.D & 32) === 0, F_H, true, F_N, false);
         },
         0xCB6B: function() { // BIT 5,E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.E & 32) === 0, F_H, true, F_N, false);
         },
         0xCB6C: function() { // BIT 5,H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.H & 32) === 0, F_H, true, F_N, false);
         },
         0xCB6D: function() { // BIT 5,L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.L & 32) === 0, F_H, true, F_N, false);
         },
         0xCB6E: function() { // BIT 5,(HL)
             this._op_t = 12;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 2;
+            this._s.setF(F_Z, (this._mmu.r8(this._s.getHL()) & 32) === 0, F_H, true, F_N, false);
         },
         0xCB6F: function() { // BIT 5,A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.A & 32) === 0, F_H, true, F_N, false);
         },
         0xCB70: function() { // BIT 6,B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.B & 64) === 0, F_H, true, F_N, false);
         },
         0xCB71: function() { // BIT 6,C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.C & 64) === 0, F_H, true, F_N, false);
         },
         0xCB72: function() { // BIT 6,D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.D & 64) === 0, F_H, true, F_N, false);
         },
         0xCB73: function() { // BIT 6,E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.E & 64) === 0, F_H, true, F_N, false);
         },
         0xCB74: function() { // BIT 6,H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.H & 64) === 0, F_H, true, F_N, false);
         },
         0xCB75: function() { // BIT 6,L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.L & 64) === 0, F_H, true, F_N, false);
         },
         0xCB76: function() { // BIT 6,(HL)
             this._op_t = 12;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 2;
+            this._s.setF(F_Z, (this._mmu.r8(this._s.getHL()) & 64) === 0, F_H, true, F_N, false);
         },
         0xCB77: function() { // BIT 6,A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.A & 64) === 0, F_H, true, F_N, false);
         },
         0xCB78: function() { // BIT 7,B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.B & 128) === 0, F_H, true, F_N, false);
         },
         0xCB79: function() { // BIT 7,C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.C & 128) === 0, F_H, true, F_N, false);
         },
         0xCB7A: function() { // BIT 7,D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.D & 128) === 0, F_H, true, F_N, false);
         },
         0xCB7B: function() { // BIT 7,E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.E & 128) === 0, F_H, true, F_N, false);
         },
         0xCB7C: function() { // BIT 7,H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.H & 128) === 0, F_H, true, F_N, false);
         },
         0xCB7D: function() { // BIT 7,L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.L & 128) === 0, F_H, true, F_N, false);
         },
         0xCB7E: function() { // BIT 7,(HL)
             this._op_t = 12;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 2;
+            this._s.setF(F_Z, (this._mmu.r8(this._s.getHL()) & 128) === 0, F_H, true, F_N, false);
         },
         0xCB7F: function() { // BIT 7,A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            this._s.setF(F_Z, (this._s.A & 128) === 0, F_H, true, F_N, false);
         },
         0xCB80: function() { // RES 0,B
             this._op_t = 8;
@@ -5246,9 +5246,16 @@ define(function() {
             this.push16(this._s.getHL());
         },
         0xE6: function() { // AND	n
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 7;
+            this._op_m = 2;
+            this._s.A = (this._s.A & this._mmu.r8(this._s.getPC(1))) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, true,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xE7: function() { // RST	20H
             this._op_t = 0;
@@ -6666,9 +6673,16 @@ define(function() {
             this.push16(this._s.getAF());
         },
         0xF6: function() { // OR	n
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 7;
+            this._op_m = 2;
+            this._s.A = (this._s.A | this._mmu.r8(this._s.getPC(1))) & 0xFF;
+            this._s.setF(
+                F_S, (this._s.A & 0x80) !== 0,
+                F_Z, this._s.A === 0,
+                F_H, false,
+                F_PV, (this._s.A & 0x01) === 0,
+                F_N, false,
+                F_C, false);
         },
         0xF7: function() { // RST	30H
             this._op_t = 0;
