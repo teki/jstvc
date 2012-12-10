@@ -63,17 +63,44 @@ define(function() {
             opcode = mmu.r8(addr + idx);
             idx++;
         }
-        else if ((opcode == 0xDD) || (opcode == 0xFD)) {
-            throw "DD FD not implemented";
-            /*
-		prefix1 = opcode;
-		opcode = mmu.r8(addr + idx);
-		idx++;
-		if (opcode == 0xCB) {
-			prefix2 = opcode;
-			opcode = mmu.r8(addr + idx);
-			idx++;
-		}*/
+        else if (opcode == 0xDD || opcode == 0xFD) {
+            prefix1 = opcode;
+            opcode = mmu.r8(addr + idx);
+            idx++;
+            if (-1 !== [0xDD, 0xED, 0xFD].indexOf(opcode))
+                return this.decodeZ80(mmu, addr + 1);
+            if (opcode == 0xCB) {
+                prefix2 = opcode;
+                opcode = mmu.r8(addr + idx);
+                idx++;
+            }
+            else {
+                var replreg;
+                if (prefix1 == 0xDD)
+                    replreg = "IX";
+                else
+                    replreg = "IY";
+                res = this.decodeZ80(mmu, addr + 1);
+                console.log(res);
+                var txt = res[0];
+                if (txt.indexOf("(HL)") !== -1) {
+                    throw "add";
+
+                }
+                else if (txt.indexOf("HL") !== -1) {
+                    txt = txt.replace("HL", replreg);
+                }
+                else if (txt.indexOf("H") !== -1) {
+                    txt = txt.replace("H", replreg + "H");
+                }
+                else if (txt.indexOf("L") !== -1) {
+                    txt = txt.replace("L", replreg + "L");
+                }
+                res[0] = txt;
+                res[1] = res[1] + 1;
+                console.log(res);
+                return res;
+            }
         }
 
         ox = (opcode & 0xC0) >>> 6; // 2 bits
@@ -282,6 +309,20 @@ define(function() {
     Z80State.prototype.setSP = function(val) {
         this._SP = val & 0xFFFF;
     };
+    Z80State.prototype.getIX = function(offset) {
+        if (offset) return (this._IX + offset) & 0xFFFF;
+        return this._IX;
+    };
+    Z80State.prototype.setIX = function(val) {
+        this._IX = val & 0xFFFF;
+    };
+    Z80State.prototype.getIY = function(offset) {
+        if (offset) return (this._IY + offset) & 0xFFFF;
+        return this._IY;
+    };
+    Z80State.prototype.setIY = function(val) {
+        this._IY = val & 0xFFFF;
+    };
 
     var F_S = 0x80; // sign
     var F_Z = 0x40; // zero
@@ -317,6 +358,37 @@ define(function() {
     function toS8(val) {
         if (val & 0x80) return -1 * (0x80 - (val & 0x7f));
         return val;
+    }
+
+    function add16(val1, val2, Cin) {
+        var res, res16, Cout;
+        if (Cin === undefined) Cin = 0;
+        res = val1 + val2 + Cin;
+        res16 = res & 0xFFFF;
+        Cout = (res > 0xFFFF); // carry out
+
+        Cin = res16 ^ val1 ^ val2; // overflows
+
+        return {
+            val: res16,
+            F_S: (res16 & 0x8000) !== 0,
+            F_Z: res16 === 0,
+            F_H: ((Cin >>> 11) & 1) !== 0,
+            F_PV: ((Cin >>> 15) ^ Cout) !== 0,
+            F_N: false,
+            F_C: res > 0xFFFF
+        };
+    }
+
+    function sub16(val1, val2, Cin) {
+        var res;
+        // negate Cin (undefined too)
+        if (!Cin) Cin = 1;
+        else Cin = 0;
+        res = add16(val1, (~val2) & 0xFFFF, Cin);
+        res.F_C = !res.F_C;
+        res.F_N = true;
+        return res;
     }
 
     function add8(val1, val2, Cin) {
@@ -423,8 +495,8 @@ define(function() {
         this._SP = 0xFFFF;
         this._PC = 0x0000;
 
-        this.IX = 0xFFFF;
-        this.IY = 0xFFFF;
+        this._IX = 0xFFFF;
+        this._IY = 0xFFFF;
 
         this.AFa = 0xFFFF;
         this.BCa = 0xFFFF,
@@ -540,8 +612,10 @@ define(function() {
         },
         0x09: function() { // ADD HL,BC
             this._op_t = 11;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 1;
+            var res = add16(this._s.getHL(), this._s.getBC());
+            this._s.setHL(res.val);
+            this._s.setF(F_H, res.F_H, F_N, false, F_C, res.F_C);
         },
         0x0A: function() { // LD A,(BC)
             this._op_t = 7;
@@ -662,8 +736,10 @@ define(function() {
         },
         0x19: function() { // ADD HL,DE
             this._op_t = 11;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 1;
+            var res = add16(this._s.getHL(), this._s.getDE());
+            this._s.setHL(res.val);
+            this._s.setF(F_H, res.F_H, F_N, false, F_C, res.F_C);
         },
         0x1A: function() { // LD A,(DE)
             this._op_t = 7;
@@ -787,8 +863,10 @@ define(function() {
         },
         0x29: function() { // ADD HL,HL
             this._op_t = 11;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 1;
+            var res = add16(this._s.getHL(), this._s.getHL());
+            this._s.setHL(res.val);
+            this._s.setF(F_H, res.F_H, F_N, false, F_C, res.F_C);
         },
         0x2A: function() { // LD HL,(nn)
             this._op_t = 16;
@@ -917,8 +995,10 @@ define(function() {
         },
         0x39: function() { // ADD HL,SP
             this._op_t = 11;
-            this._op_m = 3;
-            throw ("not implemented");
+            this._op_m = 1;
+            var res = add16(this._s.getHL(), this._s.getSP());
+            this._s.setHL(res.val);
+            this._s.setF(F_H, res.F_H, F_N, false, F_C, res.F_C);
         },
         0x3A: function() { // LD A,(nn)
             this._op_t = 13;
@@ -3764,7 +3844,7 @@ define(function() {
         0xDDAE: function() { // XOR (IX+d)
             this._op_t = 19;
             this._op_m = 3;
-            var addr = this._s.IX + toS8(this._mmu.r8(this._s.getPC(2)));
+            var addr = this._s.getIX(toS8(this._mmu.r8(this._s.getPC(2))));
             this._s.A = (this._s.A ^ this._mmu.r8(addr)) & 0xFF;
             this._s.setF(
             F_S, (this._s.A & 0x80) !== 0,
@@ -5085,9 +5165,9 @@ define(function() {
             throw ("not implemented");
         },
         0xDDE1: function() { // POP IX
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 14;
+            this._op_m = 2;
+            this._s.setIX(this.pop16());
         },
         0xDDE3: function() { // EX (SP),IX
             this._op_t = 0;
@@ -5095,9 +5175,9 @@ define(function() {
             throw ("not implemented");
         },
         0xDDE5: function() { // PUSH IX
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 15;
+            this._op_m = 2;
+            this.push16(this._s.getIX());
         },
         0xDDE9: function() { // JP (IX)
             this._op_t = 0;
@@ -7005,7 +7085,7 @@ define(function() {
         0xFDAE: function() { // XOR (IY+d)
             this._op_t = 19;
             this._op_m = 3;
-            var addr = this._s.IY + toS8(this._mmu.r8(this._s.getPC(2)));
+            var addr = this._s.getIY(toS8(this._mmu.r8(this._s.getPC(2))));
             this._s.A = (this._s.A ^ this._mmu.r8(addr)) & 0xFF;
             this._s.setF(
             F_S, (this._s.A & 0x80) !== 0,
@@ -8326,9 +8406,9 @@ define(function() {
             throw ("not implemented");
         },
         0xFDE1: function() { // POP IY
-            this._opt_t = 0;
-            this._opt_m = 0;
-            throw ("not implemented");
+            this._op_t = 14;
+            this._op_m = 2;
+            this._s.setIY(this.pop16());
         },
         0xFDE3: function() { // EX (SP),IY
             this._opt_t = 0;
@@ -8336,9 +8416,9 @@ define(function() {
             throw ("not implemented");
         },
         0xFDE5: function() { // PUSH IY
-            this._opt_t = 0;
-            this._opt_m = 0;
-            throw ("not implemented");
+            this._op_t = 15;
+            this._op_m = 2;
+            this.push16(this._s.getIY());
         },
         0xFDE9: function() { // JP (IY)
             this._opt_t = 0;
