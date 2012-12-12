@@ -135,6 +135,7 @@ function VID(mmu) {
 	this._mmu = mmu;
 	this._clock = 0;
 	this._palette = [0,0,0,0];
+	this._border = 0;
 	this._regIdx = 0;
 	this._reg = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 	this._mode = 0; // 00: 2, 01: 4, 1x: 16 color
@@ -146,6 +147,10 @@ VID.prototype.setPalette = function(idx, color) {
 
 VID.prototype.getPalette = function(idx) {
 	return this._palette[idx];
+};
+
+VID.prototype.setBorder = function(color) {
+	this._border = color;
 };
 
 VID.prototype.setReg = function(val) {
@@ -168,7 +173,7 @@ VID.prototype.getRegIdx = function() {
 
 VID.prototype.setMode = function(mode) {
 	this._mode = mode;
-}
+};
 
 ////////////////////////////////////////////
 // VID
@@ -176,12 +181,20 @@ VID.prototype.setMode = function(mode) {
 function AUD() {
 	this._clock = 0;
 	this._amp = 0;
+	this._freq = 0;
 }
 
 AUD.prototype.setAmp = function(val) {
 	this._amp = val;
-}
+};
 
+AUD.prototype.setFreqL = function(val) {
+    this._freq = (this._freq & 0x0F00) | (val & 0xFF);
+};
+
+AUD.prototype.setFreqH = function(val) {
+    this._freq = (this._freq & 0xFF) | (val << 8);
+};
 
 ////////////////////////////////////////////
 // KEY
@@ -203,6 +216,8 @@ function TVC() {
 	this._mmu = new MMU();
 	this._vid = new VID(this._mmu);
 	this._aud = new AUD();
+    this._aud_it = false;
+    this._aud_on = false;
 	this._key = new KEY();
 	this._z80 = new z80.Z80(this._mmu, function(addr, val) {
 		TVCthis.writePort(addr, val);
@@ -219,39 +234,61 @@ TVC.prototype.run = function() {
 	}
 };
 
-TVC.prototype.writePort = function(addr, val) {
-	var val1, val2, val3;
-	console.log("OUT (" + toHex8(addr) + "), " + toHex8(val));
-	if (addr == 0x02) {
-		this._mmu.setMap(val);
+TVC.prototype.writePort = function (addr, val) {
+    var val1, val2, val3;
+    console.log("OUT (" + toHex8(addr) + "), " + toHex8(val));
+	if (addr == 0x00) {
+		this._vid.setBorder(val);
 		return;
 	}
-	else if (addr == 0x03) {
-		this._key.selectRow(val & 0xF);
-		// 2 bits to select I/O memory, ignore it for now
+    if (addr == 0x02) {
+        this._mmu.setMap(val);
+        return;
+    }
+    else if (addr == 0x03) {
+        this._key.selectRow(val & 0xF);
+        // 2 bits to select I/O memory, ignore it for now
+        return;
+    }
+    else if (addr == 0x04) {
+        this._aud.setFreqL(val & 0xFF);
+        return;
+    }
+    else if (addr == 0x05) {
+        this._aud_on = (val & 0x10) !== 0;
+        this._aud_it = (val & 0x20) !== 0;
+        this._aud.setFreqH(val & 0x0F);
+        return;
+    }
+    else if (addr == 0x06) {
+        val1 = val & 0x80; // Printer ack
+        val2 = (val >>> 2) & 0x0F; // Sound amp
+        val3 = val & 0x03; // video mode
+        this._vid.setMode(val3);
+        this._aud.setAmp(val2);
+        return;
+    }
+	else if (addr == 0x07) {
+		// cursor/audio irq ack
 		return;
 	}
-	else if (addr == 0x06) {
-		val1 = val & 0x80; // Printer ack
-		val2 = (val >>> 2) & 0x0F; // Sound amp
-		val3 = val & 0x03; // video mode
-		this._vid.setMode(val3);
-		this._aud.setAmp(val2);
-		return;
-	}
-	else if (addr >= 0x60 && addr <= 0x63) {
-		this._vid.setPalette(addr-0x60, val);
-		return;
-	}
-	else if (addr == 0x70) {
-		this._vid.setRegIdx(val);
-		return;
-	}
-	else if (addr == 0x71) {
-		this._vid.setReg(val);
-		return;
-	}
-	throw ("unhandled port write " + toHex8(addr) + " " + toHex8(val));
+    else if (addr >= 0x58 && addr <= 0x5B) {
+		// bit7 : CSTL interrupt enable
+        return;
+    }
+    else if (addr >= 0x60 && addr <= 0x63) {
+        this._vid.setPalette(addr - 0x60, val);
+        return;
+    }
+    else if (addr == 0x70) {
+        this._vid.setRegIdx(val);
+        return;
+    }
+    else if (addr == 0x71) {
+        this._vid.setReg(val);
+        return;
+    }
+    throw ("unhandled port write " + toHex8(addr) + " " + toHex8(val));
 };
 
 TVC.prototype.readPort = function(addr) {
