@@ -86,8 +86,8 @@ define(function () {
                 var txt = res[0];
                 var srcstart = txt.indexOf(" ");
                 if (txt.indexOf("(HL)", srcstart) !== -1) {
-                    var ixd = mmu.r8(addr + idx + res[1]);
-                    txt = txt.replace("(HL)", "(" + replreg + "+" + toS8(ixd) + ")");
+                    var ixd = mmu.r8s(addr + idx + res[1]);
+                    txt = txt.replace("(HL)", "(" + replreg + "+" + ixd + ")");
                     res[1] = res[1] + 1;
                 }
                 else if (txt.indexOf("HL", srcstart) !== -1) {
@@ -359,11 +359,6 @@ define(function () {
         return (this.F & flag) !== 0;
     }
 
-    function toS8(val) {
-        if (val & 0x80) return -1 * (0x80 - (val & 0x7f));
-        return val;
-    }
-
     function add16(val1, val2, Cin) {
         var res, res16, Cout;
         if (Cin === undefined) Cin = 0;
@@ -426,23 +421,10 @@ define(function () {
         return res;
     }
 
-    function shlc8(val, Cin) {  // copy into C
-        var Cout = (val & 0x80) >> 7;
-        var res = ((val << 1) | Cout) & 0xFF;
-        return {
-            val: res,
-            F_S: (res & 0x80) == 0x80,
-            F_Z: res === 0,
-            F_H: false,
-            F_PV: !(res & 1),
-            F_N: false,
-            F_C: Cout
-        };
-
-    }
-    function shl8(val, Cin) {   // shift through C
-        var Cout = (val & 0x80) >> 7;
-        var res = ((val << 1) | Cin) & 0xFF;
+    function shl8(val, rightIn) {   // shift through C
+        var Cout = (val & 0x80) >> 7,
+			rightIn = rightIn ? 1 : 0;
+        var res = ((val << 1) | rightIn) & 0xFF;
         return {
             val: res,
             F_S: (res & 0x80) == 0x80,
@@ -453,22 +435,11 @@ define(function () {
             F_C: Cout
         };
     }
-    function shrc8(val, Cin) {  // copy into C
-        var Cout = val & 1;
-        var res = ((val >>> 1) | (Cout << 7)) & 0xFF;
-        return {
-            val: res,
-            F_S: (res & 0x80) == 0x80,
-            F_Z: res === 0,
-            F_H: false,
-            F_PV: !(res & 1),
-            F_N: false,
-            F_C: Cout
-        };
-    }
-    function shr8(val, Cin) {   // shift through C
-        var Cout = val & 1;
-        var res = ((val >>> 1) | (Cin << 7)) & 0xFF;
+    function shr8(val, leftIn) {
+        var Cout = val & 1,
+			res;
+		leftIn = leftIn ? 1 : 0;
+        res = ((val >>> 1) | (leftIn << 7)) & 0xFF;
         return {
             val: res,
             F_S: (res & 0x80) == 0x80,
@@ -603,7 +574,7 @@ define(function () {
         0x07: function () { // RLCA
             this._op_t = 4;
             this._op_m = 1;
-            var res = shlc8(this._s.A, this._s.getF(F_C));
+            var res = shl8(this._s.A, this._s.A & 0x80);
             this._s.A = res.val;
             this._s.setF(F_H, false, F_N, false, F_C, res.F_C);
         },
@@ -663,7 +634,7 @@ define(function () {
         0x0F: function () { // RRCA
             this._op_t = 4;
             this._op_m = 1;
-            var res = shrc8(this._s.A, this._s.getF(F_C));
+            var res = shr8(this._s.A, this._s.A & 1);
             this._s.A = res.val;
             this._s.setF(F_H, false, F_N, false, F_C, res.F_C);
         },
@@ -678,7 +649,7 @@ define(function () {
             else {
                 this._op_t = 13;
                 this._op_m = 0;
-                offset = toS8(this._mmu.r8(this._s.getPC(1)));
+                offset = this._mmu.r8s(this._s.getPC(1));
                 this._s.setPC(this._s.getPC(2 + offset));
             }
         },
@@ -729,12 +700,13 @@ define(function () {
         0x17: function () { // RLA
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+			var res = shl8(this._s.A, this._s.getF(F_C));
+			this._s.setF(F_H, false, F_N, false, F_C, res.F_C);
         },
         0x18: function () { // JR (PC+e)
             this._op_t = 12;
             this._op_m = 0;
-            offset = 2 + toS8(this._mmu.r8(this._s.getPC(1)));
+            offset = 2 + this._mmu.r8s(this._s.getPC(1));
             this._s.setPC(this._s.getPC(offset));
         },
         0x19: function () { // ADD HL,DE
@@ -786,7 +758,9 @@ define(function () {
         0x1F: function () { // RRA
             this._op_t = 4;
             this._op_m = 1;
-            throw ("not implemented");
+            var res = shr8(this._s.A, this._s.getF(F_C));
+            this._s.A = res.val;
+            this._s.setF(F_H, false, F_N, false, F_C, res.F_C);
         },
         0x20: function () { // JR NZ,(PC+e)
             var e;
@@ -797,8 +771,8 @@ define(function () {
             else {
                 this._op_t = 12;
                 this._op_m = 0;
-                e = this._mmu.r8(this._s.getPC(1));
-                this._s.setPC(this._s.getPC(toS8(e) + 2));
+                e = this._mmu.r8s(this._s.getPC(1));
+                this._s.setPC(this._s.getPC(e + 2));
             }
         },
         0x21: function () { // LD HL,nn
@@ -856,7 +830,7 @@ define(function () {
             if (this._s.F & F_Z) {
                 this._op_t = 12;
                 this._op_m = 0;
-                offset = 2 + toS8(this._mmu.r8(this._s.getPC(1)));
+                offset = 2 + this._mmu.r8s(this._s.getPC(1));
                 this._s.setPC(this._s.getPC(offset));
             }
             else {
@@ -925,7 +899,7 @@ define(function () {
             else {
                 this._op_t = 12;
                 this._op_m = 0;
-                offset = 2 + toS8(this._mmu.r8(this._s.getPC(1)));
+                offset = 2 + this._mmu.r8s(this._s.getPC(1));
                 this._s.setPC(this._s.getPC(offset));
             }
         },
@@ -975,7 +949,6 @@ define(function () {
             this._op_t = 10;
             this._op_m = 2;
             var val = this._mmu.r8(this._s.getPC(1));
-            console.log("HL: " + toHex16(this._s.getHL()));
             this._mmu.w8(this._s.getHL(), val);
         },
         0x37: function () { // SCF
@@ -988,7 +961,7 @@ define(function () {
             if (this._s.F & F_C) {
                 this._op_t = 12;
                 this._op_m = 0;
-                offset = 2 + toS8(this._mmu.r8(this._s.getPC(1)));
+                offset = 2 + this._mmu.r8s(this._s.getPC(1));
                 this._s.setPC(this._s.getPC(offset));
             }
             else {
@@ -2110,256 +2083,347 @@ define(function () {
         0xCB00: function () { // RLC B
             this._op_t = 8;
             this._op_m = 2;
-            var res = shlc8(this._s.B, this._s.getf(F_C));
+            var res = shl8(this._s.B, this._s.B & 0x80);
             this._s.B = res.val;
             this._s.updateF(res);
         },
         0xCB01: function () { // RLC C
             this._op_t = 8;
             this._op_m = 2;
-            var res = shlc8(this._s.C, this._s.getf(F_C));
+            var res = shl8(this._s.C, this._s.C & 0x80);
             this._s.C = res.val;
             this._s.updateF(res);
         },
         0xCB02: function () { // RLC D
             this._op_t = 8;
             this._op_m = 2;
-            var res = shlc8(this._s.D, this._s.getf(F_C));
+            var res = shl8(this._s.D, this._s.D & 0x80);
             this._s.D = res.val;
             this._s.updateF(res);
         },
         0xCB03: function () { // RLC E
             this._op_t = 8;
             this._op_m = 2;
-            var res = shlc8(this._s.E, this._s.getf(F_C));
+            var res = shl8(this._s.E, this._s.E & 0x80);
             this._s.E = res.val;
             this._s.updateF(res);
         },
         0xCB04: function () { // RLC H
             this._op_t = 8;
             this._op_m = 2;
-            var res = shlc8(this._s.H, this._s.getf(F_C));
+            var res = shl8(this._s.H, this._s.H & 0x80);
             this._s.H = res.val;
             this._s.updateF(res);
         },
         0xCB05: function () { // RLC L
             this._op_t = 8;
             this._op_m = 2;
-            var res = shlc8(this._s.L, this._s.getf(F_C));
+            var res = shl8(this._s.L, this._s.L & 0x80);
             this._s.L = res.val;
             this._s.updateF(res);
         },
         0xCB06: function () { // RLC (HL)
             this._op_t = 15;
-            this._op_m = 4;
-            throw ("not implemented");
+            this._op_m = 2;
+			var addr = this._s.getHL();
+			var val = this._mmu.r8(addr);
+            var res = shl8(val, val & 0x80);
+			this._mmu.w8(addr, res.val);
+            this._s.updateF(res);
         },
         0xCB07: function () { // RLC A
             this._op_t = 8;
             this._op_m = 2;
-            var res = shlc8(this._s.A, this._s.getf(F_C));
+            var res = shl8(this._s.A, this._s.A & 0x80);
             this._s.A = res.val;
             this._s.updateF(res);
         },
         0xCB08: function () { // RRC B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.B, this._s.B & 1);
+			this._s.B = res.val;
+			this._s.updateF(res);
         },
         0xCB09: function () { // RRC C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.C, this._s.C & 1);
+			this._s.C = res.val;
+			this._s.updateF(res);
         },
         0xCB0A: function () { // RRC D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.D, this._s.D & 1);
+			this._s.D = res.val;
+			this._s.updateF(res);
         },
         0xCB0B: function () { // RRC E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.E, this._s.E & 1);
+			this._s.E = res.val;
+			this._s.updateF(res);
         },
         0xCB0C: function () { // RRC H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.H, this._s.H & 1);
+			this._s.H = res.val;
+			this._s.updateF(res);
         },
         0xCB0D: function () { // RRC L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.L, this._s.L & 1);
+			this._s.L = res.val;
+			this._s.updateF(res);
         },
         0xCB0E: function () { // RRC (HL)
             this._op_t = 15;
-            this._op_m = 4;
-            throw ("not implemented");
+            this._op_m = 2;
+			var addr = this._s.getHL();
+			var memval = this._mmu.r8(addr);
+			var res = shr8(memval, memval & 1);
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xCB0F: function () { // RRC A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.A, this._s.A & 1);
+			this._s.A = res.val;
+			this._s.updateF(res);
         },
         0xCB10: function () { // RL B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.B, this._s.getF(F_C));
+			this._s.B = res.val;
+			this._s.updateF(res);
         },
         0xCB11: function () { // RL C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.C, this._s.getF(F_C));
+			this._s.C = res.val;
+			this._s.updateF(res);
         },
         0xCB12: function () { // RL D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.D, this._s.getF(F_C));
+			this._s.D = res.val;
+			this._s.updateF(res);
         },
         0xCB13: function () { // RL E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.E, this._s.getF(F_C));
+			this._s.E = res.val;
+			this._s.updateF(res);
         },
         0xCB14: function () { // RL H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.H, this._s.getF(F_C));
+			this._s.H = res.val;
+			this._s.updateF(res);
         },
         0xCB15: function () { // RL L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.L, this._s.getF(F_C));
+			this._s.L = res.val;
+			this._s.updateF(res);
         },
         0xCB16: function () { // RL (HL)
             this._op_t = 15;
-            this._op_m = 4;
-            throw ("not implemented");
+            this._op_m = 2;
+			var addr = this._s.getHL();
+			var res = shl8(this._mmu.r8(addr), this._s.getF(F_C));
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xCB17: function () { // RL A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.A, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
         },
         0xCB18: function () { // RR B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.B, this._s.getF(F_C));
+			this._s.B = res.val;
+			this._s.updateF(res);
         },
         0xCB19: function () { // RR C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.C, this._s.getF(F_C));
+			this._s.C = res.val;
+			this._s.updateF(res);
         },
         0xCB1A: function () { // RR D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.D, this._s.getF(F_C));
+			this._s.D = res.val;
+			this._s.updateF(res);
         },
         0xCB1B: function () { // RR E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.E, this._s.getF(F_C));
+			this._s.E = res.val;
+			this._s.updateF(res);
         },
         0xCB1C: function () { // RR H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.H, this._s.getF(F_C));
+			this._s.H = res.val;
+			this._s.updateF(res);
         },
         0xCB1D: function () { // RR L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.L, this._s.getF(F_C));
+			this._s.L = res.val;
+			this._s.updateF(res);
         },
         0xCB1E: function () { // RR (HL)
             this._op_t = 15;
-            this._op_m = 4;
-            throw ("not implemented");
+            this._op_m = 2;
+			var addr = this._s.getHL();
+			var res = shr8(this._mmu.r8(addr), this._s.getF(F_C));
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xCB1F: function () { // RR A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.A, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
         },
         0xCB20: function () { // SLA B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.B, 0);
+			this._s.B = res.val;
+			this._s.updateF(res);
         },
         0xCB21: function () { // SLA C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.C, 0);
+			this._s.C = res.val;
+			this._s.updateF(res);
         },
         0xCB22: function () { // SLA D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.D, 0);
+			this._s.D = res.val;
+			this._s.updateF(res);
         },
         0xCB23: function () { // SLA E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.E, 0);
+			this._s.E = res.val;
+			this._s.updateF(res);
         },
         0xCB24: function () { // SLA H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.H, 0);
+			this._s.H = res.val;
+			this._s.updateF(res);
         },
         0xCB25: function () { // SLA L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.L, 0);
+			this._s.L = res.val;
+			this._s.updateF(res);
         },
         0xCB26: function () { // SLA (HL)
             this._op_t = 15;
-            this._op_m = 4;
-            throw ("not implemented");
+            this._op_m = 2;
+			var addr = this._s.getHL();
+			var res = shl8(this._mmu.r8(addr), 0);
+			this._mmu.w8(res.val);
+			this._s.updateF(res);
         },
         0xCB27: function () { // SLA A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shl8(this._s.A, 0);
+			this._s.A = res.val;
+			this._s.updateF(res);
         },
         0xCB28: function () { // SRA B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.B, this._s.B & 0x80);
+			this._s.B = res.val;
+			this._s.updateF(res);
         },
         0xCB29: function () { // SRA C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.C, this._s.C & 0x80);
+			this._s.C = res.val;
+			this._s.updateF(res);
         },
         0xCB2A: function () { // SRA D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.D, this._s.D & 0x80);
+			this._s.D = res.val;
+			this._s.updateF(res);
         },
         0xCB2B: function () { // SRA E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.E, this._s.E & 0x80);
+			this._s.E = res.val;
+			this._s.updateF(res);
         },
         0xCB2C: function () { // SRA H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.H, this._s.H & 0x80);
+			this._s.H = res.val;
+			this._s.updateF(res);
         },
         0xCB2D: function () { // SRA L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.L, this._s.L & 0x80);
+			this._s.L = res.val;
+			this._s.updateF(res);
         },
         0xCB2E: function () { // SRA (HL)
             this._op_t = 15;
-            this._op_m = 4;
-            throw ("not implemented");
+            this._op_m = 2;
+			var addr = this._s.getHL();
+			var memval = this._mmu.r8(addr);
+			var res = shr8(memval, memval & 0x80);
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xCB2F: function () { // SRA A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+			var res = shr8(this._s.A, this._s.A & 0x80);
+			this._s.A = res.val;
+			this._s.updateF(res);
         },
         0xCB30: function () { // SLL B*
             this._op_t = 8;
@@ -2404,42 +2468,59 @@ define(function () {
         0xCB38: function () { // SRL B
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shr8(this._s.B, 0);
+            this._s.B = res.val;
+            this._s.updateF(res);
         },
         0xCB39: function () { // SRL C
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shr8(this._s.C, 0);
+            this._s.C = res.val;
+            this._s.updateF(res);
         },
         0xCB3A: function () { // SRL D
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shr8(this._s.D, 0);
+            this._s.D = res.val;
+            this._s.updateF(res);
         },
         0xCB3B: function () { // SRL E
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shr8(this._s.E, 0);
+            this._s.E = res.val;
+            this._s.updateF(res);
         },
         0xCB3C: function () { // SRL H
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shr8(this._s.H, 0);
+            this._s.H = res.val;
+            this._s.updateF(res);
         },
         0xCB3D: function () { // SRL L
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shr8(this._s.H, 0);
+            this._s.H = res.val;
+            this._s.updateF(res);
         },
         0xCB3E: function () { // SRL (HL)
             this._op_t = 15;
-            this._op_m = 4;
-            throw ("not implemented");
+            this._op_m = 2;
+			var addr = this._s.getHL();
+            var res = shr8(this._mmu.r8(addr), 0);
+			this._mmu.w8(addr, res.val);
+            this._s.updateF(res);
         },
         0xCB3F: function () { // SRL A
             this._op_t = 8;
             this._op_m = 2;
-            throw ("not implemented");
+            var res = shr8(this._s.H, 0);
+            this._s.H = res.val;
+            this._s.updateF(res);
         },
         0xCB40: function () { // BIT 0,B
             this._op_t = 8;
@@ -3928,7 +4009,7 @@ define(function () {
         0xDDAE: function () { // XOR (IX+d)
             this._op_t = 19;
             this._op_m = 3;
-            var addr = this._s.getIX(toS8(this._mmu.r8(this._s.getPC(2))));
+            var addr = this._s.getIX(this._mmu.r8s(this._s.getPC(2)));
             this._s.A = (this._s.A ^ this._mmu.r8(addr)) & 0xFF;
             this._s.setF(
             F_S, (this._s.A & 0x80) !== 0,
@@ -3999,9 +4080,14 @@ define(function () {
             throw ("not implemented");
         },
         0xDDCB06: function () { // RLC (IX+d)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			var val = this._mmu.r8(addr);
+            var res = shl8(val, val & 0x80);
+			this._mmu.w8(addr, res.val);
+            this._s.updateF(res);
         },
         0xDDCB07: function () { // LD A,RLC (IX+d)*
             this._op_t = 0;
@@ -4039,9 +4125,14 @@ define(function () {
             throw ("not implemented");
         },
         0xDDCB0E: function () { // RRC (IX+d)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			var memval = this._mmu.r8(addr);
+			var res = shr8(memval, memval & 1);
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xDDCB0F: function () { // LD A,RRC (IX+d)*
             this._op_t = 0;
@@ -4079,9 +4170,13 @@ define(function () {
             throw ("not implemented");
         },
         0xDDCB16: function () { // RL (IX+d)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			var res = shl8(this._mmu.r8(addr), this._s.getF(F_C));
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xDDCB17: function () { // LD A,RL (IX+d)*
             this._op_t = 0;
@@ -4119,9 +4214,13 @@ define(function () {
             throw ("not implemented");
         },
         0xDDCB1E: function () { // RR (IX+d)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			var res = shr8(this._mmu.r8(addr), this._s.getF(F_C));
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xDDCB1F: function () { // LD A,RR (IX+d)*
             this._op_t = 0;
@@ -4159,9 +4258,13 @@ define(function () {
             throw ("not implemented");
         },
         0xDDCB26: function () { // SLA (IX+d)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			var res = shl8(this._mmu.r8(addr), 0);
+			this._mmu.w8(res.val);
+			this._s.updateF(res);
         },
         0xDDCB27: function () { // LD A,SLA (IX+d)*
             this._op_t = 0;
@@ -4199,9 +4302,14 @@ define(function () {
             throw ("not implemented");
         },
         0xDDCB2E: function () { // SRA (IX+d)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 23
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			var memval = this._mmu.r8(addr);
+			var res = shr8(memval, memval & 0x80);
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xDDCB2F: function () { // LD A,SRA (IX+d)*
             this._op_t = 0;
@@ -4279,9 +4387,13 @@ define(function () {
             throw ("not implemented");
         },
         0xDDCB3E: function () { // SRL (IX+d)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+            var res = shr8(this._mmu.r8(addr), 0);
+			this._mmu.w8(addr, res.val);
+            this._s.updateF(res);
         },
         0xDDCB3F: function () { // LD A,SRL (IX+d)*
             this._op_t = 0;
@@ -5301,7 +5413,6 @@ define(function () {
             this._op_t = 10;
             this._op_m = 1;
             this._s.setHL(this.pop16());
-            console.log("POP HL: " + toHex16(this._s.getHL()));
         },
         0xE2: function () { // JP	PO,nn
             this._op_t = 0;
@@ -5332,7 +5443,6 @@ define(function () {
         0xE5: function () { // PUSH	HL
             this._op_t = 11;
             this._op_m = 1;
-            console.log("PUSH HL: " + toHex16(this._s.getHL()));
             this.push16(this._s.getHL());
         },
         0xE6: function () { // AND	n
@@ -5727,14 +5837,17 @@ define(function () {
             this._out(this._s.C, this._s.B);
         },
         0xED42: function () { // SBC	HL,BC
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 15;
+            this._op_m = 2;
+			var res = sub16(this._s.getHL(), this._s.getBC(), this._s.getF(F_C));
+			this._s.setHL(res.val);
+			this._s.updateF(res);
         },
         0xED43: function () { // LD	(nn),BC
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 20;
+            this._op_m = 4;
+			var addr = this._mmu.r16(this._s.getPC(2));
+			this._mmu.w16(addr, this._s.getBC());
         },
         0xED44: function () { // NEG
             this._op_t = 0;
@@ -5772,9 +5885,10 @@ define(function () {
             throw ("not implemented");
         },
         0xED4B: function () { // LD	BC,(nn)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 20;
+            this._op_m = 4;
+			var addr = this._mmu.r16(this._s.getPC(2));
+			this._s.setBC(this._mmu.r16(addr));
         },
         0xED4C: function () { //
             this._op_t = 0;
@@ -5807,14 +5921,17 @@ define(function () {
             this._out(this._s.C, this._s.D);
         },
         0xED52: function () { // SBC	HL,DE
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 15;
+            this._op_m = 2;
+			var res = sub16(this._s.getHL(), this._s.getDE(), this._s.getF(F_C));
+			this._s.setHL(res.val);
+			this._s.updateF(res);
         },
         0xED53: function () { // LD	(nn),DE
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 20;
+            this._op_m = 4;
+			var addr = this._mmu.r16(this._s.getPC(2));
+			this._mmu.w16(addr, this._s.getDE());
         },
         0xED54: function () { //
             this._op_t = 0;
@@ -5852,9 +5969,10 @@ define(function () {
             throw ("not implemented");
         },
         0xED5B: function () { // LD	DE,(nn)
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 20;
+            this._op_m = 4;
+			var addr = this._mmu.r16(this._s.getPC(2));
+			this._s.setDE(this._mmu.r16(addr));
         },
         0xED5C: function () { //
             this._op_t = 0;
@@ -5887,9 +6005,11 @@ define(function () {
             this._out(this._s.C, this._s.H);
         },
         0xED62: function () { // SBC	HL,HL
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 15;
+            this._op_m = 2;
+			var res = sub16(this._s.getHL(), this._s.getHL(), this._s.getF(F_C));
+			this._s.setHL(res.val);
+			this._s.updateF(res);
         },
         0xED63: function () { //
             this._op_t = 0;
@@ -5967,14 +6087,17 @@ define(function () {
             throw ("not implemented");
         },
         0xED72: function () { // SBC	HL,SP
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 15;
+            this._op_m = 2;
+			var res = sub16(this._s.getHL(), this._s.getSP(), this._s.getF(F_C));
+			this._s.setHL(res.val);
+			this._s.updateF(res);
         },
         0xED73: function () { // LD	(nn),SP
-            this._op_t = 0;
-            this._op_m = 0;
-            throw ("not implemented");
+            this._op_t = 20;
+            this._op_m = 4;
+			var addr = this._mmu.r16(this._s.getPC(2));
+			this._mmu.w16(addr, this._s.getSP());
         },
         0xED74: function () { //
             this._op_t = 0;
@@ -7197,7 +7320,7 @@ define(function () {
         0xFDAE: function () { // XOR (IY+d)
             this._op_t = 19;
             this._op_m = 3;
-            var addr = this._s.getIY(toS8(this._mmu.r8(this._s.getPC(2))));
+            var addr = this._s.getIY(this._mmu.r8s(this._s.getPC(2)));
             this._s.A = (this._s.A ^ this._mmu.r8(addr)) & 0xFF;
             this._s.setF(
             F_S, (this._s.A & 0x80) !== 0,
@@ -7268,9 +7391,14 @@ define(function () {
             throw ("not implemented");
         },
         0xFDCB06: function () { // RLC (IY+d)
-            this._opt_t = 0;
-            this._opt_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			var val = this._mmu.r8(addr);
+            var res = shl8(val, val & 0x80);
+			this._mmu.w8(addr, res.val);
+            this._s.updateF(res);
         },
         0xFDCB07: function () { // LD A,RLC (IY+d)*
             this._opt_t = 0;
@@ -7308,9 +7436,14 @@ define(function () {
             throw ("not implemented");
         },
         0xFDCB0E: function () { // RRC (IY+d)
-            this._opt_t = 0;
-            this._opt_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			var memval = this._mmu.r8(addr);
+			var res = shr8(memval, memval & 1);
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xFDCB0F: function () { // LD A,RRC (IY+d)*
             this._opt_t = 0;
@@ -7348,9 +7481,13 @@ define(function () {
             throw ("not implemented");
         },
         0xFDCB16: function () { // RL (IY+d)
-            this._opt_t = 0;
-            this._opt_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			var res = shl8(this._mmu.r8(addr), this._s.getF(F_C));
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xFDCB17: function () { // LD A,RL (IY+d)*
             this._opt_t = 0;
@@ -7388,9 +7525,13 @@ define(function () {
             throw ("not implemented");
         },
         0xFDCB1E: function () { // RR (IY+d)
-            this._opt_t = 0;
-            this._opt_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			var res = shr8(this._mmu.r8(addr), this._s.getF(F_C));
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xFDCB1F: function () { // LD A,RR (IY+d)*
             this._opt_t = 0;
@@ -7428,9 +7569,13 @@ define(function () {
             throw ("not implemented");
         },
         0xFDCB26: function () { // SLA (IY+d)
-            this._opt_t = 0;
-            this._opt_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			var res = shl8(this._mmu.r8(addr), 0);
+			this._mmu.w8(res.val);
+			this._s.updateF(res);
         },
         0xFDCB27: function () { // LD A,SLA (IY+d)*
             this._opt_t = 0;
@@ -7468,9 +7613,14 @@ define(function () {
             throw ("not implemented");
         },
         0xFDCB2E: function () { // SRA (IY+d)
-            this._opt_t = 0;
-            this._opt_m = 0;
-            throw ("not implemented");
+            this._op_t = 23
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			var memval = this._mmu.r8(addr);
+			var res = shr8(memval, memval & 0x80);
+			this._mmu.w8(addr, res.val);
+			this._s.updateF(res);
         },
         0xFDCB2F: function () { // LD A,SRA (IY+d)*
             this._opt_t = 0;
@@ -7548,9 +7698,13 @@ define(function () {
             throw ("not implemented");
         },
         0xFDCB3E: function () { // SRL (IY+d)
-            this._opt_t = 0;
-            this._opt_m = 0;
-            throw ("not implemented");
+            this._op_t = 23;
+            this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+            var res = shr8(this._mmu.r8(addr), 0);
+			this._mmu.w8(addr, res.val);
+            this._s.updateF(res);
         },
         0xFDCB3F: function () { // LD A,SRL (IY+d)*
             this._opt_t = 0;
@@ -8578,8 +8732,8 @@ define(function () {
             this._mmu.dasm(this._s.getPC(), 5, "??? ");
             throw ("not implemented:" + toHex8(opcode));
         }
-        this.logasm();
-        f.call(this);
+        //this.logasm();
+		f.call(this);
         if (this._op_t === 0) {
             throw ("you forgot something!");
         }

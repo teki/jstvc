@@ -103,6 +103,13 @@ MMU.prototype.r8 = function(addr) {
 	var mapIdx = addr >>> 14;
 	return this._map[mapIdx][addr & 0x3FFF];
 };
+MMU.prototype.r8s = function(addr) {
+	addr = addr & 0xFFFF;
+	var mapIdx = addr >>> 14;
+	var val = this._map[mapIdx][addr & 0x3FFF];
+	if (val & 0x80) return -1 * (0x80 - (val & 0x7f));
+	return val;
+};
 MMU.prototype.r16 = function(addr) {
 	return (this.r8(addr + 1) << 8) | this.r8(addr);
 };
@@ -155,7 +162,7 @@ VID.prototype.setBorder = function(color) {
 
 VID.prototype.setReg = function(val) {
 	this._reg[this._regIdx] = val;
-	console.log(this._reg);
+//	console.log(this._reg);
 };
 
 VID.prototype.getReg = function() {
@@ -236,7 +243,7 @@ TVC.prototype.run = function() {
 
 TVC.prototype.writePort = function (addr, val) {
     var val1, val2, val3;
-    console.log("OUT (" + toHex8(addr) + "), " + toHex8(val));
+//    console.log("OUT (" + toHex8(addr) + "), " + toHex8(val));
 	if (addr == 0x00) {
 		this._vid.setBorder(val);
 		return;
@@ -295,7 +302,7 @@ TVC.prototype.readPort = function(addr) {
 	if (addr == 0x5A) {
 		return 0xFF;
 	}
-	throw ("unhandled port read " + toHex8(addr) + " " + toHex8(val));
+	throw "unhandled port read " + toHex8(addr);
 };
 
 ////////////////////////////////////////////
@@ -304,3 +311,4 @@ TVC.prototype.readPort = function(addr) {
 
 var tvc = new TVC();
 tvc.run();
+
