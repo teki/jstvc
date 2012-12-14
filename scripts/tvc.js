@@ -48,12 +48,12 @@ MMU.prototype.init = function() {
 	// for(i=0; i<this._cart.length; i++) this._cart[i] = 0;
 	for (i = 0; i < this._ext.length; i++) this._ext[i] = 0;
 
-	var ext = n_fs.readFileSync("../TVC_EXT.ROM");
+	var ext = n_fs.readFileSync("TVC_EXT.ROM");
 	for (i = 0; i < ext.length; i++) this._ext[0x2000 + i] = ext[i];
 
 	if (this._ext[0x3000] != 0x3e) throw ("ext is not properly initialized!");
 
-	this._sys = n_fs.readFileSync("../TVC_SYS.ROM");
+	this._sys = n_fs.readFileSync("TVC_SYS.ROM");
 	this.setMap(0);
 };
 MMU.prototype.reset = function() {
@@ -113,9 +113,9 @@ MMU.prototype.r8s = function(addr) {
 MMU.prototype.r16 = function(addr) {
 	return (this.r8(addr + 1) << 8) | this.r8(addr);
 };
-MMU.prototype.dasm = function(addr, lines, prefix) {
+MMU.prototype.dasm = function(addr, lines, prefix, noLdir) {
 	var offset = 0,
-		d, i, str, oplen;
+		d, i, str, oplen, line;
 	do {
 		d = z80.decodeZ80(this, addr + offset);
 		oplen = d[1];
@@ -129,7 +129,10 @@ MMU.prototype.dasm = function(addr, lines, prefix) {
 				str += "   ";
 			}
 		}
-		console.log(prefix + str + d[0] + "\n");
+		line = prefix + str + d[0] + "\n";
+		if (!noLdir || -1 == line.indexOf("LDIR")) {
+			console.log(line);
+		}
 		offset += oplen;
 		lines--;
 	} while (lines);
@@ -220,6 +223,7 @@ KEY.prototype.selectRow = function(val) {
 function TVC() {
 	var TVCthis = this;
 	this._clock = 0;
+	this._pendIt = 0;	// b4: curs/aud, b3-0 cards
 	this._mmu = new MMU();
 	this._vid = new VID(this._mmu);
 	this._aud = new AUD();
@@ -299,7 +303,12 @@ TVC.prototype.writePort = function (addr, val) {
 };
 
 TVC.prototype.readPort = function(addr) {
-	if (addr == 0x5A) {
+	if (addr == 0x59) {
+//    59H     +++43210    R       Pending IT requests
+//    59H     765+++++    R       7: printer ack, 6: bw0/color1, 5: tape data in
+		return 0x40 | this._pendIt;
+	}
+	else if (addr == 0x5A) {
 		return 0xFF;
 	}
 	throw "unhandled port read " + toHex8(addr);
