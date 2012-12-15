@@ -196,6 +196,24 @@
         * instr table: http://www.z80.info/z80sean.txt
         * testing info: http://www.worldofspectrum.org/forums/showthread.php?t=41704
         * interrupt handling: http://www.nvg.ntnu.no/sinclair/faq/tech_z80.html
+
+	Parity:
+		This flag is also used with logical operations and
+	   	rotateinstructions to indicate the resulting parityis
+	   	Even. The number of 1bits in a byte are counted.
+	   	If the total is Odd, ODD parity is flagged (P = 0).
+	   	If the total is Even, EVEN parity is flagged (P = 1).
+
+	Sign bit: copy of bit7 (== negative)
+
+	NZ non zero Z
+	Z zero Z
+	NC non carry C
+	C carry Z
+	PO parity odd P/V
+	PE parity even P/V
+	P sign positive S
+	M sign negative S
     
     TVC specific:
         * clock: 3.125 MHz (50/16), 1 tick = 320ns
