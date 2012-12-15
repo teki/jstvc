@@ -2,6 +2,21 @@ define(function() {
 
 	var Z80Module = {};
 
+	PVTable = new Uint8Array(256);
+	for (var i = 0; i < 256; i++) {
+		PVTable[i] =
+			!((
+			((i >>> 7) & 1) +
+			((i >>> 6) & 1) +
+			((i >>> 5) & 1) +
+			((i >>> 4) & 1) +
+			((i >>> 3) & 1) +
+			((i >>> 2) & 1) +
+			((i >>> 1) & 1) +
+			((i) & 1)
+			  ) & 1);
+	}
+
 	function toHex8(x) {
 		var s = x.toString(16).toUpperCase();
 		return "0".slice(s.length - 1) + s;
@@ -446,7 +461,7 @@ define(function() {
 			F_S: (res & 0x80) == 0x80,
 			F_Z: res === 0,
 			F_H: false,
-			F_PV: !(res & 1),
+			F_PV: PVTable[res],
 			F_N: false,
 			F_C: Cout
 		};
@@ -462,7 +477,7 @@ define(function() {
 			F_S: (res & 0x80) == 0x80,
 			F_Z: res === 0,
 			F_H: false,
-			F_PV: !(res & 1),
+			F_PV: PVTable[res],
 			F_N: false,
 			F_C: Cout
 		};
@@ -895,7 +910,7 @@ define(function() {
 					F_S, res.F_S,
 					F_Z, res.F_Z,
 					F_H, res.F_H,
-					F_PV, (this._s.A & 1) === 0,
+					F_PV, PVTable[this._s.A],
 					F_C, Cout);
 		},
 		0x28: function() { // JR Z,(PC+e)
@@ -1417,222 +1432,154 @@ define(function() {
 			this._op_m = 1;
 			var res = add8(this._s.A, this._s.B);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, false,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x81: function() { // ADD A,C
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = add8(this._s.A, this._s.C);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, false,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x82: function() { // ADD A,D
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = add8(this._s.A, this._s.D);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, false,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x83: function() { // ADD A,E
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = add8(this._s.A, this._s.E);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, false,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x84: function() { // ADD A,H
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = add8(this._s.A, this._s.H);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, false,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x85: function() { // ADD A,L
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = add8(this._s.A, this._s.L);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, false,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x86: function() { // ADD A,(HL)
 			this._op_t = 7;
 			this._op_m = 1;
 			var res = add8(this._s.A, this._mmu.r8(this._s.getHL()));
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, false,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x87: function() { // ADD A,A
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = add8(this._s.A, this._s.A);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, false,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x88: function() { // ADC A,B
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = add8(this._s.A, this._s.B, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x89: function() { // ADC A,C
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = add8(this._s.A, this._s.C, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x8A: function() { // ADC A,D
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = add8(this._s.A, this._s.D, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x8B: function() { // ADC A,E
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = add8(this._s.A, this._s.E, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x8C: function() { // ADC A,H
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = add8(this._s.A, this._s.H, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x8D: function() { // ADC A,L
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = add8(this._s.A, this._s.L, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x8E: function() { // ADC A,(HL)
 			this._op_t = 7;
-			this._op_m = 2;
-			throw ("not implemented");
+			this._op_m = 1;
+			var res = add8(this._s.A, this._mmu.r8(this._s.getHL()), this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x8F: function() { // ADC A,A
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = add8(this._s.A, this._s.A, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x90: function() { // SUB B
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.B);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x91: function() { // SUB C
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.C);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x92: function() { // SUB D
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.D);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x93: function() { // SUB E
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.E);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x94: function() { // SUB H
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.H);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x95: function() { // SUB L
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.L);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x96: function() { // SUB (HL)
 			this._op_t = 7;
@@ -1640,136 +1587,141 @@ define(function() {
 			var rhs = this._mmu.r8(this._s.getHL());
 			var res = sub8(this._s.A, rhs);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x97: function() { // SUB A
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.A);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0x98: function() { // SBC A,B
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = sub8(this._s.A, this._s.B, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x99: function() { // SBC A,C
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = sub8(this._s.A, this._s.C, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x9A: function() { // SBC A,D
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = sub8(this._s.A, this._s.D, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x9B: function() { // SBC A,E
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = sub8(this._s.A, this._s.E, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x9C: function() { // SBC A,H
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = sub8(this._s.A, this._s.H, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x9D: function() { // SBC A,L
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = sub8(this._s.A, this._s.L, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x9E: function() { // SBC A,(HL)
 			this._op_t = 7;
-			this._op_m = 2;
-			throw ("not implemented");
+			this._op_m = 1;
+			var addr = this._s.getHL();
+			var res = sub8(this._s.A, this._mmu.r8(addr), this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0x9F: function() { // SBC A,A
 			this._op_t = 4;
 			this._op_m = 1;
-			throw ("not implemented");
+			var res = sub8(this._s.A, this._s.A, this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xA0: function() { // AND B
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.A = (this._s.A & this._s.B) & 0xFF;
+			this._s.A = this._s.A & this._s.B;
 			this._s.setF(
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, true,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
 		0xA1: function() { // AND C
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.A = (this._s.A & this._s.C) & 0xFF;
+			this._s.A = this._s.A & this._s.C;
 			this._s.setF(
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, true,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
 		0xA2: function() { // AND D
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.A = (this._s.A & this._s.D) & 0xFF;
+			this._s.A = this._s.A & this._s.D;
 			this._s.setF(
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, true,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
 		0xA3: function() { // AND E
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.A = (this._s.A & this._s.E) & 0xFF;
+			this._s.A = this._s.A & this._s.E;
 			this._s.setF(
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, true,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
 		0xA4: function() { // AND H
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.A = (this._s.A & this._s.H) & 0xFF;
+			this._s.A = this._s.A & this._s.H;
 			this._s.setF(
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, true,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
 		0xA5: function() { // AND L
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.A = (this._s.A & this._s.L) & 0xFF;
+			this._s.A = this._s.A & this._s.L;
 			this._s.setF(
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, true,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1777,24 +1729,24 @@ define(function() {
 			this._op_t = 7;
 			this._op_m = 1;
 			var rhs = this._mmu.r8(this._s.getHL());
-			this._s.A = (this._s.A & rhs) & 0xFF;
+			this._s.A = this._s.A & rhs;
 			this._s.setF(
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, true,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
 		0xA7: function() { // AND A
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.A = (this._s.A & this._s.A) & 0xFF;
+			this._s.A = this._s.A & this._s.A;
 			this._s.setF(
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, true,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1806,7 +1758,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1818,7 +1770,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1830,7 +1782,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1842,7 +1794,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1854,7 +1806,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1866,7 +1818,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1878,7 +1830,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1902,7 +1854,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1914,7 +1866,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1926,7 +1878,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1938,7 +1890,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1950,7 +1902,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1962,7 +1914,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1975,7 +1927,7 @@ define(function() {
 				F_S, (this._s.A & 0x80) !== 0,
 				F_Z, this._s.A === 0,
 				F_H, false,
-				F_PV, (this._s.A & 0x01) === 0,
+				F_PV, PVTable[this._s.A],
 				F_N, false,
 				F_C, false);
 		},
@@ -1986,7 +1938,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -1994,98 +1946,50 @@ define(function() {
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.B);
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xB9: function() { // CP C
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.C);
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xBA: function() { // CP D
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.D);
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xBB: function() { // CP E
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.E);
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xBC: function() { // CP H
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.H);
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xBD: function() { // CP L
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.L);
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xBE: function() { // CP (HL)
 			this._op_t = 7;
 			this._op_m = 1;
 			var rhs = this._mmu.r8(this._s.getHL());
 			var res = sub8(this._s.A, rhs);
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xBF: function() { // CP A
 			this._op_t = 4;
 			this._op_m = 1;
 			var res = sub8(this._s.A, this._s.A);
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xC0: function() { // RET NZ
 			if (this._s.F & F_Z) {
@@ -2140,12 +2044,15 @@ define(function() {
 		0xC6: function() { // ADD A,n
 			this._op_t = 7;
 			this._op_m = 2;
-			throw ("not implemented");
+			var res = add8(this._s.A, this._mmu.r8(this._s.getPC(1)));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xC7: function() { // RST 0H
 			this._op_t = 11;
-			this._op_m = 3;
-			throw ("not implemented");
+			this._op_m = 0;
+			this.push16(this._s.getPC(1));
+			this._s.setPC(0x00);
 		},
 		0xC8: function() { // RET Z
 			if (this._s.F & F_Z) {
@@ -2942,642 +2849,658 @@ define(function() {
 		0xCB80: function() { // RES 0,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = (this._s.B & ~0x01) & 0xFF;
 		},
 		0xCB81: function() { // RES 0,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = (this._s.C & ~0x01) & 0xFF;
 		},
 		0xCB82: function() { // RES 0,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = (this._s.D & ~0x01) & 0xFF;
 		},
 		0xCB83: function() { // RES 0,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = (this._s.E & ~0x01) & 0xFF;
 		},
 		0xCB84: function() { // RES 0,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = (this._s.H & ~0x01) & 0xFF;
 		},
 		0xCB85: function() { // RES 0,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = (this._s.L & ~0x01) & 0xFF;
 		},
 		0xCB86: function() { // RES 0,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, (this._mmu.r8(addr) & ~0x01) & 0xFF); 
 		},
 		0xCB87: function() { // RES 0,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = (this._s.A & ~0x01) & 0xFF;
 		},
 		0xCB88: function() { // RES 1,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = (this._s.B & ~0x02) & 0xFF;
 		},
 		0xCB89: function() { // RES 1,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = (this._s.C & ~0x02) & 0xFF;
 		},
 		0xCB8A: function() { // RES 1,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = (this._s.D & ~0x02) & 0xFF;
 		},
 		0xCB8B: function() { // RES 1,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = (this._s.E & ~0x02) & 0xFF;
 		},
 		0xCB8C: function() { // RES 1,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = (this._s.H & ~0x02) & 0xFF;
 		},
 		0xCB8D: function() { // RES 1,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = (this._s.L & ~0x02) & 0xFF;
 		},
 		0xCB8E: function() { // RES 1,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, (this._mmu.r8(addr) & ~0x02) & 0xFF); 
 		},
 		0xCB8F: function() { // RES 1,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = (this._s.A & ~0x02) & 0xFF;
 		},
 		0xCB90: function() { // RES 2,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = (this._s.B & ~0x04) & 0xFF;
 		},
 		0xCB91: function() { // RES 2,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = (this._s.C & ~0x04) & 0xFF;
 		},
 		0xCB92: function() { // RES 2,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = (this._s.D & ~0x04) & 0xFF;
 		},
 		0xCB93: function() { // RES 2,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = (this._s.E & ~0x04) & 0xFF;
 		},
 		0xCB94: function() { // RES 2,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = (this._s.H & ~0x04) & 0xFF;
 		},
 		0xCB95: function() { // RES 2,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = (this._s.L & ~0x04) & 0xFF;
 		},
 		0xCB96: function() { // RES 2,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, (this._mmu.r8(addr) & ~0x04) & 0xFF); 
 		},
 		0xCB97: function() { // RES 2,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = (this._s.A & ~0x04) & 0xFF;
 		},
 		0xCB98: function() { // RES 3,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = (this._s.B & ~0x08) & 0xFF;
 		},
 		0xCB99: function() { // RES 3,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = (this._s.C & ~0x08) & 0xFF;
 		},
 		0xCB9A: function() { // RES 3,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = (this._s.D & ~0x08) & 0xFF;
 		},
 		0xCB9B: function() { // RES 3,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = (this._s.E & ~0x08) & 0xFF;
 		},
 		0xCB9C: function() { // RES 3,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = (this._s.H & ~0x08) & 0xFF;
 		},
 		0xCB9D: function() { // RES 3,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = (this._s.L & ~0x08) & 0xFF;
 		},
 		0xCB9E: function() { // RES 3,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, (this._mmu.r8(addr) & ~0x08) & 0xFF); 
 		},
 		0xCB9F: function() { // RES 3,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = (this._s.A & ~0x08) & 0xFF;
 		},
 		0xCBA0: function() { // RES 4,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = (this._s.B & ~0x10) & 0xFF;
 		},
 		0xCBA1: function() { // RES 4,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = (this._s.C & ~0x10) & 0xFF;
 		},
 		0xCBA2: function() { // RES 4,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = (this._s.D & ~0x10) & 0xFF;
 		},
 		0xCBA3: function() { // RES 4,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = (this._s.E & ~0x10) & 0xFF;
 		},
 		0xCBA4: function() { // RES 4,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = (this._s.H & ~0x10) & 0xFF;
 		},
 		0xCBA5: function() { // RES 4,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = (this._s.L & ~0x10) & 0xFF;
 		},
 		0xCBA6: function() { // RES 4,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, (this._mmu.r8(addr) & ~0x10) & 0xFF); 
 		},
 		0xCBA7: function() { // RES 4,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = (this._s.A & ~0x10) & 0xFF;
 		},
 		0xCBA8: function() { // RES 5,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = (this._s.B & ~0x20) & 0xFF;
 		},
 		0xCBA9: function() { // RES 5,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = (this._s.C & ~0x20) & 0xFF;
 		},
 		0xCBAA: function() { // RES 5,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = (this._s.D & ~0x20) & 0xFF;
 		},
 		0xCBAB: function() { // RES 5,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = (this._s.E & ~0x20) & 0xFF;
 		},
 		0xCBAC: function() { // RES 5,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = (this._s.H & ~0x20) & 0xFF;
 		},
 		0xCBAD: function() { // RES 5,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = (this._s.L & ~0x20) & 0xFF;
 		},
 		0xCBAE: function() { // RES 5,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, (this._mmu.r8(addr) & ~0x20) & 0xFF); 
 		},
 		0xCBAF: function() { // RES 5,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = (this._s.A & ~0x20) & 0xFF;
 		},
 		0xCBB0: function() { // RES 6,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = (this._s.B & ~0x40) & 0xFF;
 		},
 		0xCBB1: function() { // RES 6,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = (this._s.C & ~0x40) & 0xFF;
 		},
 		0xCBB2: function() { // RES 6,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = (this._s.D & ~0x40) & 0xFF;
 		},
 		0xCBB3: function() { // RES 6,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = (this._s.E & ~0x40) & 0xFF;
 		},
 		0xCBB4: function() { // RES 6,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = (this._s.H & ~0x40) & 0xFF;
 		},
 		0xCBB5: function() { // RES 6,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = (this._s.L & ~0x40) & 0xFF;
 		},
 		0xCBB6: function() { // RES 6,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, (this._mmu.r8(addr) & ~0x40) & 0xFF); 
 		},
 		0xCBB7: function() { // RES 6,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = (this._s.A & ~0x40) & 0xFF;
 		},
 		0xCBB8: function() { // RES 7,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = (this._s.B & ~0x80) & 0xFF;
 		},
 		0xCBB9: function() { // RES 7,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = (this._s.C & ~0x80) & 0xFF;
 		},
 		0xCBBA: function() { // RES 7,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = (this._s.D & ~0x80) & 0xFF;
 		},
 		0xCBBB: function() { // RES 7,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = (this._s.E & ~0x80) & 0xFF;
 		},
 		0xCBBC: function() { // RES 7,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = (this._s.H & ~0x80) & 0xFF;
 		},
 		0xCBBD: function() { // RES 7,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = (this._s.L & ~0x80) & 0xFF;
 		},
 		0xCBBE: function() { // RES 7,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, (this._mmu.r8(addr) & ~0x80) & 0xFF); 
 		},
 		0xCBBF: function() { // RES 7,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = (this._s.A & ~0x80) & 0xFF;
 		},
 		0xCBC0: function() { // SET 0,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = this.B | 0x01;
 		},
 		0xCBC1: function() { // SET 0,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = this.C | 0x01;
 		},
 		0xCBC2: function() { // SET 0,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = this.D | 0x01;
 		},
 		0xCBC3: function() { // SET 0,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = this.E | 0x01;
 		},
 		0xCBC4: function() { // SET 0,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = this.H | 0x01;
 		},
 		0xCBC5: function() { // SET 0,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = this.L | 0x01;
 		},
 		0xCBC6: function() { // SET 0,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x01);
 		},
 		0xCBC7: function() { // SET 0,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = this.A | 0x01;
 		},
 		0xCBC8: function() { // SET 1,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = this.B | 0x02;
 		},
 		0xCBC9: function() { // SET 1,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = this.C | 0x02;
 		},
 		0xCBCA: function() { // SET 1,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = this.D | 0x02;
 		},
 		0xCBCB: function() { // SET 1,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = this.E | 0x02;
 		},
 		0xCBCC: function() { // SET 1,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = this.H | 0x02;
 		},
 		0xCBCD: function() { // SET 1,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = this.L | 0x02;
 		},
 		0xCBCE: function() { // SET 1,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x02);
 		},
 		0xCBCF: function() { // SET 1,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = this.A | 0x02;
 		},
 		0xCBD0: function() { // SET 2,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = this.B | 0x04;
 		},
 		0xCBD1: function() { // SET 2,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = this.C | 0x04;
 		},
 		0xCBD2: function() { // SET 2,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = this.D | 0x04;
 		},
 		0xCBD3: function() { // SET 2,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = this.E | 0x04;
 		},
 		0xCBD4: function() { // SET 2,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = this.H | 0x04;
 		},
 		0xCBD5: function() { // SET 2,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = this.L | 0x04;
 		},
 		0xCBD6: function() { // SET 2,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x04);
 		},
 		0xCBD7: function() { // SET 2,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = this.A | 0x04;
 		},
 		0xCBD8: function() { // SET 3,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = this.B | 0x08;
 		},
 		0xCBD9: function() { // SET 3,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = this.C | 0x08;
 		},
 		0xCBDA: function() { // SET 3,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = this.D | 0x08;
 		},
 		0xCBDB: function() { // SET 3,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = this.E | 0x08;
 		},
 		0xCBDC: function() { // SET 3,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = this.H | 0x08;
 		},
 		0xCBDD: function() { // SET 3,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = this.L | 0x08;
 		},
 		0xCBDE: function() { // SET 3,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x08);
 		},
 		0xCBDF: function() { // SET 3,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = this.A | 0x08;
 		},
 		0xCBE0: function() { // SET 4,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = this.B | 0x10;
 		},
 		0xCBE1: function() { // SET 4,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = this.C | 0x10;
 		},
 		0xCBE2: function() { // SET 4,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = this.D | 0x10;
 		},
 		0xCBE3: function() { // SET 4,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = this.E | 0x10;
 		},
 		0xCBE4: function() { // SET 4,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = this.H | 0x10;
 		},
 		0xCBE5: function() { // SET 4,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = this.L | 0x10;
 		},
 		0xCBE6: function() { // SET 4,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x10);
 		},
 		0xCBE7: function() { // SET 4,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = this.A | 0x10;
 		},
 		0xCBE8: function() { // SET 5,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = this.B | 0x20;
 		},
 		0xCBE9: function() { // SET 5,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = this.C | 0x20;
 		},
 		0xCBEA: function() { // SET 5,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = this.D | 0x20;
 		},
 		0xCBEB: function() { // SET 5,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = this.E | 0x20;
 		},
 		0xCBEC: function() { // SET 5,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = this.H | 0x20;
 		},
 		0xCBED: function() { // SET 5,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = this.L | 0x20;
 		},
 		0xCBEE: function() { // SET 5,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x20);
 		},
 		0xCBEF: function() { // SET 5,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = this.A | 0x20;
 		},
 		0xCBF0: function() { // SET 6,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = this.B | 0x40;
 		},
 		0xCBF1: function() { // SET 6,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = this.C | 0x40;
 		},
 		0xCBF2: function() { // SET 6,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = this.D | 0x40;
 		},
 		0xCBF3: function() { // SET 6,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = this.E | 0x40;
 		},
 		0xCBF4: function() { // SET 6,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = this.H | 0x40;
 		},
 		0xCBF5: function() { // SET 6,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = this.L | 0x40;
 		},
 		0xCBF6: function() { // SET 6,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x40);
 		},
 		0xCBF7: function() { // SET 6,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = this.A | 0x40;
 		},
 		0xCBF8: function() { // SET 7,B
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.B = this.B | 0x80;
 		},
 		0xCBF9: function() { // SET 7,C
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.C = this.C | 0x80;
 		},
 		0xCBFA: function() { // SET 7,D
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.D = this.D | 0x80;
 		},
 		0xCBFB: function() { // SET 7,E
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.E = this.E | 0x80;
 		},
 		0xCBFC: function() { // SET 7,H
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.H = this.H | 0x80;
 		},
 		0xCBFD: function() { // SET 7,L
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.L = this.L | 0x80;
 		},
 		0xCBFE: function() { // SET 7,(HL)
 			this._op_t = 15;
-			this._op_m = 4;
-			throw ("not implemented");
+			this._op_m = 2;
+			var addr = this._s.getHL();
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x80);
 		},
 		0xCBFF: function() { // SET 7,A
 			this._op_t = 8;
 			this._op_m = 2;
-			throw ("not implemented");
+			this._s.A = this.A | 0x80;
 		},
 		0xCC: function() { // CALL	Z,nn
 			if (this._s.F & F_Z) {
@@ -3600,14 +3523,17 @@ define(function() {
 			this._s.setPC(addr);
 		},
 		0xCE: function() { // ADC	A,n
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 7;
+			this._op_m = 2;
+			var res = add8(this._s.A, this._mmu.r8(this._s.getPC(1)), this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xCF: function() { // RST	08H
-			this._op_t = 0;
+			this._op_t = 11;
 			this._op_m = 0;
-			throw ("not implemented");
+			this.push16(this._s.getPC(1));
+			this._s.setPC(0x08);
 		},
 		0xD0: function() { // RET	NC
 			if (this._s.F & F_C) {
@@ -3665,18 +3591,13 @@ define(function() {
 			var rhs = this._mmu.r8(this._s.getPC(1));
 			var res = sub8(this._s.A, rhs);
 			this._s.A = res.val;
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xD7: function() { // RST	10H
-			this._op_t = 0;
+			this._op_t = 11;
 			this._op_m = 0;
-			throw ("not implemented");
+			this.push16(this._s.getPC(1));
+			this._s.setPC(0x10);
 		},
 		0xD8: function() { // RET	C
 			if (this._s.F & F_C) {
@@ -3787,14 +3708,15 @@ define(function() {
 			this._s.setF(F_H, res.F_H, F_N, false, F_C, res.F_C);
 		},
 		0xDD2A: function() { // LD IX,(nn)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var addr = this._mmu.r16(this._s.getPC(2));
+			this._s.setIX(this._mmu.r16(addr));
 		},
 		0xDD2B: function() { // DEC IX
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 10;
+			this._op_m = 2;
+			this._s.setIX(this._s.getIX() - 1);
 		},
 		0xDD2C: function() { // INC IXL*
 			this._op_t = 0;
@@ -3812,19 +3734,24 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDD34: function() { // INC (IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) + 1);
 		},
 		0xDD35: function() { // DEC (IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) - 1);
 		},
 		0xDD36: function() { // LD (IX+d),n
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIX(displ), this._mmu.r8(this._s.getPC(3)));
 		},
 		0xDD39: function() { // ADD IX,SP
 			this._op_t = 15;
@@ -3980,39 +3907,46 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDD70: function() { // LD (IX+d),B
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIX(displ), this._s.B);
 		},
 		0xDD71: function() { // LD (IX+d),C
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIX(displ), this._s.C);
 		},
 		0xDD72: function() { // LD (IX+d),D
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIX(displ), this._s.D);
 		},
 		0xDD73: function() { // LD (IX+d),E
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIX(displ), this._s.E);
 		},
 		0xDD74: function() { // LD (IX+d),H
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIX(displ), this._s.H);
 		},
 		0xDD75: function() { // LD (IX+d),L
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIX(displ), this._s.L);
 		},
 		0xDD77: function() { // LD (IX+d),A
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIX(displ), this._s.A);
 		},
 		0xDD7C: function() { // LD A,IXH*
 			this._op_t = 0;
@@ -4041,9 +3975,12 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDD86: function() { // ADD A,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var res = add8(this._s.A, this._mmu.r8(this._s.getIX(displ)));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xDD8C: function() { // ADC A,IXH*
 			this._op_t = 0;
@@ -4056,9 +3993,13 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDD8E: function() { // ADC A,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 15;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			var res = add8(this._s.A, this._mmu.r8(addr), this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xDD94: function() { // SUB IXH*
 			this._op_t = 0;
@@ -4071,9 +4012,13 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDD96: function() { // SUB (IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			var res = sub8(this._s.A, this._mmu.r8(addr));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xDD9C: function() { // SBC A,IXH*
 			this._op_t = 0;
@@ -4086,9 +4031,13 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDD9E: function() { // SBC A,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			var res = sub8(this._s.A, this._mmu.r8(addr), this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xDDA4: function() { // AND IXH*
 			this._op_t = 0;
@@ -4101,9 +4050,18 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDA6: function() { // AND (IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._s.A = this._s.A & this._mmu.r8(addr);
+			this._s.setF(
+			F_S, (this._s.A & 0x80) !== 0,
+			F_Z, this._s.A === 0,
+			F_H, true,
+			F_PV, PVTable[this._s.A],
+			F_N, false,
+			F_C, false);
 		},
 		0xDDAC: function() { // XOR IXH*
 			this._op_t = 0;
@@ -4124,7 +4082,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -4139,9 +4097,18 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDB6: function() { // OR (IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var val = this._mmu.r8(this._s.getIX(displ));
+			this._s.A = (this._s.A | val) & 0xFF;
+			this._s.setF(
+				F_S, (this._s.A & 0x80) !== 0,
+				F_Z, this._s.A === 0,
+				F_H, false,
+				F_PV, PVTable[this._s.A],
+				F_N, false,
+				F_C, false);
 		},
 		0xDDBC: function() { // CP IXH*
 			this._op_t = 0;
@@ -4154,9 +4121,12 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDBE: function() { // CP (IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var rhs = this._mmu.r8(this._s.getIX(displ));
+			var res = sub8(this._s.A, rhs);
+			this._s.updateF(res);
 		},
 		0xDDCB00: function() { // LD B,RLC (IX+d)*
 			this._op_t = 0;
@@ -4540,9 +4510,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB46: function() { // BIT 0,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIX(displ)) & 0x01) === 0, F_H, true, F_N, false);
 		},
 		0xDDCB47: function() { // BIT 0,(IX+d)*
 			this._op_t = 0;
@@ -4580,9 +4551,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB4E: function() { // BIT 1,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIX(displ)) & 0x02) === 0, F_H, true, F_N, false);
 		},
 		0xDDCB4F: function() { // BIT 1,(IX+d)*
 			this._op_t = 0;
@@ -4620,9 +4592,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB56: function() { // BIT 2,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIX(displ)) & 0x04) === 0, F_H, true, F_N, false);
 		},
 		0xDDCB57: function() { // BIT 2,(IX+d)*
 			this._op_t = 0;
@@ -4660,9 +4633,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB5E: function() { // BIT 3,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIX(displ)) & 0x08) === 0, F_H, true, F_N, false);
 		},
 		0xDDCB5F: function() { // BIT 3,(IX+d)*
 			this._op_t = 0;
@@ -4700,9 +4674,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB66: function() { // BIT 4,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIX(displ)) & 0x10) === 0, F_H, true, F_N, false);
 		},
 		0xDDCB67: function() { // BIT 4,(IX+d)*
 			this._op_t = 0;
@@ -4740,9 +4715,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB6E: function() { // BIT 5,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIX(displ)) & 0x20) === 0, F_H, true, F_N, false);
 		},
 		0xDDCB6F: function() { // BIT 5,(IX+d)*
 			this._op_t = 0;
@@ -4780,9 +4756,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB76: function() { // BIT 6,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIX(displ)) & 0x40) === 0, F_H, true, F_N, false);
 		},
 		0xDDCB77: function() { // BIT 6,(IX+d)*
 			this._op_t = 0;
@@ -4820,9 +4797,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB7E: function() { // BIT 7,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIX(displ)) & 0x80) === 0, F_H, true, F_N, false);
 		},
 		0xDDCB7F: function() { // BIT 7,(IX+d)*
 			this._op_t = 0;
@@ -4860,9 +4838,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB86: function() { // RES 0,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x01); 
 		},
 		0xDDCB87: function() { // LD A,RES 0,(IX+d)*
 			this._op_t = 0;
@@ -4900,9 +4880,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB8E: function() { // RES 1,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x02); 
 		},
 		0xDDCB8F: function() { // LD A,RES 1,(IX+d)*
 			this._op_t = 0;
@@ -4940,9 +4922,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB96: function() { // RES 2,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x04); 
 		},
 		0xDDCB97: function() { // LD A,RES 2,(IX+d)*
 			this._op_t = 0;
@@ -4980,9 +4964,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCB9E: function() { // RES 3,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x08); 
 		},
 		0xDDCB9F: function() { // LD A,RES 3,(IX+d)*
 			this._op_t = 0;
@@ -5020,9 +5006,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCBA6: function() { // RES 4,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x10); 
 		},
 		0xDDCBA7: function() { // LD A,RES 4,(IX+d)*
 			this._op_t = 0;
@@ -5060,9 +5048,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCBAE: function() { // RES 5,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x20); 
 		},
 		0xDDCBAF: function() { // LD A,RES 5,(IX+d)*
 			this._op_t = 0;
@@ -5100,9 +5090,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCBB6: function() { // RES 6,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x40); 
 		},
 		0xDDCBB7: function() { // LD A,RES 6,(IX+d)*
 			this._op_t = 0;
@@ -5140,9 +5132,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDDCBBE: function() { // RES 7,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x80); 
 		},
 		0xDDCBBF: function() { // LD A,RES 7,(IX+d)*
 			this._op_t = 0;
@@ -5503,9 +5497,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xDF: function() { // RST	18H
-			this._op_t = 0;
+			this._op_t = 11;
 			this._op_m = 0;
-			throw ("not implemented");
+			this.push16(this._s.getPC(1));
+			this._s.setPC(0x18);
 		},
 		0xE0: function() { // RET	PO
 			if (this._s.F & F_PV) {
@@ -5568,14 +5563,15 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, true,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
 		0xE7: function() { // RST	20H
-			this._op_t = 0;
+			this._op_t = 11;
 			this._op_m = 0;
-			throw ("not implemented");
+			this.push16(this._s.getPC(1));
+			this._s.setPC(0x20);
 		},
 		0xE8: function() { // RET	PE
 			if (this._s.F & F_PV) {
@@ -6952,14 +6948,15 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
 		0xEF: function() { // RST	28H
-			this._op_t = 0;
+			this._op_t = 11;
 			this._op_m = 0;
-			throw ("not implemented");
+			this.push16(this._s.getPC(1));
+			this._s.setPC(0x28);
 		},
 		0xF0: function() { // RET	P
 			if (this._s.F & F_S) {
@@ -7020,14 +7017,15 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
 		0xF7: function() { // RST	30H
-			this._op_t = 0;
+			this._op_t = 11;
 			this._op_m = 0;
-			throw ("not implemented");
+			this.push16(this._s.getPC(1));
+			this._s.setPC(0x30);
 		},
 		0xF8: function() { // RET	M
 			if (this._s.F & F_S) {
@@ -7079,14 +7077,18 @@ define(function() {
 			throw ("Z80 FD");
 		},
 		0xFD09: function() { // ADD IY,BC
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 15;
+			this._op_m = 2;
+			var res = add16(this._s.getIY(), this._s.getBC());
+			this._s.setIY(res.val);
+			this._s.setF(F_H, res.F_H, F_N, false, F_C, res.F_C);
 		},
 		0xFD19: function() { // ADD IY,DE
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 15;
+			this._op_m = 2;
+			var res = add16(this._s.getIY(), this._s.getDE());
+			this._s.setIY(res.val);
+			this._s.setF(F_H, res.F_H, F_N, false, F_C, res.F_C);
 		},
 		0xFD21: function() { // LD IY,nn
 			this._op_t = 14;
@@ -7120,19 +7122,22 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFD29: function() { // ADD IY,IY
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 15;
+			this._op_m = 2;
+			var res = add16(this._s.getIY(), this._s.getIY());
+			this._s.setIY(res.val);
+			this._s.setF(F_H, res.F_H, F_N, false, F_C, res.F_C);
 		},
 		0xFD2A: function() { // LD IY,(nn)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var addr = this._mmu.r16(this._s.getPC(2));
+			this._s.setIY(this._mmu.r16(addr));
 		},
 		0xFD2B: function() { // DEC IY
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 10;
+			this._op_m = 2;
+			this._s.setIY(this._s.getIY() - 1);
 		},
 		0xFD2C: function() { // INC IYL*
 			this._opt_t = 0;
@@ -7150,24 +7155,31 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFD34: function() { // INC (IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) + 1);
 		},
 		0xFD35: function() { // DEC (IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) - 1);
 		},
 		0xFD36: function() { // LD (IY+d),n
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIY(displ), this._mmu.r8(this._s.getPC(3)));
 		},
 		0xFD39: function() { // ADD IY,SP
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 15;
+			this._op_m = 2;
+			var res = add16(this._s.getIY(), this._s.getSP());
+			this._s.setIY(res.val);
+			this._s.setF(F_H, res.F_H, F_N, false, F_C, res.F_C);
 		},
 		0xFD44: function() { // LD B,IYH*
 			this._opt_t = 0;
@@ -7316,39 +7328,46 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFD70: function() { // LD (IY+d),B
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIY(displ), this._s.B);
 		},
 		0xFD71: function() { // LD (IY+d),C
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIY(displ), this._s.C);
 		},
 		0xFD72: function() { // LD (IY+d),D
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIY(displ), this._s.D);
 		},
 		0xFD73: function() { // LD (IY+d),E
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIY(displ), this._s.E);
 		},
 		0xFD74: function() { // LD (IY+d),H
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIY(displ), this._s.H);
 		},
 		0xFD75: function() { // LD (IY+d),L
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIY(displ), this._s.L);
 		},
 		0xFD77: function() { // LD (IY+d),A
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._mmu.w8(this._s.getIY(displ), this._s.A);
 		},
 		0xFD7C: function() { // LD A,IYH*
 			this._opt_t = 0;
@@ -7377,9 +7396,12 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFD86: function() { // ADD A,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var res = add8(this._s.A, this._mmu.r8(this._s.getIY(displ)));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xFD8C: function() { // ADC A,IYH*
 			this._opt_t = 0;
@@ -7392,9 +7414,13 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFD8E: function() { // ADC A,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 15;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			var res = add8(this._s.A, this._mmu.r8(addr), this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xFD94: function() { // SUB IYH*
 			this._opt_t = 0;
@@ -7407,9 +7433,13 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFD96: function() { // SUB (IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			var res = sub8(this._s.A, this._mmu.r8(addr));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xFD9C: function() { // SBC A,IYH*
 			this._opt_t = 0;
@@ -7422,9 +7452,13 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFD9E: function() { // SBC A,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			var res = sub8(this._s.A, this._mmu.r8(addr), this._s.getF(F_C));
+			this._s.A = res.val;
+			this._s.updateF(res);
 		},
 		0xFDA4: function() { // AND IYH*
 			this._opt_t = 0;
@@ -7437,9 +7471,18 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDA6: function() { // AND (IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._s.A = this._s.A & this._mmu.r8(addr);
+			this._s.setF(
+			F_S, (this._s.A & 0x80) !== 0,
+			F_Z, this._s.A === 0,
+			F_H, true,
+			F_PV, PVTable[this._s.A],
+			F_N, false,
+			F_C, false);
 		},
 		0xFDAC: function() { // XOR IYH*
 			this._opt_t = 0;
@@ -7460,7 +7503,7 @@ define(function() {
 			F_S, (this._s.A & 0x80) !== 0,
 			F_Z, this._s.A === 0,
 			F_H, false,
-			F_PV, (this._s.A & 0x01) === 0,
+			F_PV, PVTable[this._s.A],
 			F_N, false,
 			F_C, false);
 		},
@@ -7475,9 +7518,18 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDB6: function() { // OR (IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var val = this._mmu.r8(this._s.getIY(displ));
+			this._s.A = (this._s.A | val) & 0xFF;
+			this._s.setF(
+				F_S, (this._s.A & 0x80) !== 0,
+				F_Z, this._s.A === 0,
+				F_H, false,
+				F_PV, PVTable[this._s.A],
+				F_N, false,
+				F_C, false);
 		},
 		0xFDBC: function() { // CP IYH*
 			this._opt_t = 0;
@@ -7490,9 +7542,12 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDBE: function() { // CP (IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 19;
+			this._op_m = 3;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var rhs = this._mmu.r8(this._s.getIX(displ));
+			var res = sub8(this._s.A, rhs);
+			this._s.updateF(res);
 		},
 		0xFDCB00: function() { // LD B,RLC (IY+d)*
 			this._opt_t = 0;
@@ -7876,9 +7931,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB46: function() { // BIT 0,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIY(displ)) & 0x01) === 0, F_H, true, F_N, false);
 		},
 		0xFDCB47: function() { // BIT 0,(IY+d)*
 			this._opt_t = 0;
@@ -7916,9 +7972,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB4E: function() { // BIT 1,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIY(displ)) & 0x02) === 0, F_H, true, F_N, false);
 		},
 		0xFDCB4F: function() { // BIT 1,(IY+d)*
 			this._opt_t = 0;
@@ -7956,9 +8013,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB56: function() { // BIT 2,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIY(displ)) & 0x04) === 0, F_H, true, F_N, false);
 		},
 		0xFDCB57: function() { // BIT 2,(IY+d)*
 			this._opt_t = 0;
@@ -7996,9 +8054,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB5E: function() { // BIT 3,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIY(displ)) & 0x08) === 0, F_H, true, F_N, false);
 		},
 		0xFDCB5F: function() { // BIT 3,(IY+d)*
 			this._opt_t = 0;
@@ -8036,9 +8095,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB66: function() { // BIT 4,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIY(displ)) & 0x10) === 0, F_H, true, F_N, false);
 		},
 		0xFDCB67: function() { // BIT 4,(IY+d)*
 			this._opt_t = 0;
@@ -8076,9 +8136,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB6E: function() { // BIT 5,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIY(displ)) & 0x20) === 0, F_H, true, F_N, false);
 		},
 		0xFDCB6F: function() { // BIT 5,(IY+d)*
 			this._opt_t = 0;
@@ -8116,9 +8177,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB76: function() { // BIT 6,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIY(displ)) & 0x40) === 0, F_H, true, F_N, false);
 		},
 		0xFDCB77: function() { // BIT 6,(IY+d)*
 			this._opt_t = 0;
@@ -8156,9 +8218,10 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB7E: function() { // BIT 7,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 20;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			this._s.setF(F_Z, (this._mmu.r8(this._s.getIY(displ)) & 0x80) === 0, F_H, true, F_N, false);
 		},
 		0xFDCB7F: function() { // BIT 7,(IY+d)*
 			this._opt_t = 0;
@@ -8196,9 +8259,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB86: function() { // RES 0,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x01); 
 		},
 		0xFDCB87: function() { // LD A,RES 0,(IY+d)*
 			this._opt_t = 0;
@@ -8236,9 +8301,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB8E: function() { // RES 1,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x02); 
 		},
 		0xFDCB8F: function() { // LD A,RES 1,(IY+d)*
 			this._opt_t = 0;
@@ -8276,9 +8343,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB96: function() { // RES 2,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x04); 
 		},
 		0xFDCB97: function() { // LD A,RES 2,(IY+d)*
 			this._opt_t = 0;
@@ -8316,9 +8385,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCB9E: function() { // RES 3,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x08); 
 		},
 		0xFDCB9F: function() { // LD A,RES 3,(IY+d)*
 			this._opt_t = 0;
@@ -8356,9 +8427,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCBA6: function() { // RES 4,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x10); 
 		},
 		0xFDCBA7: function() { // LD A,RES 4,(IY+d)*
 			this._opt_t = 0;
@@ -8396,9 +8469,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCBAE: function() { // RES 5,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x20); 
 		},
 		0xFDCBAF: function() { // LD A,RES 5,(IY+d)*
 			this._opt_t = 0;
@@ -8436,9 +8511,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCBB6: function() { // RES 6,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x40); 
 		},
 		0xFDCBB7: function() { // LD A,RES 6,(IY+d)*
 			this._opt_t = 0;
@@ -8476,9 +8553,11 @@ define(function() {
 			throw ("not implemented");
 		},
 		0xFDCBBE: function() { // RES 7,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x80); 
 		},
 		0xFDCBBF: function() { // LD A,RES 7,(IY+d)*
 			this._opt_t = 0;
@@ -8838,18 +8917,13 @@ define(function() {
 			this._op_m = 2;
 			var rhs = this._mmu.r8(this._s.getPC(1));
 			var res = sub8(this._s.A, rhs);
-			this._s.setF(
-			F_S, res.F_S,
-			F_Z, res.F_Z,
-			F_H, res.F_H,
-			F_PV, res.F_PV,
-			F_N, true,
-			F_C, res.F_C);
+			this._s.updateF(res);
 		},
 		0xFF: function() { // RST	38H
-			this._op_t = 0;
+			this._op_t = 11;
 			this._op_m = 0;
-			throw ("not implemented");
+			this.push16(this._s.getPC(1));
+			this._s.setPC(0x38);
 		}
 	};
 
@@ -8866,7 +8940,7 @@ define(function() {
 			this._mmu.dasm(this._s.getPC(), 5, "??? ");
 			throw ("not implemented:" + toHex8(opcode));
 		}
-		this.logasm();
+		//this.logasm();
 		f.call(this);
 		if (this._op_t === 0) {
 			throw ("you forgot something!");
