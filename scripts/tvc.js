@@ -1,14 +1,5 @@
-/* Resources
-	http://www.z80.info/decoding.htm
-*/
-
-var requirejs = require('./r.js');
-requirejs.config({
-	nodeRequire: require
-});
-
-var n_fs = requirejs("fs");
-var z80 = requirejs("z80");
+var TVCModule = function() {
+	var TVCExports = {};
 
 function toHex8(x) {
 	var s = x.toString(16).toUpperCase();
@@ -48,14 +39,22 @@ MMU.prototype.init = function() {
 	// for(i=0; i<this._cart.length; i++) this._cart[i] = 0;
 	for (i = 0; i < this._ext.length; i++) this._ext[i] = 0;
 
-	var ext = n_fs.readFileSync("TVC_EXT.ROM");
-	for (i = 0; i < ext.length; i++) this._ext[0x2000 + i] = ext[i];
-
-	if (this._ext[0x3000] != 0x3e) throw ("ext is not properly initialized!");
-
-	this._sys = n_fs.readFileSync("TVC_SYS.ROM");
 	this.setMap(0);
 };
+
+MMU.prototype.addRom = function(name, data) {
+	var i;
+	console.log("DATA name: " + name + " size: " + data.length);
+	if (name == "EXT") {
+		for (i = 0; i < data.length; i++) this._ext[0x2000 + i] = data[i];
+		if (this._ext[0x3000] != 0x3e) throw ("ext is not properly initialized!");
+	}
+
+	if (name == "SYS") {
+		for (i = 0; i < data.length; i++) this._sys[i] = data[i];
+	}
+}
+
 MMU.prototype.reset = function() {
 	this.setMap(0);
 };
@@ -117,7 +116,7 @@ MMU.prototype.dasm = function(addr, lines, prefix, noLdir) {
 	var offset = 0,
 		d, i, str, oplen, line;
 	do {
-		d = z80.decodeZ80(this, addr + offset);
+		d = Z80Module.decodeZ80(this, addr + offset);
 		oplen = d[1];
 
 		str = toHex16(addr + offset) + " ";
@@ -222,6 +221,8 @@ KEY.prototype.selectRow = function(val) {
 ////////////////////////////////////////////
 function TVC() {
 	var TVCthis = this;
+	this._clockfreq = 3125000;
+	this._clockperframe = (1/50) / (1/this._clockfreq);
 	this._clock = 0;
 	this._pendIt = 0;	// b4: curs/aud, b3-0 cards
 	this._mmu = new MMU();
@@ -230,18 +231,28 @@ function TVC() {
     this._aud_it = false;
     this._aud_on = false;
 	this._key = new KEY();
-	this._z80 = new z80.Z80(this._mmu, function(addr, val) {
+	this._z80 = new Z80Module.Z80(this._mmu, function(addr, val) {
 		TVCthis.writePort(addr, val);
 	}, function(addr) {
 		return TVCthis.readPort(addr);
 	});
 }
 
+TVC.prototype.addRom = function(name, data) {
+	this._mmu.addRom(name, data);
+}
+
 TVC.prototype.run = function() {
-	var limit = 100;
-	while (this._clock < limit) {
-		var tinc = this._z80.step();
-		this.clock += tinc;
+	var times;
+	while (true) {
+		times = new Date();
+		while (this._clock < this._clockperframe) {
+			var tinc = this._z80.step();
+			this._clock += tinc;
+		}
+		this._clock = 0;
+		console.log( (new Date()) - times);
+		break;
 	}
 };
 
@@ -318,6 +329,9 @@ TVC.prototype.readPort = function(addr) {
 // runner
 ////////////////////////////////////////////
 
-var tvc = new TVC();
-tvc.run();
+//var tvc = new TVC();
+//tvc.run();
+TVCExports.TVC = TVC;
+return TVCExports;
+}();
 

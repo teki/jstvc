@@ -1,6 +1,6 @@
-define(function() {
+var Z80Module = function() {
 
-	var Z80Module = {};
+	var Z80Exports = {};
 
 	PVTable = new Uint8Array(256);
 	for (var i = 0; i < 256; i++) {
@@ -27,7 +27,7 @@ define(function() {
 		return "000".slice(s.length - 1) + s;
 	}
 
-	Z80Module.decodeZ80 = function(mmu, addr) {
+	Z80Exports.decodeZ80 = function(mmu, addr) {
 		var tableR = ["B", "C", "D", "E", "H", "L", "(HL)", "A"],
 			tableRP = ["BC", "DE", "HL", "SP"],
 			tableRP2 = ["BC", "DE", "HL", "AF"],
@@ -8959,7 +8959,7 @@ define(function() {
 		this._mmu.dasm(this._s.getPC(), 1, "%% ", true);
 	};
 
-	Z80Module.Z80 = Z80;
+	Z80Exports.Z80 = Z80;
 
-	return Z80Module;
-});
+	return Z80Exports;
+}();
