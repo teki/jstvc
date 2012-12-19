@@ -196,6 +196,7 @@
         * instr table: http://www.z80.info/z80sean.txt
         * testing info: http://www.worldofspectrum.org/forums/showthread.php?t=41704
         * interrupt handling: http://www.nvg.ntnu.no/sinclair/faq/tech_z80.html
+        * tests: http://mdfs.net/Software/Z80/Exerciser/
 
 	Parity:
 		This flag is also used with logical operations and
