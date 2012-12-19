@@ -140,14 +140,168 @@ MMU.prototype.dasm = function(addr, lines, prefix, noLdir) {
 ////////////////////////////////////////////
 // VID
 ////////////////////////////////////////////
+function testVid() {
+	console.log("Testing video!");
+	var mmu = new MMU(),
+		vid = new VID(mmu),
+        regs = [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ],
+		screentime = (1/25) / (1/3125000),
+		i;
+
+	for (i = 0; i < regs.length; i++) {
+		vid.setRegIdx(i);
+		vid.setReg(regs[i]);
+	}
+
+	while (screentime > 0) {
+		vid.step(4); // nop
+		screentime -= 4;
+	}
+}
+
 function VID(mmu) {
 	this._mmu = mmu;
-	this._clock = 0;
+	this._timer = 0;
 	this._palette = [0,0,0,0];
 	this._border = 0;
 	this._regIdx = 0;
 	this._reg = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 	this._mode = 0; // 00: 2, 01: 4, 1x: 16 color
+
+	this._dispen = 0;
+	this._hcc = 0; // horizontal character counter
+	this._vcc = 0; // vertical character counter
+	this._vlc = 0; // vertical line counter
+	this._startAddress = 0;
+	this._hsync = 0;
+	this._vsync = 0;
+
+// testing:
+	this._linestr = "";
+}
+
+VID.prototype.step = function(cpuTime) {
+	var pixelData, pixelColors;
+	// convert it to character unit, plus add the remaining cycles
+	// from the previous run
+	this._timer += cpuTime;
+	var stepCount = this._timer >>> 1;
+	this._timer -= (stepCount << 1);
+
+	// initialize start address on new screen
+	if (this._hcc === 0 && this._vcc === 0 && this._vlc === 0) {
+		this._startAddress = this._reg[12] << 8 | this._reg[13];
+	}
+
+	var scanLinesPerChLine = this._reg[9] & 0x1F;
+
+	while (stepCount) {
+		stepCount--;
+		// change line
+		if (this._hcc == this._reg[0]) {
+			console.log(this._linestr);
+			this._linestr = "";
+			// change character line
+			if (this._vlc == scanLinesPerChLine) {
+				this._vlc = 0;
+				this._vcc += 1;
+
+				// vsync start
+				if (this._vcc == (this._reg[7] & 0x7F)) {
+					this._vsync = this._reg[3] >>> 4;
+					if (this._vsync === 0)
+						this._vsync = 16;
+				}
+			}
+			// just a scan line
+			else {
+				this._vlc += 1;
+			}
+			this._hcc = 0;
+			if (this._vsync > 0) {
+				this._vsync -= 1;
+			}
+			// new screen
+			if (this._vcc == this._reg[4] && this._vlc == this._reg[5]) {
+				this._vcc = 0;
+				this._vlc = 0;
+				continue;
+			}
+		}
+
+		// hsync start
+		if (this._hcc == this._reg[2]) {
+			this._hsync = this._reg[3] & 0x0F;
+		}
+
+		// disp off
+		this._dispen = this._vcc < this._reg[6] && this._hcc < this._reg[1];
+		//console.log("vcc: " + this._vcc + " limit: " + this._reg[6]);
+
+		if (this._mode == 0) {
+			colorCnt = 2;
+			colorPixels = 8;
+		}
+		else if (this._mode == 1) {
+			colorCnt = 4;
+			colorPixels = 4;
+		}
+		else {
+			colorCnt = 16;
+			colorPixels = 2;
+		}
+
+		var outchar = this._dispen ? "O" : "_";
+		if (this._hsync) outchar = "H";
+		if (this._vsync) outchar = "V";
+		this._linestr += outchar;
+		if (this._dispen) {
+			var line = this._vcc * scanLinesPerChLine + this._vcl;
+			// read mem
+			var addr = this._startAddress + line * 64 + this._hcc;
+			pixelData = this._mmu.r8(addr);
+			pixelColors = [];
+			if (this._mode == 0) {
+				for (i = 7; i >= 0; i--) {
+					pixelColors[i] = this._palette[pixelData & 1];
+					pixelData = pixelData >>> 1;
+				}
+			}
+			else if (this._mode == 1) {
+				for (i = 3; i >= 0; i--) {
+					pixelColors[i] = this._palette[pixelData & 3];
+					pixelData = pixelData >>> 2;
+				}
+			}
+			else {
+				pixelColor[0] = pixelData >>> 4;
+				pixelColor[1] = pixelData & 0x0F;
+			}
+		} else {
+			// out border
+			pixelColors = [];
+			if (this._mode == 0) {
+				for (i = 7; i >= 0; i--) {
+					pixelColors[i] = this._border;
+				}
+			}
+			else if (this._mode == 1) {
+				for (i = 3; i >= 0; i--) {
+					pixelColors[i] = this._border;
+				}
+			}
+			else {
+				pixelColor[0] = this._border;
+				pixelColor[1] = this._border;
+			}
+		}
+		this._hcc += 1;
+		// hsync run
+		if (this._hsync > 0) {
+			this._hsync -= 1;
+		}
+	}
+	this._clock += stepCount * 2;
 }
 
 VID.prototype.setPalette = function(idx, color) {
@@ -326,12 +480,18 @@ TVC.prototype.readPort = function(addr) {
 };
 
 ////////////////////////////////////////////
-// runner
+// module exports
 ////////////////////////////////////////////
 
-//var tvc = new TVC();
-//tvc.run();
 TVCExports.TVC = TVC;
+TVCExports.testVid = testVid;
 return TVCExports;
 }();
 
+if (process != undefined) {
+	if (process.argv.length > 2) {
+		if (process.argv[2] == "vid") {
+			TVCModule.testVid();
+		}	
+	}
+}
