@@ -42,6 +42,10 @@ MMU.prototype.init = function() {
 	this.setMap(0);
 };
 
+MMU.prototype.getVid = function() {
+	return this._vid;
+}
+
 MMU.prototype.addRom = function(name, data) {
 	var i;
 	console.log("DATA name: " + name + " size: " + data.length);
@@ -141,11 +145,10 @@ MMU.prototype.dasm = function(addr, lines, prefix, noLdir) {
 // VID
 ////////////////////////////////////////////
 function testVid() {
-	console.log("Testing video!");
 	var mmu = new MMU(),
-		vid = new VID(mmu),
+		vid = new VID(mmu, undefined),
         regs = [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ],
-		screentime = (1/25) / (1/3125000),
+		screentime = 4 * (1/50) / (1/3125000),
 		i;
 
 	for (i = 0; i < regs.length; i++) {
@@ -159,14 +162,18 @@ function testVid() {
 	}
 }
 
-function VID(mmu) {
+function VID(mmu, ctx) {
 	this._mmu = mmu;
+	this._ctx = ctx;
 	this._timer = 0;
 	this._palette = [0,0,0,0];
 	this._border = 0;
 	this._regIdx = 0;
 	this._reg = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 	this._mode = 0; // 00: 2, 01: 4, 1x: 16 color
+	this._cr = [0x00,0x00,0x00,0x00,0x80,0x80,0x80,0x80,0x80,0x00,0x00,0x00,0xFF,0xFF,0xFF,0xFF];
+	this._cg = [0x00,0x00,0x80,0x80,0x00,0x00,0x80,0x80,0x80,0x00,0xFF,0xFF,0x00,0x00,0xFF,0xFF];
+	this._cb = [0x00,0x80,0x00,0x08,0x00,0x80,0x00,0x80,0x80,0xFF,0x00,0xFF,0x00,0xFF,0x00,0xFF];
 
 	this._dispen = 0;
 	this._hcc = 0; // horizontal character counter
@@ -176,12 +183,20 @@ function VID(mmu) {
 	this._hsync = 0;
 	this._vsync = 0;
 
+	if (this._ctx) this._fb = this._ctx.createImageData(800,400);
+	this._fbx = 0;
+	this._fby = 0;
+
 // testing:
-	this._linestr = "";
+//	this._linestr = "";
 }
 
 VID.prototype.step = function(cpuTime) {
-	var pixelData, pixelColors;
+	if (this._reg[0] == 0) {
+		return;
+	}
+	var vidmem = this._mmu.getVid();
+	var pixelData, pixelColors, i;
 	// convert it to character unit, plus add the remaining cycles
 	// from the previous run
 	this._timer += cpuTime;
@@ -189,28 +204,32 @@ VID.prototype.step = function(cpuTime) {
 	this._timer -= (stepCount << 1);
 
 	// initialize start address on new screen
-	if (this._hcc === 0 && this._vcc === 0 && this._vlc === 0) {
-		this._startAddress = this._reg[12] << 8 | this._reg[13];
-	}
-
-	var scanLinesPerChLine = this._reg[9] & 0x1F;
 
 	while (stepCount) {
+		//console.log("hcc: " + this._hcc + " vcc: " + this._vcc + " vlc: " + this._vlc);
+		if (this._hcc === 0 && this._vcc === 0 && this._vlc === 0) {
+			this._startAddress = this._reg[12] << 8 | this._reg[13];
+		}
+		var scanLinesPerChLine = this._reg[9] & 0x1F;
+
 		stepCount--;
 		// change line
-		if (this._hcc == this._reg[0]) {
-			console.log(this._linestr);
-			this._linestr = "";
+		if (this._hcc > this._reg[0]) {
+			//console.log(this._linestr);
+			//this._linestr = "";
 			// change character line
 			if (this._vlc == scanLinesPerChLine) {
 				this._vlc = 0;
 				this._vcc += 1;
 
 				// vsync start
-				if (this._vcc == (this._reg[7] & 0x7F)) {
+				if (this._vcc == ((this._reg[7] & 0x7F) + 1)) {
 					this._vsync = this._reg[3] >>> 4;
 					if (this._vsync === 0)
 						this._vsync = 16;
+
+					if (this._ctx) this._ctx.putImageData(this._fb, 0,0);
+					console.log("new screen");
 				}
 			}
 			// just a scan line
@@ -218,11 +237,13 @@ VID.prototype.step = function(cpuTime) {
 				this._vlc += 1;
 			}
 			this._hcc = 0;
+			this._fby += 1; // new line in the framebuffer
+			this._fbx = 0;
 			if (this._vsync > 0) {
 				this._vsync -= 1;
 			}
 			// new screen
-			if (this._vcc == this._reg[4] && this._vlc == this._reg[5]) {
+			if (this._vcc == (this._reg[4] + 1) && this._vlc == this._reg[5]) {
 				this._vcc = 0;
 				this._vlc = 0;
 				continue;
@@ -230,36 +251,40 @@ VID.prototype.step = function(cpuTime) {
 		}
 
 		// hsync start
-		if (this._hcc == this._reg[2]) {
+		if (this._hcc == (this._reg[2] + 1)) {
 			this._hsync = this._reg[3] & 0x0F;
 		}
 
 		// disp off
-		this._dispen = this._vcc < this._reg[6] && this._hcc < this._reg[1];
+		this._dispen = (this._vcc < this._reg[6]) && (this._hcc < this._reg[1]);
 		//console.log("vcc: " + this._vcc + " limit: " + this._reg[6]);
 
 		if (this._mode == 0) {
 			colorCnt = 2;
 			colorPixels = 8;
+			colorDiv = 1;
 		}
 		else if (this._mode == 1) {
 			colorCnt = 4;
 			colorPixels = 4;
+			colorDiv = 2;
 		}
 		else {
 			colorCnt = 16;
 			colorPixels = 2;
+			colorDiv = 4;
 		}
 
-		var outchar = this._dispen ? "O" : "_";
-		if (this._hsync) outchar = "H";
-		if (this._vsync) outchar = "V";
-		this._linestr += outchar;
+		//var hccstr = this._hcc.toString();
+		//var outchar = this._dispen ? hccstr[hccstr.length -1] : "_";
+		//if (this._hsync) outchar = "H";
+		//if (this._vsync) outchar = "V";
+		//this._linestr += outchar;
 		if (this._dispen) {
 			var line = this._vcc * scanLinesPerChLine + this._vcl;
 			// read mem
 			var addr = this._startAddress + line * 64 + this._hcc;
-			pixelData = this._mmu.r8(addr);
+			pixelData = vidmem[addr];
 			pixelColors = [];
 			if (this._mode == 0) {
 				for (i = 7; i >= 0; i--) {
@@ -274,8 +299,8 @@ VID.prototype.step = function(cpuTime) {
 				}
 			}
 			else {
-				pixelColor[0] = pixelData >>> 4;
-				pixelColor[1] = pixelData & 0x0F;
+				pixelColors[0] = pixelData >>> 4;
+				pixelColors[1] = pixelData & 0x0F;
 			}
 		} else {
 			// out border
@@ -293,6 +318,19 @@ VID.prototype.step = function(cpuTime) {
 			else {
 				pixelColor[0] = this._border;
 				pixelColor[1] = this._border;
+			}
+		}
+		// always draw 8 pixels
+		if (this._ctx) {
+			for (i = 0; i < 8; i++) {
+				color = pixelColors[i / colorDiv];
+				pixelIdx = (this._fby * 800 + this._fbx) * 4;
+				//console.log("x: " + this._fbx + " y: " + this._fby);
+				this._fb.data[pixelIdx] = 0;//this._cr[color];
+				this._fb.data[pixelIdx+1] = 0;//this._cg[color];
+				this._fb.data[pixelIdx+2] = 0;//this._cb[color];
+				this._fb.data[pixelIdx+3] = 255;
+				this._fbx += 1;
 			}
 		}
 		this._hcc += 1;
@@ -318,7 +356,7 @@ VID.prototype.setBorder = function(color) {
 
 VID.prototype.setReg = function(val) {
 	this._reg[this._regIdx] = val;
-//	console.log(this._reg);
+	console.log(this._reg);
 };
 
 VID.prototype.getReg = function() {
@@ -373,14 +411,15 @@ KEY.prototype.selectRow = function(val) {
 ////////////////////////////////////////////
 // TVC
 ////////////////////////////////////////////
-function TVC() {
+function TVC(ctx) {
 	var TVCthis = this;
 	this._clockfreq = 3125000;
 	this._clockperframe = (1/50) / (1/this._clockfreq);
+	console.log(this._clockperframe);
 	this._clock = 0;
 	this._pendIt = 0;	// b4: curs/aud, b3-0 cards
 	this._mmu = new MMU();
-	this._vid = new VID(this._mmu);
+	this._vid = new VID(this._mmu, ctx);
 	this._aud = new AUD();
     this._aud_it = false;
     this._aud_on = false;
@@ -400,8 +439,9 @@ TVC.prototype.run = function() {
 	var times;
 	while (true) {
 		times = new Date();
-		while (this._clock < this._clockperframe) {
+		while (this._clock < 20*this._clockperframe) {
 			var tinc = this._z80.step();
+			this._vid.step(tinc);
 			this._clock += tinc;
 		}
 		this._clock = 0;
@@ -488,6 +528,7 @@ TVCExports.testVid = testVid;
 return TVCExports;
 }();
 
+try {
 if (process != undefined) {
 	if (process.argv.length > 2) {
 		if (process.argv[2] == "vid") {
@@ -495,3 +536,4 @@ if (process != undefined) {
 		}	
 	}
 }
+} catch (e) {}

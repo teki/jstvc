@@ -6,36 +6,29 @@
 <script src="scripts/z80.js"></script>
 <script src="scripts/tvc.js"></script>
 <script type="text/javascript">
-	var tvc;
-	function startEmu() {
-		canvas = document.getElementById('tvc');
-		ctx = canvas.getContext('2d');
-
-		tvc = new TVCModule.TVC(ctx);
-
+	var tvc,canvas,ctx;
+	function readData(url, callback) {
 		var oReq = new XMLHttpRequest();
-		oReq.open("GET", "TVC_SYS.ROM", true);
+		oReq.open("GET", url, true);
 		oReq.responseType = "arraybuffer";
 		oReq.onload = function (oEvent) {
 			var arrayBuffer = oReq.response;
-			  if (arrayBuffer) {
-				var byteArray = new Uint8Array(arrayBuffer);
-				tvc.addRom("SYS", byteArray);
-			  }
-		var oReq2 = new XMLHttpRequest();
-		oReq2.open("GET", "TVC_EXT.ROM", true);
-		oReq2.responseType = "arraybuffer";
-		oReq2.onload = function (oEvent) {
-			var arrayBuffer2 = oReq2.response;
-			  if (arrayBuffer2) {
-				var byteArray2 = new Uint8Array(arrayBuffer2);
-				tvc.addRom("EXT", byteArray2);
-				tvc.run();
-			  }
-		};
-		oReq2.send(null);
-		};
+			if (arrayBuffer) { callback(arrayBuffer); }
+		}
 		oReq.send(null);
+	}
+	function startEmu() {
+		var im, imx, imy;
+		canvas = document.getElementById('tvc');
+		ctx = canvas.getContext('2d');
+		tvc = new TVCModule.TVC(ctx);
+		readData("TVC_SYS.ROM", function (data) {
+			tvc.addRom("SYS", new Uint8Array(data));
+			readData("TVC_EXT.ROM", function (data) {
+				tvc.addRom("EXT", new Uint8Array(data));
+				tvc.run();
+			  });
+		  });
 	};
 </script>
     <style type="text/css">
@@ -43,6 +36,7 @@
     </style>
 </head>
 <body onload="startEmu();">
-<canvas id="tvc" width="640" height="480"></canvas>
+<canvas id="tvc" width="800" height="400"></canvas>
+
 </body>
 </html>
