@@ -3728,9 +3728,9 @@ Z80Module = function () {
 				F_N, true);
 		},
 		0xDD26:function () { // LD IXH,n*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 7;
+			this._op_m = 3;
+			this._s.IXH = this._mmu.r8(this._s.getPC(2));
 		},
 		0xDD29:function () { // ADD IX,IX
 			this._op_t = 15;
@@ -3775,9 +3775,9 @@ Z80Module = function () {
 				F_N, true);
 		},
 		0xDD2E:function () { // LD IXL,n*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 7;
+			this._op_m = 3;
+			this._s.IXL = this._mmu.r8(this._s.getPC(2));
 		},
 		0xDD34:function () { // INC (IX+d)
 			this._op_t = 23;
@@ -3885,34 +3885,33 @@ Z80Module = function () {
 			this._s.E = this._mmu.r8(this._s.getIX(disp));
 		},
 		0xDD60:function () { // LD IXH,B*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXH = this._s.B;
 		},
 		0xDD61:function () { // LD IXH,C*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXH = this._s.C;
 		},
 		0xDD62:function () { // LD IXH,D*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXH = this._s.D;
 		},
 		0xDD63:function () { // LD IXH,E*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXH = this._s.E;
 		},
 		0xDD64:function () { // LD IXH,IXH*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
 		},
 		0xDD65:function () { // LD IXH,IXL*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXH = this._s.IXL;
 		},
 		0xDD66:function () { // LD H,(IX+d)
 			this._op_t = 19;
@@ -3921,39 +3920,38 @@ Z80Module = function () {
 			this._s.H = this._mmu.r8(this._s.getIX(disp));
 		},
 		0xDD67:function () { // LD IXH,A*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXH = this._s.A;
 		},
 		0xDD68:function () { // LD IXL,B*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXL = this._s.B;
 		},
 		0xDD69:function () { // LD IXL,C*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXL = this._s.C;
 		},
 		0xDD6A:function () { // LD IXL,D*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXL = this._s.D;
 		},
 		0xDD6B:function () { // LD IXL,E*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXL = this._s.E;
 		},
 		0xDD6C:function () { // LD IXL,IXH*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXL = this._s.IXH;
 		},
 		0xDD6D:function () { // LD IXL,IXL*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
 		},
 		0xDD6E:function () { // LD L,(IX+d)
 			this._op_t = 19;
@@ -3962,9 +3960,9 @@ Z80Module = function () {
 			this._s.L = this._mmu.r8(this._s.getIX(disp));
 		},
 		0xDD6F:function () { // LD IXL,A*
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IXL = this._s.A;
 		},
 		0xDD70:function () { // LD (IX+d),B
 			this._op_t = 19;
@@ -7321,9 +7319,9 @@ Z80Module = function () {
 				F_N, true);
 		},
 		0xFD26:function () { // LD IYH,n*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 7;
+			this._op_m = 3;
+			this._s.IYH = this._mmu.r8(this._s.getPC(2));
 		},
 		0xFD29:function () { // ADD IY,IY
 			this._op_t = 15;
@@ -7368,9 +7366,9 @@ Z80Module = function () {
 				F_N, true);
 		},
 		0xFD2E:function () { // LD IYL,n*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 7;
+			this._op_m = 3;
+			this._s.IYL = this._mmu.r8(this._s.getPC(2));
 		},
 		0xFD34:function () { // INC (IY+d)
 			this._op_t = 23;
@@ -7478,34 +7476,33 @@ Z80Module = function () {
 			this._s.E = this._mmu.r8(this._s.getIY(disp));
 		},
 		0xFD60:function () { // LD IYH,B*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYH = this._s.B;
 		},
 		0xFD61:function () { // LD IYH,C*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYH = this._s.C;
 		},
 		0xFD62:function () { // LD IYH,D*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYH = this._s.D;
 		},
 		0xFD63:function () { // LD IYH,E*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYH = this._s.E;
 		},
 		0xFD64:function () { // LD IYH,IYH*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
 		},
 		0xFD65:function () { // LD IYH,IYL*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYH = this._s.IYL;
 		},
 		0xFD66:function () { // LD H,(IY+d)
 			this._op_t = 19;
@@ -7514,39 +7511,38 @@ Z80Module = function () {
 			this._s.H = this._mmu.r8(this._s.getIY(disp));
 		},
 		0xFD67:function () { // LD IYH,A*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYH = this._s.A;
 		},
 		0xFD68:function () { // LD IYL,B*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYL = this._s.B;
 		},
 		0xFD69:function () { // LD IYL,C*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYL = this._s.C;
 		},
 		0xFD6A:function () { // LD IYL,D*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYL = this._s.D;
 		},
 		0xFD6B:function () { // LD IYL,E*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYL = this._s.E;
 		},
 		0xFD6C:function () { // LD IYL,IYH*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYL = this._s.IYH;
 		},
 		0xFD6D:function () { // LD IYL,IYL*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
 		},
 		0xFD6E:function () { // LD L,(IY+d)
 			this._op_t = 19;
@@ -7555,9 +7551,9 @@ Z80Module = function () {
 			this._s.L = this._mmu.r8(this._s.getIY(disp));
 		},
 		0xFD6F:function () { // LD IYL,A*
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 4;
+			this._op_m = 2;
+			this._s.IYL = this._s.A;
 		},
 		0xFD70:function () { // LD (IY+d),B
 			this._op_t = 19;
