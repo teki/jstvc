@@ -219,4 +219,5 @@
     TVC specific:
         * clock: 3.125 MHz (50/16), 1 tick = 320ns
 
-    
+# RESOURCES
+	* how to write emulators: http://atarihq.com/danb/emulation.shtml
