@@ -4066,7 +4066,7 @@ Z80Module = function () {
 			//TODO: fix timing info
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = add8(this._s.A, this._s.getIXL(), 0);
+			var res = add8(this._s.A, this._s.IXL, 0);
 			this._s.A = res.val;
 			this._s.updateF(res);
 		},
@@ -4090,7 +4090,7 @@ Z80Module = function () {
 			//TODO: fix timing info
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = add8(this._s.A, this._s.getIXL(), this._s.getF(F_C));
+			var res = add8(this._s.A, this._s.IXL, this._s.getF(F_C));
 			this._s.A = res.val;
 			this._s.updateF(res);
 		},
@@ -4115,7 +4115,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = sub8(this._s.A, this._s.getIXL());
+			var res = sub8(this._s.A, this._s.IXL);
 			this._s.A = res.val;
 			this._s.updateF(res);
 		},
@@ -4140,7 +4140,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = sub8(this._s.A, this._s.getIXL(), this._s.getF(F_C));
+			var res = sub8(this._s.A, this._s.IXL, this._s.getF(F_C));
 			this._s.A = res.val;
 			this._s.updateF(res);
 		},
@@ -4170,7 +4170,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			this._s.A = this._s.A & this._s.getIXL();
+			this._s.A = this._s.A & this._s.IXL;
 			this._s.setF(
 				F_S, (this._s.A & 0x80) !== 0,
 				F_Z, this._s.A === 0,
@@ -4210,7 +4210,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			this._s.A = (this._s.A ^ this._s.getIXL()) & 0xFF;
+			this._s.A = (this._s.A ^ this._s.IXL) & 0xFF;
 			this._s.setF(
 				F_S, (this._s.A & 0x80) !== 0,
 				F_Z, this._s.A === 0,
@@ -4249,7 +4249,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			this._s.A = (this._s.A | this._s.getIXL()) & 0xFF;
+			this._s.A = (this._s.A | this._s.IXL) & 0xFF;
 			this._s.setF(
 				F_S, (this._s.A & 0x80) !== 0,
 				F_Z, this._s.A === 0,
@@ -4283,7 +4283,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = sub8(this._s.A, this._s.getIXL());
+			var res = sub8(this._s.A, this._s.IXL);
 			this._s.updateF(res);
 		},
 		0xDDBE:function () { // CP (IX+d)
@@ -5344,9 +5344,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xDDCBC6:function () { // SET 0,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x01);
 		},
 		0xDDCBC7:function () { // LD A,SET 0,(IX+d)*
 			this._op_t = 0;
@@ -5384,9 +5386,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xDDCBCE:function () { // SET 1,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x02);
 		},
 		0xDDCBCF:function () { // LD A,SET 1,(IX+d)*
 			this._op_t = 0;
@@ -5424,9 +5428,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xDDCBD6:function () { // SET 2,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x04);
 		},
 		0xDDCBD7:function () { // LD A,SET 2,(IX+d)*
 			this._op_t = 0;
@@ -5464,9 +5470,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xDDCBDE:function () { // SET 3,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x08);
 		},
 		0xDDCBDF:function () { // LD A,SET 3,(IX+d)*
 			this._op_t = 0;
@@ -5504,9 +5512,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xDDCBE6:function () { // SET 4,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x10);
 		},
 		0xDDCBE7:function () { // LD A,SET 4,(IX+d)*
 			this._op_t = 0;
@@ -5544,9 +5554,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xDDCBEE:function () { // SET 5,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x20);
 		},
 		0xDDCBEF:function () { // LD A,SET 5,(IX+d)*
 			this._op_t = 0;
@@ -5584,9 +5596,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xDDCBF6:function () { // SET 6,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x40);
 		},
 		0xDDCBF7:function () { // LD A,SET 6,(IX+d)*
 			this._op_t = 0;
@@ -5624,9 +5638,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xDDCBFE:function () { // SET 7,(IX+d)
-			this._op_t = 0;
-			this._op_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIX(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x80);
 		},
 		0xDDCBFF:function () { // LD A,SET 7,(IX+d)*
 			this._op_t = 0;
@@ -7709,7 +7725,7 @@ Z80Module = function () {
 			//TODO: fix timing info
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = add8(this._s.A, this._s.getIYL(), 0);
+			var res = add8(this._s.A, this._s.IYL, 0);
 			this._s.A = res.val;
 			this._s.updateF(res);
 		},
@@ -7733,7 +7749,7 @@ Z80Module = function () {
 			//TODO: fix timing info
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = add8(this._s.A, this._s.getIYL(), this._s.getF(F_C));
+			var res = add8(this._s.A, this._s.IYL, this._s.getF(F_C));
 			this._s.A = res.val;
 			this._s.updateF(res);
 		},
@@ -7758,7 +7774,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = sub8(this._s.A, this._s.getIYL());
+			var res = sub8(this._s.A, this._s.IYL);
 			this._s.A = res.val;
 			this._s.updateF(res);
 		},
@@ -7783,7 +7799,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = sub8(this._s.A, this._s.getIYL(), this._s.getF(F_C));
+			var res = sub8(this._s.A, this._s.IYL, this._s.getF(F_C));
 			this._s.A = res.val;
 			this._s.updateF(res);
 		},
@@ -7813,7 +7829,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			this._s.A = this._s.A & this._s.getIYL();
+			this._s.A = this._s.A & this._s.IYL;
 			this._s.setF(
 				F_S, (this._s.A & 0x80) !== 0,
 				F_Z, this._s.A === 0,
@@ -7853,7 +7869,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			this._s.A = (this._s.A ^ this._s.getIYL()) & 0xFF;
+			this._s.A = (this._s.A ^ this._s.IYL) & 0xFF;
 			this._s.setF(
 				F_S, (this._s.A & 0x80) !== 0,
 				F_Z, this._s.A === 0,
@@ -7892,7 +7908,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			this._s.A = (this._s.A | this._s.getIYL()) & 0xFF;
+			this._s.A = (this._s.A | this._s.IYL) & 0xFF;
 			this._s.setF(
 				F_S, (this._s.A & 0x80) !== 0,
 				F_Z, this._s.A === 0,
@@ -7926,7 +7942,7 @@ Z80Module = function () {
 			//TODO fix timing
 			this._op_t = 4;
 			this._op_m = 2;
-			var res = sub8(this._s.A, this._s.getIYL());
+			var res = sub8(this._s.A, this._s.IYL);
 			this._s.updateF(res);
 		},
 		0xFDBE:function () { // CP (IY+d)
@@ -8987,9 +9003,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xFDCBC6:function () { // SET 0,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x01);
 		},
 		0xFDCBC7:function () { // LD A,SET 0,(IY+d)*
 			this._opt_t = 0;
@@ -9027,9 +9045,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xFDCBCE:function () { // SET 1,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x02);
 		},
 		0xFDCBCF:function () { // LD A,SET 1,(IY+d)*
 			this._opt_t = 0;
@@ -9067,9 +9087,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xFDCBD6:function () { // SET 2,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x04);
 		},
 		0xFDCBD7:function () { // LD A,SET 2,(IY+d)*
 			this._opt_t = 0;
@@ -9107,9 +9129,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xFDCBDE:function () { // SET 3,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x08);
 		},
 		0xFDCBDF:function () { // LD A,SET 3,(IY+d)*
 			this._opt_t = 0;
@@ -9147,9 +9171,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xFDCBE6:function () { // SET 4,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x10);
 		},
 		0xFDCBE7:function () { // LD A,SET 4,(IY+d)*
 			this._opt_t = 0;
@@ -9187,9 +9213,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xFDCBEE:function () { // SET 5,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x20);
 		},
 		0xFDCBEF:function () { // LD A,SET 5,(IY+d)*
 			this._opt_t = 0;
@@ -9227,9 +9255,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xFDCBF6:function () { // SET 6,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x40);
 		},
 		0xFDCBF7:function () { // LD A,SET 6,(IY+d)*
 			this._opt_t = 0;
@@ -9267,9 +9297,11 @@ Z80Module = function () {
 			throw ("not implemented");
 		},
 		0xFDCBFE:function () { // SET 7,(IY+d)
-			this._opt_t = 0;
-			this._opt_m = 0;
-			throw ("not implemented");
+			this._op_t = 23;
+			this._op_m = 4;
+			var displ = this._mmu.r8s(this._s.getPC(2));
+			var addr = this._s.getIY(displ);
+			this._mmu.w8(addr, this._mmu.r8(addr) | 0x80);
 		},
 		0xFDCBFF:function () { // LD A,SET 7,(IY+d)*
 			this._opt_t = 0;
