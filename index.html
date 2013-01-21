@@ -32,6 +32,10 @@
 		return defer;
 	}
 	function emuInit() {
+		(function() {
+		  var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+		  window.requestAnimationFrame = requestAnimationFrame;
+		})();
 		g.regs = $("#regs")[0];
 		g.lastrefresh = 0;
 		// frame buffer
@@ -70,9 +74,6 @@
 	}
 	function emuContinue() {
 		window.requestAnimationFrame(emuRunFrame);
-	};
-	function emuStop() {
-		window.cancelAnimationFrame(emuRunFrame);
 	};
 	function emuRunFrame() {
 		if (g.isPaused) {
