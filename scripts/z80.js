@@ -27,6 +27,21 @@ Z80Module = function () {
 		return "000".slice(s.length - 1) + s;
 	}
 
+	function toHex88(x,y) {
+		var s = ((x << 8) | y).toString(16).toUpperCase();
+		return "000".slice(s.length - 1) + s;
+	}
+
+	function toBin8(x) {
+		var arr = [];
+		var i;
+		for (i=0; i<8; i++) {
+			arr.push((x & 0x80) ? "1" : "0");
+			x = (x << 1);
+		}
+		return arr.join("");
+	}
+
 	Z80Exports.decodeZ80 = function (mmu, addr) {
 		var tableR = ["B", "C", "D", "E", "H", "L", "(HL)", "A"],
 			tableRP = ["BC", "DE", "HL", "SP"],
@@ -535,6 +550,22 @@ Z80Module = function () {
 		this.im = 0;
 	};
 
+	Z80State.prototype.toString = function() {
+		var arr = [];
+		arr.push("PC:");arr.push(toHex16(this._PC));
+		arr.push(" SP:");arr.push(toHex16(this._SP));
+		arr.push(" AF:");arr.push(toHex88(this.A, this.F));
+		arr.push(" SZ5H3PNC:");arr.push(toBin8(this.F));
+		arr.push("\n");
+		arr.push("BC:");arr.push(toHex88(this.B, this.C));
+		arr.push(" DE:");arr.push(toHex88(this.D,this.E));
+		arr.push(" HL:");arr.push(toHex88(this.H,this.L));
+		arr.push(" IX:");arr.push(toHex88(this.IXH,this.IXL));
+		arr.push(" IY:");arr.push(toHex88(this.IYH,this.IYL));
+
+		return arr.join("");
+	}
+
 	////////////////////////////////////////////
 	// Z80
 	////////////////////////////////////////////
@@ -546,6 +577,7 @@ Z80Module = function () {
 		this._op_t = 0;
 		this._op_m = 0;
 		this._op_halt = false;
+		this.bt = [];
 		
 		var i,opcode;
 		
@@ -560,6 +592,9 @@ Z80Module = function () {
 				this._opcodes[opcode] = this._opcodes[i];
 			}
 		}
+	}
+	Z80.prototype.toString = function() {
+		return this._s.toString();
 	}
 
 	Z80.prototype.push16 = function (val) {
@@ -882,41 +917,61 @@ Z80Module = function () {
 			this._s.H = this._mmu.r8(this._s.getPC(1));
 		},
 		0x27:function () { // DAA
+			this._op_t = 4;
+			this._op_m = 1;
+			var res;
+			var add = 0, carry = ( this._s.F & F_C );
+			if( ( this._s.F & F_H ) || ( (this._s.A & 0x0f)>9 ) ) add=6;
+			if( carry || (this._s.A > 0x99 ) ) add|=0x60;
+			if( this._s.A > 0x99 ) carry=F_C;
+			if ( this._s.F & F_N ) {
+			  res = sub8(this._s.A, add, 0);
+			} else {
+			  res = add8(this._s.A, add, 0);
+			}
+			this._s.A = res.val;
+			this._s.setF(
+					F_S, res.F_S,
+					F_Z, res.F_Z,
+					F_5, this._s.A & F_5,
+					F_H, res.F_H,
+					F_3, this._s.A & F_3,
+					F_PV, PVTable[this._s.A],
+					F_C, carry);
+/*
 			var high = (this._s.A & 0xf0) >>> 4,
 				low = (this._s.A & 0x0f),
 				high09 = (high <= 9),
 				low09 = (low <= 9),
-				highAF = (high > 9),
-				lowAF = (low > 9),
+				CIn = this._s.getF(F_C),
+				HIn = this._s.getF(F_H),
 				diff = 0,
-				Cout = 0,
+				COut = 0,
 				Hout = 0,
 				res;
-			this._op_t = 4;
-			this._op_m = 1;
 			// C
-			Cout = this._s.getF(F_C) | (high >= 0x09 && lowAF) | (highAF && low09);
+			COut = CIn || (high >= 0x09 && !low09) || (!high09 && low09);
 			// H
 			if (this._s.getF(F_N)) { // sub
-				Hout = this._s.getF(F_H) && low <= 5;
+				Hout = HIn && low <= 5;
 			}
 			else {
-				Hout = low >= 0x0a;
+				Hout = !low09;
 			}
 			// diff
-			if (this._s.getF(F_C)) {
-				diff = (!this._s.getF(F_H) && low09) ? 0x60 : 0x66;
+			if (CIn) {
+				diff = (!HIn && low09) ? 0x60 : 0x66;
 			}
-			else if (low09 && high09 && !this._s.getF(F_C) && !this._s.getF(F_H)) {
+			else if (low09 && high09 && !HIn) {
 				diff = 0;
 			}
-			else if (lowAF) {
+			else if (!low09) {
 				diff = (high >= 0x09) ? 0x66 : 0x06;
 			}
 			else if (high09) {
 				diff = 0x06;
 			}
-			else if (this._s.getF(F_H)) {
+			else if (HIn) {
 				diff = 0x66;
 			}
 			else {
@@ -936,11 +991,11 @@ Z80Module = function () {
 			this._s.setF(
 					F_S, this._s.A & F_S,
 					F_H, Hout,
-					F_C, Cout,
+					F_C, COut,
 					F_PV, PVTable[this._s.A],
 					F_Z, this._s.A == 0
 			);
-
+*/
 /*
 			if (this._s.getF(F_N)) { // sub
 				Cout = this._s.getF(F_C);
@@ -1060,7 +1115,7 @@ Z80Module = function () {
 			this._op_t = 4;
 			this._op_m = 1;
 			this._s.A = (~this._s.A) & 0xFF;
-			this._s.setF(F_H, true, F_N, true);
+			this._s.setF(F_H, true, F_N, true, F_5, this._s.A & F_5, F_3, this._s.A & F_3);
 		},
 		0x30:function () { // JR NC,(PC+e)
 			var offset;
@@ -1126,7 +1181,7 @@ Z80Module = function () {
 		0x37:function () { // SCF
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.setF(F_C, true, F_H, false, F_N, false);
+			this._s.setF(F_C, true, F_H, false, F_N, false, F_5, this._s.A & F_5, F_3, this._s.A & F_3);
 		},
 		0x38:function () { // JR C,(PC+e)
 			var offset;
@@ -1192,7 +1247,7 @@ Z80Module = function () {
 		0x3F:function () { // CCF
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.setF(F_C, !this._s.getF(F_C), F_N, false);
+			this._s.setF(F_C, !this._s.getF(F_C), F_N, false, F_5, this._s.A & F_5, F_3, this._s.A & F_3);
 		},
 		0x40:function () { // LD B,B
 			this._op_t = 4;
@@ -9401,6 +9456,8 @@ Z80Module = function () {
 	};
 
 	Z80.prototype.step = function () {
+		this.bt.push(this._s.getPC());
+		if (this.bt.length > 5) this.bt.shift();
 		var opcode = this._mmu.r8(this._s.getPC());
 		if (opcode == 0xED || opcode == 0xCB || opcode == 0xDD || opcode == 0xFD) {
 			opcode = (opcode << 8) | this._mmu.r8(this._s.getPC(1));
@@ -9410,7 +9467,7 @@ Z80Module = function () {
 		}
 		var f = this._opcodes[opcode];
 		if (!f) {
-			this._mmu.dasm(this._s.getPC(), 5, "??? ");
+			console.log(this._mmu.dasm(this._s.getPC(), 5, "??? ").join("\n"));
 			throw ("not implemented:" + toHex8(opcode));
 		}
 		//this.logasm();
@@ -9426,10 +9483,21 @@ Z80Module = function () {
 
 	Z80.prototype.reset = function () {
 		this._s.reset();
+		this.bt = [];
 	};
 
 	Z80.prototype.logasm = function () {
-		this._mmu.dasm(this._s.getPC(), 1, "%% ", true);
+		console.log(this._mmu.dasm(this._s.getPC(), 1, "%% ", true).join("\n"));
+	};
+
+	Z80.prototype.btToString = function() {
+		var arr = [];
+		var i;
+		for(i=0; i<this.bt.length; i++) {
+			arr.push(this._mmu.dasm(this.bt[i], 1, "", true)[0]);
+		}
+		arr.push(this._mmu.dasm(this._s.getPC(), 1, "", true)[0]);
+		return arr;
 	};
 
 	Z80Exports.Z80 = Z80;
@@ -9444,6 +9512,7 @@ Z80Module = function () {
 
 	FakeMMU.prototype.dasm = function (addr, lines, prefix, noLdir) {
 		var offset = 0,
+			res = [],
 			d, i, str, oplen, line;
 		do {
 			d = Z80Module.decodeZ80(this, addr + offset);
@@ -9460,11 +9529,12 @@ Z80Module = function () {
 			}
 			line = prefix + str + d[0];
 			if (!noLdir || -1 == line.indexOf("LDIR")) {
-				console.log(line);
+				res.push(line);
 			}
 			offset += oplen;
 			lines--;
 		} while (lines);
+		return res;
 	};
 	FakeMMU.prototype.r8 = function (addr) {
 		return this._mem[addr];
@@ -9510,13 +9580,19 @@ Z80Module = function () {
 			z80._s.setIX(valIdx);
 			z80._s.setIY(valIdy);
 			z80._s.F = a.iF;
+			z80._s.A = a.ival;
 			fakeMmu.w8(valIdx + a.op[2], a.ival);
 			fakeMmu.w8(valIdy + a.op[2], a.ival);
 			for (var i = 0; i < a.op.length; i++) {
 				fakeMmu.w8(opIdx+i, a.op[i]);
 			}
 			z80.step();
-			if (z80._s.F != a.eF || fakeMmu.r8(a.addr) != a.eval) {
+			if (a.addr == -1) {
+				if (z80._s.F != a.eF || z80._s.A != a.eval) {
+					throw(JSON.stringify(a) + "\n F: " + toHex8(z80._s.F) + " A:" + toHex8(z80._s.A));
+				}
+			}
+			else if (z80._s.F != a.eF || fakeMmu.r8(a.addr) != a.eval) {
 				throw(JSON.stringify(a) + "\n F: " + toHex8(z80._s.F) + " m:" + fakeMmu.r8(a.eval));
 			}
 		}
@@ -9553,6 +9629,20 @@ Z80Module = function () {
 		testOp({ival: 0x00, iF: F_C, eval: 0x00, eF: F_PV|F_Z,  name: "sla2", op: [ 0xDD, 0xCB, 0x01, 0x26 ], addr: valIdx+1});
 		testOp({ival: 0x80, iF: 0, eval: 0x00, eF: F_C|F_Z|F_PV,  name: "sla3", op: [ 0xDD, 0xCB, 0x01, 0x26 ], addr: valIdx+1});
 		testOp({ival: 0xC0, iF: 0, eval: 0x80, eF: F_C|F_S,  name: "sla4", op: [ 0xDD, 0xCB, 0x01, 0x26 ], addr: valIdx+1});
+
+		// DAA
+		testOp({ival: 0x9A, iF: 0x02, eval: 0x34, eF: 0x23,  name: "daa1", op: [ 0x27 ], addr: -1});
+		testOp({ival: 0x1F, iF: 0x00, eval: 0x25, eF: 0x30,  name: "daa2", op: [ 0x27 ], addr: -1});
+		// CPL
+		testOp({ival: 0x89, iF: 0x00, eval: 0x76, eF: 0x32,  name: "cpl", op: [ 0x2F ], addr: -1});
+		// SCF
+		testOp({ival: 0x00, iF: 0xFF, eval: 0x00, eF: 0xC5,  name: "scf1", op: [ 0x37 ], addr: -1});
+		testOp({ival: 0xFF, iF: 0x00, eval: 0xFF, eF: 0x29,  name: "scf2", op: [ 0x37 ], addr: -1});
+		testOp({ival: 0xFF, iF: 0xFF, eval: 0xFF, eF: 0xED,  name: "scf3", op: [ 0x37 ], addr: -1});
+		testOp({ival: 0x00, iF: 0x00, eval: 0x00, eF: 0x01,  name: "scf4", op: [ 0x37 ], addr: -1});
+		// CCF
+		testOp({ival: 0x00, iF: 0x5B, eval: 0x00, eF: 0x50,  name: "ccf", op: [ 0x3F ], addr: -1});
+
 	};
 
 
@@ -9580,7 +9670,7 @@ Z80Module = function () {
 			z80.step();
 			var pc = z80._s.getPC();
 			if (pc == 0x1D42 && doDasm) {
-				fakemmu.dasm(z80._s.getPC(), 1, "%% ", false);
+				console.log(fakemmu.dasm(z80._s.getPC(), 1, "%% ", false).join("\n"));
 			}
 			// 0 = soft reset
 			else if (pc == 0) {
@@ -9613,6 +9703,7 @@ Z80Module = function () {
 }();
 
 //try {
+/*
 if (process != undefined) {
 	if (process.argv.length > 2) {
 		if (process.argv[2] == "cpu") {
@@ -9626,6 +9717,7 @@ if (process != undefined) {
 		}
 	}
 }
+*/
 //} catch (e) {
 //	console.log(e);
 //}

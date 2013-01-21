@@ -3,40 +3,133 @@
 <head>
 <meta http-equiv="Content-type" content="text/html; charset=utf-8">
 <title>tvc</title>
+<script src="scripts/jquery-1.9.0.min.js"></script>
 <script src="scripts/z80.js"></script>
 <script src="scripts/tvc.js"></script>
 <script type="text/javascript">
-	var tvc,canvas,ctx;
-	function readData(url, callback) {
+	var g = {};
+	g.isPaused = false;
+	g.tvc = undefined;
+	g.canvas = undefined;
+	g.regs = undefined;
+	g.fb = undefined;
+
+	function getData(url) {
+		var defer = $.Deferred();
 		var oReq = new XMLHttpRequest();
 		oReq.open("GET", url, true);
 		oReq.responseType = "arraybuffer";
 		oReq.onload = function (oEvent) {
 			var arrayBuffer = oReq.response;
-			if (arrayBuffer) { callback(arrayBuffer); }
+			if (arrayBuffer) {
+				defer.resolve(arrayBuffer);
+			}
+			else {
+				defer.reject(this);
+			}
 		}
 		oReq.send(null);
+		return defer;
 	}
-	function startEmu() {
-		var im, imx, imy;
-		canvas = document.getElementById('tvc');
-		ctx = canvas.getContext('2d');
-		tvc = new TVCModule.TVC(ctx);
-		readData("TVC_SYS.ROM", function (data) {
-			tvc.addRom("SYS", new Uint8Array(data));
-			readData("TVC_EXT.ROM", function (data) {
-				tvc.addRom("EXT", new Uint8Array(data));
-				tvc.run();
-			  });
-		  });
+	function emuInit() {
+		g.regs = $("#regs")[0];
+		g.lastrefresh = 0;
+		// frame buffer
+		g.canvas = $("#tvc")[0];
+		g.ctx = g.canvas.getContext("2d");
+		g.fb = {};
+		g.fb.width = g.canvas.width;
+		g.fb.height = g.canvas.height;
+		g.fb.data = g.ctx.createImageData(g.fb.width, g.fb.height);
+		g.fb.refresh = function() {
+			g.ctx.putImageData(g.fb.data, 0, 0);
+		}
+		g.tvc = new TVCModule.TVC(g.fb);
+		// gui
+		$("#run").on("click", function() {
+			g.isPaused = !$("#run").is(":checked");
+			if (!g.isPaused) {
+				emuContinue();
+			}
+		});
+		$("#step").on("click", function() {
+			emuStep();
+		});
+
+		// load roms
+		getData("TVC_SYS.ROM")
+			.then(function(data) {
+				g.tvc.addRom("SYS", new Uint8Array(data));
+				return getData("TVC_EXT.ROM");
+				})
+			.then(function(data) {
+				g.tvc.addRom("EXT", new Uint8Array(data));
+				// start
+				emuContinue();
+				});
+	}
+	function emuContinue() {
+		window.webkitRequestAnimationFrame(emuRunFrame);
+	};
+	function emuStop() {
+		window.webkitCancelAnimationFrame(emuRunFrame);
+	};
+	function emuRunFrame() {
+		if (g.isPaused) {
+			return;
+		}
+		// limit to pal refresh rate
+		var timediff = performance.now() - g.lastrefresh;
+		g.lastrefresh = performance.now();
+		if (timediff < (1/25)) {
+			emuContinue();
+			return;
+		}
+		// run + update + continue
+		g.tvc.runForAFrame();
+		g.regs.innerHTML = g.tvc._z80.toString();
+		emuContinue();
+	};
+	function emuStep() {
+		var arr = [];
+		if (g.isPaused) {
+			g.tvc.runOne();
+			arr.push(g.tvc._z80.toString());
+			arr = arr.concat(g.tvc._z80.btToString());
+			g.regs.innerHTML = arr.join("\n");
+		}
 	};
 </script>
-    <style type="text/css">
-      canvas { border: 1px solid black; }
-    </style>
-</head>
-<body onload="startEmu();">
-<canvas id="tvc" width="800" height="400"></canvas>
 
+<style type="text/css">
+	canvas {
+		border: 1px solid black;
+		background-color: red;
+	}
+	#regs {
+		font-family: "Courier New", Courier, monospace;
+		font-size: 12px;
+		white-space: pre;
+	}
+	#screen {
+		width: 512px;
+		float: left;
+	}
+	#dbg {
+		float: right;
+	}
+</style>
+
+</head>
+<body onload="emuInit();">
+	<div id="screen">
+		<canvas id="tvc" width="512" height="240"></canvas>
+	</div>
+	<div id="dbg">
+		<input id="run" type="CHECKBOX" checked="true">run</input>
+		<input id="step" type="BUTTON" value="step"></input>
+		<div id="regs">
+		</div>
+	</div>
 </body>
 </html>
