@@ -69,10 +69,10 @@
 				});
 	}
 	function emuContinue() {
-		window.webkitRequestAnimationFrame(emuRunFrame);
+		window.requestAnimationFrame(emuRunFrame);
 	};
 	function emuStop() {
-		window.webkitCancelAnimationFrame(emuRunFrame);
+		window.cancelAnimationFrame(emuRunFrame);
 	};
 	function emuRunFrame() {
 		if (g.isPaused) {
