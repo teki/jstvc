@@ -39,9 +39,6 @@
 		oReq.send(null);
 		return defer;
 	}
-	function vidModeChange(x) {
-		g.canvas.css("-webkit-transform", "scaleY(1.6) scaleX(" + x + ")");
-	}
 	function emuInit() {
 		(function() {
 		  var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
@@ -59,7 +56,7 @@
 		g.fb.refresh = function() {
 			g.ctx.putImageData(g.fb.data, 0, 0);
 		}
-		g.tvc = new TVCModule.TVC(g.fb, vidModeChange);
+		g.tvc = new TVCModule.TVC(g.fb);
 		// gui
 		$("#run").on("click", function() {
 			g.isRunning = !g.isRunning;
@@ -171,11 +168,6 @@ abbr, acronym
 		background-color: red;
 		-webkit-transform-origin: left top 0;
 		-webkit-transform: scaleY(1.6);
-	}
-	#screen {
-		width: 512px;
-		height: 384px;
-		overflow: hidden;
 	}
 	#regs {
 		font-family: "Courier New", Courier, monospace;

@@ -230,10 +230,12 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		var vidmem = this._mmu.getVid();
 		this._startAddress = this._reg[12] << 8 | this._reg[13];
 
-		var i,j,k,val1,val2,val3,val4,pixelIdx,pixelData,addr;
+		var i,j,k,val1,val2,val3,val4,pixelIdx,pixelData,pixelData2,addr;
 		var fbd = this._fb.data.data;
 		var fbw = ~~this._fb.width;
 		var fbh = ~~this._fb.height;
+		var p0,p1,p2,p3;
+		var d0,d1,d2,d3;
 
 		switch (this._mode) {
 			case 0: // 2 colors
@@ -291,34 +293,55 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 					pixelIdx = fbw * j * 4;
 					for (i = 0; i < 64; i++) {
 						pixelData = vidmem[addr++];
-						val1 = this._palettergb[((pixelData&0x08)>>2) | ((pixelData&0x80)>>7)];
-						fbd[pixelIdx++] = (val1 & 0xFF0000) >>> 16;
-						fbd[pixelIdx++] = (val1 & 0xFF00) >>> 8;
-						fbd[pixelIdx++] = val1 & 0xFF;
+						pixelData2 = pixelData >>> 4;
+						pixelData <<= 1;
+						d3 = (pixelData & 2) | (pixelData2 & 1);
+						pixelData >>= 1;
+						pixelData2 >>= 1;
+						d2 = (pixelData & 2) | (pixelData2 & 1);
+						pixelData >>= 1;
+						pixelData2 >>= 1;
+						d1 = (pixelData & 2) | (pixelData2 & 1);
+						pixelData >>= 1;
+						pixelData2 >>= 1;
+						d0 = (pixelData & 2) | (pixelData2 & 1);
+						p0 = this._palettergb[d0];
+						fbd[pixelIdx++] = (p0 >> 16) & 0xFF;
+						fbd[pixelIdx++] = (p0 >> 8) & 0xFF;
+						fbd[pixelIdx++] = (p0) & 0xFF;
 						fbd[pixelIdx++] = 255;
-						val2 = this._palettergb[((pixelData&0x04)>>1) | ((pixelData&0x40)>>6)];
-						fbd[pixelIdx++] = (val2 & 0xFF0000) >>> 16;
-						fbd[pixelIdx++] = (val2 & 0xFF00) >>> 8;
-						fbd[pixelIdx++] = val2 & 0xFF;
+						fbd[pixelIdx++] = (p0 >> 16) & 0xFF;
+						fbd[pixelIdx++] = (p0 >> 8) & 0xFF;
+						fbd[pixelIdx++] = (p0) & 0xFF;
 						fbd[pixelIdx++] = 255;
-						val3 = this._palettergb[(pixelData&0x02) | ((pixelData&0x20)>>5)];
-						fbd[pixelIdx++] = (val3 & 0xFF0000) >>> 16;
-						fbd[pixelIdx++] = (val3 & 0xFF00) >>> 8;
-						fbd[pixelIdx++] = val3 & 0xFF;
+						p1 = this._palettergb[d1];
+						fbd[pixelIdx++] = (p1 >> 16) & 0xFF;
+						fbd[pixelIdx++] = (p1 >> 8) & 0xFF;
+						fbd[pixelIdx++] = (p1) & 0xFF;
 						fbd[pixelIdx++] = 255;
-						val4 = this._palettergb[((pixelData&0x01)<<1) | ((pixelData&0x10)>>5)];
-						fbd[pixelIdx++] = (val4 & 0xFF0000) >>> 16;
-						fbd[pixelIdx++] = (val4 & 0xFF00) >>> 8;
-						fbd[pixelIdx++] = val4 & 0xFF;
+						fbd[pixelIdx++] = (p1 >> 16) & 0xFF;
+						fbd[pixelIdx++] = (p1 >> 8) & 0xFF;
+						fbd[pixelIdx++] = (p1) & 0xFF;
+						fbd[pixelIdx++] = 255;
+						p2 = this._palettergb[d2];
+						fbd[pixelIdx++] = (p2 >> 16) & 0xFF;
+						fbd[pixelIdx++] = (p2 >> 8) & 0xFF;
+						fbd[pixelIdx++] = (p2) & 0xFF;
+						fbd[pixelIdx++] = 255;
+						fbd[pixelIdx++] = (p2 >> 16) & 0xFF;
+						fbd[pixelIdx++] = (p2 >> 8) & 0xFF;
+						fbd[pixelIdx++] = (p2) & 0xFF;
+						fbd[pixelIdx++] = 255;
+						p3 = this._palettergb[d3];
+						fbd[pixelIdx++] = (p3 >> 16) & 0xFF;
+						fbd[pixelIdx++] = (p3 >> 8) & 0xFF;
+						fbd[pixelIdx++] = (p3) & 0xFF;
+						fbd[pixelIdx++] = 255;
+						fbd[pixelIdx++] = (p3 >> 16) & 0xFF;
+						fbd[pixelIdx++] = (p3 >> 8) & 0xFF;
+						fbd[pixelIdx++] = (p3) & 0xFF;
 						fbd[pixelIdx++] = 255;
 					}
-				}
-				for (j = 0; j < 240; j++) {
-					pixelIdx = (fbw * j + j) * 4;
-					fbd[pixelIdx++] = 255;
-					fbd[pixelIdx++] = 255;
-					fbd[pixelIdx++] = 255;
-					fbd[pixelIdx++] = 255;
 				}
 				break;
 			default: // 2 = 16 colors
@@ -573,7 +596,7 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	////////////////////////////////////////////
 	// TVC
 	////////////////////////////////////////////
-	function TVC(fb, vidModeChange) {
+	function TVC(fb) {
 		var TVCthis = this;
 		this._clockfreq = 3125000;
 		this._clockperframe = (1/50) / (1/this._clockfreq);
@@ -586,7 +609,6 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		this._aud_it = false;
 		this._aud_on = false;
 		this._key = new KEY();
-		this._vidModeChange = vidModeChange;
 		this._z80 = new Z80Module.Z80(this._mmu, function(addr, val) {
 			TVCthis.writePort(addr, val);
 		}, function(addr) {
@@ -623,7 +645,6 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 
 	TVC.prototype.writePort = function (addr, val) {
 		var val1, val2, val3;
-		//    console.log("OUT (" + Utils.toHex8(addr) + "), " + Utils.toHex8(val));
 		switch(addr) {
 		case 0x00:
 			this._vid.setBorder(val);
@@ -640,12 +661,14 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 
 		case 0x04:
 			this._aud.setFreqL(val & 0xFF);
+			console.log("Set freq LOW: ", Utils.toHex8(val));
 			break;
 
 		case 0x05:
 			this._aud_on = (val & 0x10) !== 0;
 			this._aud_it = (val & 0x20) !== 0;
 			this._aud.setFreqH(val & 0x0F);
+			console.log("Set freq HIGH: ", Utils.toHex8(val & 0x0F), "AUD IT:",this._aud_it);
 			break;
 
 		case 0x06:
@@ -653,7 +676,6 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 			val2 = (val >>> 2) & 0x0F; // Sound amp
 			val3 = val & 0x03; // video mode
 			this._vid.setMode(val3);
-			this._vidModeChange(1 << val3);
 			this._aud.setAmp(val2);
 			break;
 
