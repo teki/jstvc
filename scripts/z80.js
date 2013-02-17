@@ -63,6 +63,21 @@ define(["scripts/utils.js"], function (Utils) {
 		this.R = 0x00;
 	};
 
+	Z80State.prototype = {
+		get AF() { return (this.A << 8) | this.F; },
+		set AF(val) {this.A = (val & 0xFF00) >>> 8; this.F = val & 0xFF;},
+		get BC() { return (this.B << 8) | this.C; },
+		set BC(val) {this.B = (val & 0xFF00) >>> 8; this.C = val & 0xFF;},
+		get DE() { return (this.D << 8) | this.E; },
+		set DE(val) {this.D = (val & 0xFF00) >>> 8; this.E = val & 0xFF;},
+		get HL() { return (this.H << 8) | this.L; },
+		set HL(val) {this.H = (val & 0xFF00) >>> 8; this.L = val & 0xFF;},
+		get IX() { return (this.IXH << 8) | this.IXL; },
+		set IX(val) {this.IXH = (val & 0xFF00) >>> 8; this.IXL = val & 0xFF;},
+		get IY() { return (this.IYH << 8) | this.IYL; },
+		set IY(val) {this.IYH = (val & 0xFF00) >>> 8; this.IYL = val & 0xFF;},
+	};
+
 	Z80State.prototype.reset = function () {
 		// interrupt
 		this.halted = 0;
@@ -163,6 +178,7 @@ define(["scripts/utils.js"], function (Utils) {
 		}
 	}
 
+
 	Z80State.prototype.getSSa = function (reg, offset) {
 		offset = offset || 0;
 		return ((this[reg[0] + "a"] << 8 | this[reg[1] + "a"]) + offset ) & 0xFFFF;
@@ -194,6 +210,7 @@ define(["scripts/utils.js"], function (Utils) {
 		this._op_t = 0;
 		this._op_m = 0;
 		this._op_displ = 0;
+		this._op_alures = [0,0];
 		this.bt = [];
 	}
 	Z80.prototype.toString = function() {
@@ -201,21 +218,19 @@ define(["scripts/utils.js"], function (Utils) {
 	}
 
 	Z80.prototype.push16 = function (val) {
-		//console.log("push16: " + Utils.toHex16(this._s.getSS("SP")) + " val: " + Utils.toHex16(val));
-		var SP = this._s.getSS("SP", -1);
+		var SP = (this._s.SP - 1) & 0xFFFF;
 		this._mmu.w8(SP, (val >>> 8) & 0xFF);
 		SP--;
 		this._mmu.w8(SP, val & 0xFF);
-		this._s.setSS("SP", SP);
+		this._s.SP = SP;
 	};
 
 	Z80.prototype.pop16 = function () {
-		var SP = this._s.getSS("SP");
+		var SP = this._s.SP;
 		var val = this._mmu.r8(SP);
 		SP++;
 		val |= (this._mmu.r8(SP) << 8);
-		this._s.setSS("SP", SP + 1);
-		//console.log("pop16 : " + Utils.toHex16(this._s.getSS("SP")) + " val: " + Utils.toHex16(val));
+		this._s.SP = (SP + 1) & 0xFFFF;
 		return val;
 	};
 
@@ -223,82 +238,84 @@ define(["scripts/utils.js"], function (Utils) {
 // opcode helpers
 // /////////////////////////////
 
-	function add8(val1, val2, CIn) {
-		CIn = CIn || 0;
-		var val1S = (val1 & 0x80) >>> 7,
-			val2S = (val2 & 0x80) >>> 7,
-			res = val1 + val2 + CIn,
-			res4 = (val1 & 0x0F) + (val2 & 0x0F) + CIn,
-			res8 = res & 0xFF,
-			resS = (res8 & 0x80) >>> 7,
-			overflow = (val1S == val2S) && (val1S != resS),
-			Chalf = res4 > 0x0F,
-			Cout = (res > 0xFF) ? (F_C) : (0);
-		return [res8,
+	function add8(val1, val2, CIn, resOut) {
+		CIn = CIn ? 1 : 0;
+		var val1S = (val1 & 0x80) >>> 7;
+		var val2S = (val2 & 0x80) >>> 7;
+		var res = val1 + val2 + CIn;
+		var res4 = (val1 & 0x0F) + (val2 & 0x0F) + CIn;
+		var res8 = res & 0xFF;
+		var resS = (res8 & 0x80) >>> 7;
+		var overflow = (val1S == val2S) && (val1S != resS);
+		var Chalf = res4 > 0x0F;
+		var Cout = (res > 0xFF) ? (F_C) : (0);
+		resOut[0] = res8;
+		resOut[1] =
 			   SZ53table[res8]
 				| (overflow ? F_PV : 0)
 				| (Chalf ? F_H : 0)
-				| Cout
-			];
+				| Cout ;
 	}
 
-	function sub8(val1, val2, CIn) {
-		var res;
-		// negate Cin (undefined too)
-		if (!CIn) CIn = 1;
-		else CIn = 0;
-		res = add8(val1, (~val2) & 0xFF, CIn);
-		res[1] ^= (F_H|F_C);
-		res[1] |= F_N;
-		return res;
+	function sub8(val1, val2, CIn, resOut) {
+		CIn = !CIn;
+		add8(val1, (~val2) & 0xFF, CIn, resOut);
+		resOut[1] ^= (F_H|F_C);
+		resOut[1] |= F_N;
 	}
 
-	function add16(val1, val2, Cin) {
-		var resL = add8(val1 & 0xFF, val2 & 0xFF, Cin);
-		var resH = add8(val1 >>> 8, val2 >>> 8, resL[1] & F_C);
+	function add16(val1, val2, Cin, resOut) {
+		var resL = [0,0];
+		var resH = [0,0];
+		add8(val1 & 0xFF, val2 & 0xFF, Cin, resL);
+		add8(val1 >>> 8, val2 >>> 8, resL[1] & F_C, resH);
 		var res16 = (resH[0] << 8) | resL[0];
-		return [res16,
+		resOut[0] = res16;
+		resOut[1] =
 			(resH[0] & F_S) |
 			((res16 == 0) ? (F_Z) : (0)) |
 			(resH[0] & F_5) |
 			(resH[1] & F_H) |
 			(resH[0] & F_3) |
 			(resH[1] & F_PV) |
-			(resH[1] & F_C)];
+			(resH[1] & F_C);
 	}
 
-	function sub16(val1, val2, Cin) {
-		var res;
+	function sub16(val1, val2, Cin, resOut) {
 		Cin = !Cin;
-		res = add16(val1, (~val2) & 0xFFFF, Cin);
-		res[1] ^= (F_C|F_H);
-		res[1] |= F_N;
-		return res;
+		add16(val1, (~val2) & 0xFFFF, Cin, resOut);
+		resOut[1] ^= (F_C|F_H);
+		resOut[1] |= F_N;
 	}
 
-	function shl8(val, rightIn) {
-		var COut = (val & 0x80) >> 7,
-			res;
+	function shl8(val, rightIn, resOut) {
+		var COut = (val & 0x80) >> 7;
+		var res;
 		rightIn = rightIn ? 1 : 0;
 		res = ((val << 1) | rightIn) & 0xFF;
-		return [res, SZ53Ptable[res] | COut ];
+		resOut[0] = res;
+		resOut[1] = SZ53Ptable[res] | COut;
 	}
 
-	function shr8(val, leftIn) {
-		var COut = val & 1,
-			res;
+	function shr8(val, leftIn, resOut) {
+		var COut = val & 1;
+		var res;
 		leftIn = leftIn ? 1 : 0;
 		res = ((val >>> 1) | (leftIn << 7)) & 0xFF;
-		return [res, SZ53Ptable[res] | COut ];
+		resOut[0] = res;
+		resOut[1] = SZ53Ptable[res] | COut;
 	}
 
+// ///////////////////////////////////////
+// opcode implementations
+// ///////////////////////////////////////
 	function srl_r(reg) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var res = shr8(this._s[reg], 0);
-			this._s[reg] = res[0];
-			this._s.F = res[1];
+			shr8(this._s[reg], 0, this._op_alures);
+			this._s[reg] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -306,9 +323,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var res = shr8(this._s[reg], this._s[reg] & 0x80);
-			this._s[reg] = res[0];
-			this._s.F = res[1];
+			shr8(this._s[reg], this._s[reg] & 0x80, this._op_alures);
+			this._s[reg] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -316,9 +333,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var res = shr8(this._s[reg], this._s.F & F_C);
-			this._s[reg] = res[0];
-			this._s.F = res[1];
+			shr8(this._s[reg], this._s.F & F_C, this._op_alures);
+			this._s[reg] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -326,9 +343,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var res = shr8(this._s[reg], this._s[reg] & 0x01);
-			this._s[reg] = res[0];
-			this._s.F = res[1];
+			shr8(this._s[reg], this._s[reg] & 0x01, this._op_alures);
+			this._s[reg] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -336,9 +353,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var res = shl8(this._s[reg], 1);
-			this._s[reg] = res[0];
-			this._s.F = res[1];
+			shl8(this._s[reg], 1, this._op_alures);
+			this._s[reg] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -346,9 +363,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var res = shl8(this._s[reg], 0);
-			this._s[reg] = res[0];
-			this._s.F = res[1];
+			shl8(this._s[reg], 0, this._op_alures);
+			this._s[reg] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -356,9 +373,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var res = shl8(this._s[reg], this._s.F & F_C);
-			this._s[reg] = res[0];
-			this._s.F = res[1];
+			shl8(this._s[reg], this._s.F & F_C, this._op_alures);
+			this._s[reg] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -366,9 +383,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var res = shl8(this._s[reg], this._s[reg] & 0x80);
-			this._s[reg] = res[0];
-			this._s.F = res[1];
+			shl8(this._s[reg], this._s[reg] & 0x80, this._op_alures);
+			this._s[reg] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -377,17 +394,14 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var memval = this._mmu.r8(addr);
 			var val = memval & mask;
-			var addrh = addr >>> 8;
 			this._s.F =
 				(val & F_S) |
-				((val) ? (0) : (F_Z)) |
-				(addrh & F_5) |
+				((val) ? (0) : (F_Z|F_PV)) |
+				((addr >>> 8) & (F_3|F_5)) |
 				F_H |
-				(addrh & F_3) |
-				((val) ? (0) : (F_PV)) |
 				(this._s.F & F_C);
 		}
 	}
@@ -397,15 +411,13 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 12;
 			this._op_m = 2;
-			var memval = this._mmu.r8(this._s.getSS("HL"));
+			var memval = this._mmu.r8(this._s.HL);
 			var val = memval & mask;
 			this._s.F =
 				(val & F_S) |
-				((val) ? (0) : (F_Z)) |
-				(memval & F_5) |
+				((val) ? (0) : (F_Z|F_PV)) |
+				(memval & (F_3|F_5)) |
 				F_H |
-				(memval & F_3) |
-				((val) ? (0) : (F_PV)) |
 				(this._s.F & F_C);
 		}
 	}
@@ -418,30 +430,9 @@ define(["scripts/utils.js"], function (Utils) {
 			var val = this._s[reg] & mask;
 			this._s.F =
 				(val & F_S) |
-				((val) ? (0) : (F_Z)) |
-				(this._s[reg] & F_5) |
+				((val) ? (0) : (F_Z|F_PV)) |
+				(this._s[reg] & (F_3|F_5)) |
 				F_H |
-				(this._s[reg] & F_3) |
-				((val) ? (0) : (F_PV)) |
-				(this._s.F & F_C);
-		}
-	}
-
-	function bit_n_xd(n, reg) {
-		var mask = 1 << n;
-		return function() {
-			this._op_t = 20;
-			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
-			var addrh = addr >>> 8;
-			var val = this._mmu.r8(addr) & mask;
-			this._s.F =
-				(val & F_S) |
-				((val) ? (0) : (F_Z)) |
-				(addrh & F_5) |
-				F_H |
-				(addrh & F_3) |
-				((val) ? (0) : (F_PV)) |
 				(this._s.F & F_C);
 		}
 	}
@@ -495,9 +486,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var res = sub8(0, this._s.A, 0);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			sub8(0, this._s.A, 0, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -506,7 +497,7 @@ define(["scripts/utils.js"], function (Utils) {
 			this._op_t = 14;
 			this._op_m = 0;
 			this._s.IFF1 = this._s.IFF2;
-			this._s.setSS("PC", this.pop16());
+			this._s.PC = this.pop16();
 		}
 	}
 
@@ -520,8 +511,8 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var res = sub8(this._s.A, this._s[reg],0);
-			this._s.F = (res[1] & ~(F_5|F_3)) | (this._s[reg] & (F_5|F_3));
+			sub8(this._s.A, this._s[reg],0, this._op_alures);
+			this._s.F = (this._op_alures[1] & ~(F_5|F_3)) | (this._s[reg] & (F_5|F_3));
 		}
 	}
 
@@ -535,9 +526,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var res = sub8(this._s.A, this._s[reg], this._s.F & F_C);
-			this._s.A = res[0]
-			this._s.F = res[1];
+			sub8(this._s.A, this._s[reg], this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0]
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -551,9 +542,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var res = sub8(this._s.A, this._s[reg],0);
-			this._s.A = res[0]
-			this._s.F = res[1];
+			sub8(this._s.A, this._s[reg],0, this._op_alures);
+			this._s.A = this._op_alures[0]
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -567,9 +558,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var res = add8(this._s.A, this._s[reg], this._s.F & F_C);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			add8(this._s.A, this._s[reg], this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -583,9 +574,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var res = add8(this._s.A, this._s[reg], 0);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			add8(this._s.A, this._s[reg], 0, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -599,10 +590,10 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var res = add8(this._s[reg], 1, 0);
-			this._s[reg] = res[0]
+			add8(this._s[reg], 1, 0, this._op_alures);
+			this._s[reg] = this._op_alures[0]
 			var mask = F_C;
-			this._s.F = (res[1] & ~mask) | (this._s.F & mask);
+			this._s.F = (this._op_alures[1] & ~mask) | (this._s.F & mask);
 		}
 	}
 
@@ -616,10 +607,10 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var res = sub8(this._s[reg], 1,0);
-			this._s[reg] = res[0];
+			sub8(this._s[reg], 1,0, this._op_alures);
+			this._s[reg] = this._op_alures[0];
 			var mask = F_C;
-			this._s.F = (res[1] & ~mask) | (this._s.F & mask);
+			this._s.F = (this._op_alures[1] & ~mask) | (this._s.F & mask);
 		}
 	}
 
@@ -633,8 +624,8 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var val = this._s.getSS(reg, 1);
-			this._s.setSS(reg, val);
+			var val = (this._s[reg] + 1) & 0xFFFF;
+			this._s[reg] = val;
 		}
 	}
 
@@ -648,8 +639,8 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var val = this._s.getSS(reg, -1);
-			this._s.setSS(reg, val);
+			var val = this._s[reg] - 1;
+			this._s[reg] = val;
 		}
 	}
 
@@ -658,7 +649,7 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr) & (~mask);
 			this._mmu.w8(addr, val);
 		}
@@ -669,7 +660,7 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr) | mask;
 			this._s[dstreg] = val;
 			this._mmu.w8(addr, val);
@@ -681,7 +672,7 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr) & (~mask);
 			this._s[dstreg] = val;
 			this._mmu.w8(addr, val);
@@ -692,12 +683,12 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr);
-			var res = shr8(val, this._s.F & F_C);
-			this._s[dstreg] = res[0];
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(val, this._s.F & F_C, this._op_alures);
+			this._s[dstreg] = this._op_alures[0];
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -705,12 +696,12 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr);
-			var res = shr8(val, val & 0x01);
-			this._s[dstreg] = res[0];
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(val, val & 0x01, this._op_alures);
+			this._s[dstreg] = this._op_alures[0];
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -718,12 +709,12 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr);
-			var res = shl8(val, this._s.F & F_C);
-			this._s[dstreg] = res[0];
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shl8(val, this._s.F & F_C, this._op_alures);
+			this._s[dstreg] = this._op_alures[0];
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -731,12 +722,12 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr);
-			var res = shl8(val, val & 0x80);
-			this._s[dstreg] = res[0];
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shl8(val, val & 0x80, this._op_alures);
+			this._s[dstreg] = this._op_alures[0];
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -744,12 +735,12 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr);
-			var res = shl8(val, 1);
-			this._s[dstreg] = res[0];
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shl8(val, 1, this._op_alures);
+			this._s[dstreg] = this._op_alures[0];
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -757,12 +748,12 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr);
-			var res = shl8(val, 0);
-			this._s[dstreg] = res[0];
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shl8(val, 0, this._op_alures);
+			this._s[dstreg] = this._op_alures[0];
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -770,12 +761,12 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr);
-			var res = shr8(val, 0);
-			this._s[dstreg] = res[0];
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(val, 0, this._op_alures);
+			this._s[dstreg] = this._op_alures[0];
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -783,12 +774,12 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS(reg, this._op_displ);
+			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
 			var val = this._mmu.r8(addr);
-			var res = shr8(val, val & 0x80);
-			this._s[dstreg] = res[0];
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(val, val & 0x80, this._op_alures);
+			this._s[dstreg] = this._op_alures[0];
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -804,8 +795,8 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var val = this._mmu.r16(this._s.getSS("PC", 1 + offset));
-			this._s.setSS(reg, val);
+			var val = this._mmu.r16(this._s.PC + 1 + offset);
+			this._s[reg] = val;
 		}
 	}
 
@@ -813,7 +804,7 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 7;
 			this._op_m = 1;
-			this._mmu.w8(this._s.getSS(regl), this._s[regr]);
+			this._mmu.w8(this._s[regl], this._s[regr]);
 		}
 	}
 
@@ -821,7 +812,7 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 7;
 			this._op_m = 1;
-			this._s[regl] = this._mmu.r8(this._s.getSS(regr));
+			this._s[regl] = this._mmu.r8(this._s[regr]);
 		}
 	}
 
@@ -835,7 +826,7 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			this._s[reg] = this._mmu.r8(this._s.getSS("PC", m-1));
+			this._s[reg] = this._mmu.r8(this._s.PC + m-1);
 		}
 	}
 
@@ -843,9 +834,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 15;
 			this._op_m = 2;
-			var res = sub16(this._s.getSS(regl), this._s.getSS(regr), this._s.F & F_C);
-			this._s.setSS(regl, res[0]);
-			this._s.F = res[1];
+			sub16(this._s[regl], this._s[regr], this._s.F & F_C, this._op_alures);
+			this._s[regl] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -853,9 +844,9 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = 15;
 			this._op_m = 2;
-			var res = add16(this._s.getSS(regl), this._s.getSS(regr), this._s.F & F_C);
-			this._s.setSS(regl, res[0]);
-			this._s.F = res[1];
+			add16(this._s[regl], this._s[regr], this._s.F & F_C, this._op_alures);
+			this._s[regl] = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		}
 	}
 
@@ -869,10 +860,10 @@ define(["scripts/utils.js"], function (Utils) {
 		return function() {
 			this._op_t = t;
 			this._op_m = m;
-			var res = add16(this._s.getSS(regl), this._s.getSS(regr), 0);
-			this._s.setSS(regl, res[0]);
+			add16(this._s[regl], this._s[regr], 0, this._op_alures);
+			this._s[regl] = this._op_alures[0];
 			var mask = F_S|F_Z|F_PV;
-			this._s.F = (res[1] & ~mask) | (this._s.F & mask);
+			this._s.F = (this._op_alures[1] & ~mask) | (this._s.F & mask);
 		}
 	}
 
@@ -912,11 +903,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0x07:function () { // RLCA
 			this._op_t = 4;
 			this._op_m = 1;
-			var res = shl8(this._s.A, this._s.A & 0x80);
-			this._s.A = res[0];
-			this._s.F = (this._s.F & ~(F_H|F_N|F_C)) | (res[1] & F_C);
+			shl8(this._s.A, this._s.A & 0x80, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = (this._s.F & ~(F_H|F_N|F_C)) | (this._op_alures[1] & F_C);
 			var mask = F_S|F_Z|F_PV;
-			this._s.F = (this._s.F & mask) | (res[1] & ~mask);
+			this._s.F = (this._s.F & mask) | (this._op_alures[1] & ~mask);
 		},
 		0x08:function () { // EX AF,AF'
 			this._op_t = 4;
@@ -932,10 +923,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0x0F:function () { // RRCA
 			this._op_t = 4;
 			this._op_m = 1;
-			var res = shr8(this._s.A, this._s.A & 1);
-			this._s.A = res[0];
+			shr8(this._s.A, this._s.A & 1, this._op_alures);
+			this._s.A = this._op_alures[0];
 			var mask = F_S|F_Z|F_PV;
-			this._s.F = (this._s.F & mask) | (res[1] & ~mask);
+			this._s.F = (this._s.F & mask) | (this._op_alures[1] & ~mask);
 		},
 		0x10:function () { // DJNZ (PC+e)
 			var offset,pc;
@@ -950,9 +941,9 @@ define(["scripts/utils.js"], function (Utils) {
 			else {
 				this._op_t = 13;
 				this._op_m = 0;
-				pc = this._s.getSS("PC");
+				pc = this._s.PC;
 				offset = this._mmu.r8s(pc + 1);
-				this._s.setSS("PC", pc + 2 + offset);
+				this._s.PC = pc + 2 + offset;
 			}
 		},
 		0x11: ld_ss_nn("DE"), // LD DE,nn
@@ -964,18 +955,18 @@ define(["scripts/utils.js"], function (Utils) {
 		0x17:function () { // RLA
 			this._op_t = 4;
 			this._op_m = 1;
-			var res = shl8(this._s.A, this._s.F & F_C);
-			this._s.A = res[0];
+			shl8(this._s.A, this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0];
 			var mask = F_S|F_Z|F_PV;
-			this._s.F = (this._s.F & mask) | (res[1] & ~mask);
+			this._s.F = (this._s.F & mask) | (this._op_alures[1] & ~mask);
 		},
 		0x18:function () { // JR (PC+e)
 			this._op_t = 12;
 			this._op_m = 0;
 			var offset,pc;
-			pc = this._s.getSS("PC");
+			pc = this._s.PC;
 			offset = 2 + this._mmu.r8s(pc + 1);
-			this._s.setSS("PC", pc + offset);
+			this._s.PC = pc + offset;
 		},
 		0x19: add_ss_ss("HL", "DE"), // ADD HL,DE
 		0x1A: ld_r_iss("A", "DE"), // LD A,(DE)
@@ -986,10 +977,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0x1F:function () { // RRA
 			this._op_t = 4;
 			this._op_m = 1;
-			var res = shr8(this._s.A, this._s.F & F_C);
-			this._s.A = res[0];
+			shr8(this._s.A, this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0];
 			var mask = F_S|F_Z|F_PV;
-			this._s.F = (this._s.F & mask) | (res[1] & ~mask);
+			this._s.F = (this._s.F & mask) | (this._op_alures[1] & ~mask);
 		},
 		0x20:function () { // JR NZ,(PC+e)
 			var e;
@@ -1001,17 +992,17 @@ define(["scripts/utils.js"], function (Utils) {
 				this._op_t = 12;
 				this._op_m = 0;
 				var offset,pc;
-				pc = this._s.getSS("PC");
+				pc = this._s.PC;
 				offset = 2 + this._mmu.r8s(pc + 1);
-				this._s.setSS("PC", pc + offset);
+				this._s.PC = pc + offset;
 			}
 		},
 		0x21: ld_ss_nn("HL"), // LD HL,nn
 		0x22:function () { // LD (nn),HL
 			this._op_t = 16;
 			this._op_m = 3;
-			var addr = this._mmu.r16(this._s.getSS("PC",1));
-			this._mmu.w16(addr, this._s.getSS("HL"));
+			var addr = this._mmu.r16(this._s.PC+1);
+			this._mmu.w16(addr, this._s.HL);
 		},
 		0x23: inc_ss("HL"), // INC HL
 		0x24: inc_r("H"), // INC H
@@ -1028,15 +1019,15 @@ define(["scripts/utils.js"], function (Utils) {
 			if(carry || (this._s.A > 0x99)) add |= 0x60;
 			if(this._s.A > 0x99) carry=F_C;
 			if (this._s.F & F_N) {
-				res = sub8(this._s.A, add, 0);
+				sub8(this._s.A, add, 0, this._op_alures);
 			} else {
-				res = add8(this._s.A, add, 0);
+				add8(this._s.A, add, 0, this._op_alures);
 			}
-			this._s.A = res[0];
+			this._s.A = this._op_alures[0];
 			this._s.F =
 				(this._s.F & F_N) |
 				SZ53Ptable[this._s.A] |
-				(res[1] & F_H) |
+				(this._op_alures[1] & F_H) |
 				carry;
 		},
 		0x28:function () { // JR Z,(PC+e)
@@ -1044,9 +1035,9 @@ define(["scripts/utils.js"], function (Utils) {
 				this._op_t = 12;
 				this._op_m = 0;
 				var offset,pc;
-				pc = this._s.getSS("PC");
+				pc = this._s.PC;
 				offset = 2 + this._mmu.r8s(pc + 1);
-				this._s.setSS("PC", pc + offset);
+				this._s.PC = pc + offset;
 			}
 			else {
 				this._op_t = 7;
@@ -1057,8 +1048,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0x2A:function () { // LD HL,(nn)
 			this._op_t = 16;
 			this._op_m = 3;
-			var addr = this._mmu.r16(this._s.getSS("PC", 1));
-			this._s.setSS("HL", this._mmu.r16(addr));
+			var addr = this._mmu.r16(this._s.PC+1);
+			this._s.HL = this._mmu.r16(addr);
 		},
 		0x2B: dec_ss("HL"), // DEC HL
 		0x2C: inc_r("L"), // INC L
@@ -1083,42 +1074,42 @@ define(["scripts/utils.js"], function (Utils) {
 				this._op_t = 12;
 				this._op_m = 0;
 				var offset,pc;
-				pc = this._s.getSS("PC");
+				pc = this._s.PC;
 				offset = 2 + this._mmu.r8s(pc + 1);
-				this._s.setSS("PC", pc + offset);
+				this._s.PC = pc + offset;
 			}
 		},
 		0x31: ld_ss_nn("SP"), // LD SP,nn
 		0x32:function () { // LD (nn),A
 			this._op_t = 13;
 			this._op_m = 3;
-			var addr = this._mmu.r16(this._s.getSS("PC",1));
+			var addr = this._mmu.r16(this._s.PC+1);
 			this._mmu.w8(addr, this._s.A);
 		},
 		0x33: inc_ss("SP"), // INC SP
 		0x34:function () { // INC (HL)
 			this._op_t = 11;
 			this._op_m = 1;
-			var HL = this._s.getSS("HL")
-			var res = add8(this._mmu.r8(HL), 1, 0);
-			this._mmu.w8(HL, res[0]);
+			var HL = this._s.HL
+			add8(this._mmu.r8(HL), 1, 0, this._op_alures);
+			this._mmu.w8(HL, this._op_alures[0]);
 			var mask = F_C;
-			this._s.F = (res[1] & ~mask) | (this._s.F & mask); 
+			this._s.F = (this._op_alures[1] & ~mask) | (this._s.F & mask); 
 		},
 		0x35:function () { // DEC (HL)
 			this._op_t = 11;
 			this._op_m = 1;
-			var HL = this._s.getSS("HL");
-			var res = sub8(this._mmu.r8(HL), 1, 0);
-			this._mmu.w8(HL, res[0]);
+			var HL = this._s.HL;
+			sub8(this._mmu.r8(HL), 1, 0, this._op_alures);
+			this._mmu.w8(HL, this._op_alures[0]);
 			var mask = F_C;
-			this._s.F = (res[1] & ~mask) | (this._s.F & mask); 
+			this._s.F = (this._op_alures[1] & ~mask) | (this._s.F & mask); 
 		},
 		0x36:function () { // LD (HL),n
 			this._op_t = 10;
 			this._op_m = 2;
-			var val = this._mmu.r8(this._s.getSS("PC", 1));
-			this._mmu.w8(this._s.getSS("HL"), val);
+			var val = this._mmu.r8(this._s.PC+1);
+			this._mmu.w8(this._s.HL, val);
 		},
 		0x37:function () { // SCF
 			this._op_t = 4;
@@ -1135,9 +1126,9 @@ define(["scripts/utils.js"], function (Utils) {
 				this._op_t = 12;
 				this._op_m = 0;
 				var offset,pc;
-				pc = this._s.getSS("PC");
+				pc = this._s.PC;
 				offset = 2 + this._mmu.r8s(pc + 1);
-				this._s.setSS("PC", pc + offset);
+				this._s.PC = pc + offset;
 			}
 			else {
 				this._op_t = 7;
@@ -1149,7 +1140,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0x3A:function () { // LD A,(nn)
 			this._op_t = 13;
 			this._op_m = 3;
-			var addr = this._mmu.r16(this._s.getSS("PC", 1));
+			var addr = this._mmu.r16(this._s.PC+1);
 			this._s.A = this._mmu.r8(addr);
 		},
 		0x3B: dec_ss("SP"), // DEC SP
@@ -1432,9 +1423,9 @@ define(["scripts/utils.js"], function (Utils) {
 		0x86:function () { // ADD A,(HL)
 			this._op_t = 7;
 			this._op_m = 1;
-			var res = add8(this._s.A, this._mmu.r8(this._s.getSS("HL")), 0);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			add8(this._s.A, this._mmu.r8(this._s.HL), 0, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
 		0x87: add_a_r("A"), // ADD A,A
 		0x88: adc_a_r("B"), // ADC A,B
@@ -1446,9 +1437,9 @@ define(["scripts/utils.js"], function (Utils) {
 		0x8E:function () { // ADC A,(HL)
 			this._op_t = 7;
 			this._op_m = 1;
-			var res = add8(this._s.A, this._mmu.r8(this._s.getSS("HL")), this._s.F & F_C);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			add8(this._s.A, this._mmu.r8(this._s.HL), this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
 		0x8F: adc_a_r("A"), // ADC A,A
 		0x90: sub_r("B"), // SUB B
@@ -1460,10 +1451,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0x96:function () { // SUB (HL)
 			this._op_t = 7;
 			this._op_m = 1;
-			var rhs = this._mmu.r8(this._s.getSS("HL"));
-			var res = sub8(this._s.A, rhs, 0);
-			this._s.A = res[0]
-			this._s.F = res[1];
+			var rhs = this._mmu.r8(this._s.HL);
+			sub8(this._s.A, rhs, 0, this._op_alures);
+			this._s.A = this._op_alures[0]
+			this._s.F = this._op_alures[1];
 		},
 		0x97: sub_r("A"), // SUB A
 		0x98: sbc_a_r("B"), // SBC A,B
@@ -1475,10 +1466,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0x9E:function () { // SBC A,(HL)
 			this._op_t = 7;
 			this._op_m = 1;
-			var addr = this._s.getSS("HL");
-			var res = sub8(this._s.A, this._mmu.r8(addr), this._s.F & F_C);
-			this._s.A = res[0]
-			this._s.F = res[1];
+			var addr = this._s.HL;
+			sub8(this._s.A, this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0]
+			this._s.F = this._op_alures[1];
 		},
 		0x9F: sbc_a_r("A"), // SBC A,A
 		0xA0: and_r("B"), // AND B
@@ -1490,7 +1481,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xA6:function () { // AND (HL)
 			this._op_t = 7;
 			this._op_m = 1;
-			var rhs = this._mmu.r8(this._s.getSS("HL"));
+			var rhs = this._mmu.r8(this._s.HL);
 			this._s.A &= rhs;
 			this._s.F = SZ53Ptable[this._s.A] | F_H;
 		},
@@ -1504,7 +1495,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xAE: function () { // XOR (HL)
 			this._op_t = 7;
 			this._op_m = 1;
-			var rhs = this._mmu.r8(this._s.getSS("HL"));
+			var rhs = this._mmu.r8(this._s.HL);
 			this._s.A ^= rhs;
 			this._s.F = SZ53Ptable[this._s.A];
 		},
@@ -1518,7 +1509,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xB6: function () { // OR (HL)
 			this._op_t = 7;
 			this._op_m = 1;
-			var val = this._mmu.r8(this._s.getSS("HL"));
+			var val = this._mmu.r8(this._s.HL);
 			this._s.A |= val;
 			this._s.F = SZ53Ptable[this._s.A];
 		},
@@ -1532,9 +1523,9 @@ define(["scripts/utils.js"], function (Utils) {
 		0xBE:function () { // CP (HL)
 			this._op_t = 7;
 			this._op_m = 1;
-			var rhs = this._mmu.r8(this._s.getSS("HL"));
-			var res = sub8(this._s.A, rhs, 0);
-			this._s.F = (res[1] & ~(F_5|F_3)) | (rhs & (F_5|F_3));
+			var rhs = this._mmu.r8(this._s.HL);
+			sub8(this._s.A, rhs, 0, this._op_alures);
+			this._s.F = (this._op_alures[1] & ~(F_5|F_3)) | (rhs & (F_5|F_3));
 		},
 		0xBF: cp_r("A"), // CP A
 		0xC0:function () { // RET NZ
@@ -1545,13 +1536,13 @@ define(["scripts/utils.js"], function (Utils) {
 			else {
 				this._op_t = 11;
 				this._op_m = 0;
-				this._s.setSS("PC", this.pop16());
+				this._s.PC = this.pop16();
 			}
 		},
 		0xC1:function () { // POP BC
 			this._op_t = 10;
 			this._op_m = 1;
-			this._s.setSS("BC", this.pop16());
+			this._s.BC = this.pop16();
 		},
 		0xC2:function () { // JP NZ,(nn)
 			this._op_t = 10;
@@ -1559,15 +1550,15 @@ define(["scripts/utils.js"], function (Utils) {
 				this._op_m = 3;
 			}
 			else {
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this._s.PC = addr;
 				this._op_m = 0;
 			}
 		},
 		0xC3:function () { // JP (nn)
 			this._op_t = 10;
 			this._op_m = 0;
-			this._s.setSS("PC", this._mmu.r16(this._s.getSS("PC", 1)));
+			this._s.PC = this._mmu.r16(this._s.PC+1);
 		},
 		0xC4:function () { // CALL NZ,(nn)
 			if (this._s.F & F_Z) {
@@ -1577,35 +1568,35 @@ define(["scripts/utils.js"], function (Utils) {
 			else {
 				this._op_t = 17;
 				this._op_m = 0;
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this.push16(this._s.getSS("PC", 3));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this.push16(this._s.PC+3);
+				this._s.PC = addr;
 			}
 		},
 		0xC5:function () { // PUSH BC
 			this._op_t = 11;
 			this._op_m = 1;
-			this.push16(this._s.getSS("BC"));
+			this.push16(this._s.BC);
 		},
 		0xC6:function () { // ADD A,n
 			this._op_t = 7;
 			this._op_m = 2;
-			var val = this._mmu.r8(this._s.getSS("PC", 1));
-			var res = add8(this._s.A, val, 0);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			var val = this._mmu.r8(this._s.PC+1);
+			add8(this._s.A, val, 0, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
 		0xC7:function () { // RST 0H
 			this._op_t = 11;
 			this._op_m = 0;
-			this.push16(this._s.getSS("PC", 1));
-			this._s.setSS("PC", 0x00);
+			this.push16(this._s.PC+1);
+			this._s.PC = 0x00;
 		},
 		0xC8:function () { // RET Z
 			if (this._s.F & F_Z) {
 				this._op_t = 11;
 				this._op_m = 0;
-				this._s.setSS("PC", this.pop16());
+				this._s.PC = this.pop16();
 			}
 			else {
 				this._op_t = 5;
@@ -1615,13 +1606,13 @@ define(["scripts/utils.js"], function (Utils) {
 		0xC9:function () { // RET
 			this._op_t = 10;
 			this._op_m = 0;
-			this._s.setSS("PC", this.pop16());
+			this._s.PC = this.pop16();
 		},
 		0xCA:function () { // JP Z,(nn)
 			this._op_t = 10;
 			if (this._s.F & F_Z) {
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this._s.PC = addr;
 				this._op_m = 0;
 			}
 			else {
@@ -1640,11 +1631,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB06:function () { // RLC (HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			var val = this._mmu.r8(addr);
-			var res = shl8(val, val & 0x80);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shl8(val, val & 0x80, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xCB07: rlc_r("A"), // RLC A
 		0xCB08: rrc_r("B"), // RRC B
@@ -1656,11 +1647,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB0E:function () { // RRC (HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			var memval = this._mmu.r8(addr);
-			var res = shr8(memval, memval & 1);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(memval, memval & 1, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xCB0F: rrc_r("A"), // RRC A
 		0xCB10: rl_r("B"), // RL B
@@ -1672,10 +1663,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB16:function () { // RL (HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
-			var res = shl8(this._mmu.r8(addr), this._s.F & F_C);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.HL;
+			shl8(this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xCB17: rl_r("A"), // RL A
 		0xCB18: rr_r("B"), // RR B
@@ -1687,10 +1678,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB1E:function () { // RR (HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
-			var res = shr8(this._mmu.r8(addr), this._s.F & F_C);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.HL;
+			shr8(this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xCB1F: rr_r("A"), // RR A
 		0xCB20: sla_r("B"), // SLA B
@@ -1702,10 +1693,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB26:function () { // SLA (HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
-			var res = shl8(this._mmu.r8(addr), 0);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.HL;
+			shl8(this._mmu.r8(addr), 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xCB27: sla_r("A"), // SLA A
 		0xCB28: sra_r("B"), // SRA B
@@ -1717,11 +1708,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB2E:function () { // SRA (HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			var memval = this._mmu.r8(addr);
-			var res = shr8(memval, memval & 0x80);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(memval, memval & 0x80, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xCB2F: sra_r("A"), // SRA A
 		0xCB30: sll_r("B"), // SLL B*
@@ -1733,10 +1724,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB36:function () { // SLL (HL)*
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
-			var res = shl8(this._mmu.r8(addr), 1);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.HL;
+			shl8(this._mmu.r8(addr), 1, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xCB37: sll_r("A"), // SLL A*
 		0xCB38: srl_r("B"), // SRL B
@@ -1748,10 +1739,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB3E:function () { // SRL (HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
-			var res = shr8(this._mmu.r8(addr), 0);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.HL;
+			shr8(this._mmu.r8(addr), 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xCB3F: srl_r("A"), // SRL A
 		0xCB40: bit_n_r(0,"B"), // BIT 0,B
@@ -1851,7 +1842,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB86:function () { // RES 0,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x01);
 		},
 		0xCB87:function () { // RES 0,A
@@ -1892,7 +1883,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB8E:function () { // RES 1,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x02);
 		},
 		0xCB8F:function () { // RES 1,A
@@ -1933,7 +1924,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB96:function () { // RES 2,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x04);
 		},
 		0xCB97:function () { // RES 2,A
@@ -1974,7 +1965,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCB9E:function () { // RES 3,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x08);
 		},
 		0xCB9F:function () { // RES 3,A
@@ -2015,7 +2006,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBA6:function () { // RES 4,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x10);
 		},
 		0xCBA7:function () { // RES 4,A
@@ -2056,7 +2047,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBAE:function () { // RES 5,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x20);
 		},
 		0xCBAF:function () { // RES 5,A
@@ -2097,7 +2088,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBB6:function () { // RES 6,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x40);
 		},
 		0xCBB7:function () { // RES 6,A
@@ -2138,7 +2129,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBBE:function () { // RES 7,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x80);
 		},
 		0xCBBF:function () { // RES 7,A
@@ -2179,7 +2170,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBC6:function () { // SET 0,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x01);
 		},
 		0xCBC7:function () { // SET 0,A
@@ -2220,7 +2211,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBCE:function () { // SET 1,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x02);
 		},
 		0xCBCF:function () { // SET 1,A
@@ -2261,7 +2252,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBD6:function () { // SET 2,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x04);
 		},
 		0xCBD7:function () { // SET 2,A
@@ -2302,7 +2293,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBDE:function () { // SET 3,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x08);
 		},
 		0xCBDF:function () { // SET 3,A
@@ -2343,7 +2334,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBE6:function () { // SET 4,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x10);
 		},
 		0xCBE7:function () { // SET 4,A
@@ -2384,7 +2375,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBEE:function () { // SET 5,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x20);
 		},
 		0xCBEF:function () { // SET 5,A
@@ -2425,7 +2416,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBF6:function () { // SET 6,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x40);
 		},
 		0xCBF7:function () { // SET 6,A
@@ -2466,7 +2457,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xCBFE:function () { // SET 7,(HL)
 			this._op_t = 15;
 			this._op_m = 2;
-			var addr = this._s.getSS("HL");
+			var addr = this._s.HL;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x80);
 		},
 		0xCBFF:function () { // SET 7,A
@@ -2474,42 +2465,42 @@ define(["scripts/utils.js"], function (Utils) {
 			this._op_m = 2;
 			this._s.A = this._s.A | 0x80;
 		},
-		0xCC:function () { // CALL	Z,nn
+		0xCC:function () { // CALL Z,nn
 			if (this._s.F & F_Z) {
 				this._op_t = 17;
 				this._op_m = 0;
-				var pc = this._s.getSS("PC");
+				var pc = this._s.PC;
 				var addr = this._mmu.r16(pc + 1);
 				this.push16(pc + 3);
-				this._s.setSS("PC", addr);
+				this._s.PC = addr;
 			}
 			else {
 				this._op_t = 10;
 				this._op_m = 3;
 			}
 		},
-		0xCD:function () { // CALL	nn
+		0xCD:function () { // CALL nn
 			this._op_t = 17;
 			this._op_m = 0;
-			var addr = this._mmu.r16(this._s.getSS("PC", 1));
-			this.push16(this._s.getSS("PC", 3));
-			this._s.setSS("PC", addr);
+			var addr = this._mmu.r16(this._s.PC+1);
+			this.push16(this._s.PC+3);
+			this._s.PC = addr;
 		},
-		0xCE:function () { // ADC	A,n
+		0xCE:function () { // ADC A,n
 			this._op_t = 7;
 			this._op_m = 2;
-			var val = this._mmu.r8(this._s.getSS("PC", 1));
-			var res = add8(this._s.A, val, this._s.F & F_C);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			var val = this._mmu.r8(this._s.PC+1);
+			add8(this._s.A, val, this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
-		0xCF:function () { // RST	08H
+		0xCF:function () { // RST 08H
 			this._op_t = 11;
 			this._op_m = 0;
-			this.push16(this._s.getSS("PC", 1));
-			this._s.setSS("PC", 0x08);
+			this.push16(this._s.PC+1);
+			this._s.PC = 0x08;
 		},
-		0xD0:function () { // RET	NC
+		0xD0:function () { // RET NC
 			if (this._s.F & F_C) {
 				this._op_t = 5;
 				this._op_m = 1;
@@ -2517,31 +2508,31 @@ define(["scripts/utils.js"], function (Utils) {
 			else {
 				this._op_t = 11;
 				this._op_m = 0;
-				this._s.setSS("PC", this.pop16());
+				this._s.PC = this.pop16();
 			}
 		},
-		0xD1:function () { // POP	DE
+		0xD1:function () { // POP DE
 			this._op_t = 10;
 			this._op_m = 1;
-			this._s.setSS("DE", this.pop16());
+			this._s.DE = this.pop16();
 		},
-		0xD2:function () { // JP	NC,nn
+		0xD2:function () { // JP NC,nn
 			this._op_t = 10;
 			if (this._s.F & F_C) {
 				this._op_m = 3;
 			}
 			else {
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this._s.PC = addr;
 				this._op_m = 0;
 			}
 		},
-		0xD3:function () { // OUT	(n),A
+		0xD3:function () { // OUT (n),A
 			this._op_t = 11;
 			this._op_m = 2;
-			this._out(this._mmu.r8(this._s.getSS("PC", 1)), this._s.A, this._s.A);
+			this._out(this._mmu.r8(this._s.PC+1), this._s.A, this._s.A);
 		},
-		0xD4:function () { // CALL	NC,nn
+		0xD4:function () { // CALL NC,nn
 			if (this._s.F & F_C) {
 				this._op_t = 10;
 				this._op_m = 3;
@@ -2549,35 +2540,35 @@ define(["scripts/utils.js"], function (Utils) {
 			else {
 				this._op_t = 17;
 				this._op_m = 0;
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this.push16(this._s.getSS("PC", 3));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this.push16(this._s.PC+3);
+				this._s.PC = addr;
 			}
 		},
-		0xD5:function () { // PUSH	DE
+		0xD5:function () { // PUSH DE
 			this._op_t = 11;
 			this._op_m = 1;
-			this.push16(this._s.getSS("DE"));
+			this.push16(this._s.DE);
 		},
-		0xD6:function () { // SUB	n
+		0xD6:function () { // SUB n
 			this._op_t = 7;
 			this._op_m = 2;
-			var rhs = this._mmu.r8(this._s.getSS("PC", 1));
-			var res = sub8(this._s.A, rhs, 0);
-			this._s.A = res[0]
-			this._s.F = res[1];
+			var rhs = this._mmu.r8(this._s.PC+1);
+			sub8(this._s.A, rhs, 0, this._op_alures);
+			this._s.A = this._op_alures[0]
+			this._s.F = this._op_alures[1];
 		},
-		0xD7:function () { // RST	10H
+		0xD7:function () { // RST 10H
 			this._op_t = 11;
 			this._op_m = 0;
-			this.push16(this._s.getSS("PC", 1));
-			this._s.setSS("PC", 0x10);
+			this.push16(this._s.PC+1);
+			this._s.PC = 0x10;
 		},
-		0xD8:function () { // RET	C
+		0xD8:function () { // RET C
 			if (this._s.F & F_C) {
 				this._op_t = 11;
 				this._op_m = 0;
-				this._s.setSS("PC", this.pop16());
+				this._s.PC = this.pop16();
 			}
 			else {
 				this._op_t = 5;
@@ -2591,29 +2582,29 @@ define(["scripts/utils.js"], function (Utils) {
 			this._s.exR("DE");
 			this._s.exR("HL");
 		},
-		0xDA:function () { // JP	C,nn
+		0xDA:function () { // JP C,nn
 			this._op_t = 10;
 			if (this._s.F & F_C) {
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this._s.PC = addr;
 				this._op_m = 0;
 			}
 			else {
 				this._op_m = 3;
 			}
 		},
-		0xDB:function () { // IN	A,(n)
+		0xDB:function () { // IN A,(n)
 			this._op_t = 11;
 			this._op_m = 2;
-			this._s.A = this._in(this._mmu.r8(this._s.getSS("PC", 1)), this._s.A);
+			this._s.A = this._in(this._mmu.r8(this._s.PC+1), this._s.A);
 		},
-		0xDC:function () { // CALL	C,nn
+		0xDC:function () { // CALL C,nn
 			if (this._s.F & F_C) {
 				this._op_t = 17;
 				this._op_m = 0;
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this.push16(this._s.getSS("PC", 3));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this.push16(this._s.PC+3);
+				this._s.PC = addr;
 			}
 			else {
 				this._op_t = 10;
@@ -2630,8 +2621,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD22:function () { // LD (nn),IX
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC",2));
-			this._mmu.w16(addr, this._s.getSS("IX"));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._mmu.w16(addr, this._s.IX);
 		},
 		0xDD23: inc_ss("IX"), // INC IX
 		0xDD24: inc_r("IXH"), // INC IXH*
@@ -2641,8 +2632,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD2A:function () { // LD IX,(nn)
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._s.setSS("IX", this._mmu.r16(addr));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._s.IX = this._mmu.r16(addr);
 		},
 		0xDD2B: dec_ss("IX"), // DEC IX
 		0xDD2C: inc_r("IXL"), // INC IXL*
@@ -2651,28 +2642,28 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD34:function () { // INC (IX+d)
 			this._op_t = 23;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IX", displ);
-			var res = add8(this._mmu.r8(addr), 1, 0);
-			this._mmu.w8(addr, res[0]);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IX+displ;
+			add8(this._mmu.r8(addr), 1, 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
 			var mask = F_C;
-			this._s.F = (res[1] & ~mask) | (this._s.F & mask); 
+			this._s.F = (this._op_alures[1] & ~mask) | (this._s.F & mask); 
 		},
 		0xDD35:function () { // DEC (IX+d)
 			this._op_t = 23;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IX", displ);
-			var res = sub8(this._mmu.r8(addr), 1, 0);
-			this._mmu.w8(addr, res[0]);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IX+displ;
+			sub8(this._mmu.r8(addr), 1, 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
 			var mask = F_C;
-			this._s.F = (res[1] & ~mask) | (this._s.F & mask); 
+			this._s.F = (this._op_alures[1] & ~mask) | (this._s.F & mask); 
 		},
 		0xDD36:function () { // LD (IX+d),n
 			this._op_t = 19;
 			this._op_m = 4;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IX",displ), this._mmu.r8(this._s.getSS("PC", 3)));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IX+displ, this._mmu.r8(this._s.PC+3));
 		},
 		0xDD39: add_ss_ss("IX", "SP"), // ADD IX,SP
 		0xDD44:function () { // LD B,IXH*
@@ -2688,8 +2679,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD46:function () { // LD B,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.B = this._mmu.r8(this._s.getSS("IX",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.B = this._mmu.r8(this._s.IX+displ);
 		},
 		0xDD4C:function () { // LD C,IXH*
 			this._op_t = 8;
@@ -2704,8 +2695,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD4E:function () { // LD C,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.C = this._mmu.r8(this._s.getSS("IX",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.C = this._mmu.r8(this._s.IX+displ);
 		},
 		0xDD54:function () { // LD D,IXH*
 			this._op_t = 8;
@@ -2720,8 +2711,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD56:function () { // LD D,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.D = this._mmu.r8(this._s.getSS("IX",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.D = this._mmu.r8(this._s.IX+displ);
 		},
 		0xDD5C:function () { // LD E,IXH*
 			this._op_t = 8;
@@ -2736,8 +2727,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD5E:function () { // LD E,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.E = this._mmu.r8(this._s.getSS("IX",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.E = this._mmu.r8(this._s.IX+displ);
 		},
 		0xDD60:function () { // LD IXH,B*
 			this._op_t = 8;
@@ -2771,8 +2762,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD66:function () { // LD H,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.H = this._mmu.r8(this._s.getSS("IX",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.H = this._mmu.r8(this._s.IX+displ);
 		},
 		0xDD67:function () { // LD IXH,A*
 			this._op_t = 8;
@@ -2811,8 +2802,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD6E:function () { // LD L,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.L = this._mmu.r8(this._s.getSS("IX",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.L = this._mmu.r8(this._s.IX+displ);
 		},
 		0xDD6F:function () { // LD IXL,A*
 			this._op_t = 8;
@@ -2822,44 +2813,44 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD70:function () { // LD (IX+d),B
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IX",displ), this._s.B);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IX+displ, this._s.B);
 		},
 		0xDD71:function () { // LD (IX+d),C
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IX",displ), this._s.C);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IX+displ, this._s.C);
 		},
 		0xDD72:function () { // LD (IX+d),D
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IX",displ), this._s.D);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IX+displ, this._s.D);
 		},
 		0xDD73:function () { // LD (IX+d),E
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IX",displ), this._s.E);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IX+displ, this._s.E);
 		},
 		0xDD74:function () { // LD (IX+d),H
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IX",displ), this._s.H);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IX+displ, this._s.H);
 		},
 		0xDD75:function () { // LD (IX+d),L
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IX",displ), this._s.L);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IX+displ, this._s.L);
 		},
 		0xDD77:function () { // LD (IX+d),A
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IX",displ), this._s.A);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IX+displ, this._s.A);
 		},
 		0xDD7C:function () { // LD A,IXH*
 			this._op_t = 8;
@@ -2874,59 +2865,59 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDD7E:function () { // LD A,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.A = this._mmu.r8(this._s.getSS("IX",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.A = this._mmu.r8(this._s.IX+displ);
 		},
 		0xDD84: add_a_r("IXH"), // ADD A,IXH*
 		0xDD85: add_a_r("IXL"), // ADD A,IXL*
 		0xDD86:function () { // ADD A,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var res = add8(this._s.A, this._mmu.r8(this._s.getSS("IX",displ)), 0);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			var displ = this._mmu.r8s(this._s.PC+2);
+			add8(this._s.A, this._mmu.r8(this._s.IX+displ), 0, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
 		0xDD8C: adc_a_r("IXH"), // ADC A,IXH*
 		0xDD8D: adc_a_r("IXL"), // ADC A,IXL*
 		0xDD8E:function () { // ADC A,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IX",displ);
-			var res = add8(this._s.A, this._mmu.r8(addr), this._s.F & F_C);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IX+displ;
+			add8(this._s.A, this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
 		0xDD94: sub_r("IXH"), // SUB IXH*
 		0xDD95: sub_r("IXL"), // SUB IXL*
 		0xDD96:function () { // SUB (IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IX",displ);
-			var res = sub8(this._s.A, this._mmu.r8(addr), 0);
-			this._s.A = res[0]
-			this._s.F = res[1];
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IX+displ;
+			sub8(this._s.A, this._mmu.r8(addr), 0, this._op_alures);
+			this._s.A = this._op_alures[0]
+			this._s.F = this._op_alures[1];
 		},
 		0xDD9C: sbc_a_r("IXH"), // SBC A,IXH*
 		0xDD9D: sbc_a_r("IXL"), // SBC A,IXL*
 		0xDD9E:function () { // SBC A,(IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IX",displ);
-			var res = sub8(this._s.A, this._mmu.r8(addr), this._s.F & F_C);
-			this._s.A = res[0]
-			this._s.F = res[1];
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IX+displ;
+			sub8(this._s.A, this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0]
+			this._s.F = this._op_alures[1];
 		},
 		0xDDA4: and_r("IXH"), // AND IXH*
 		0xDDA5: and_r("IXL"), // AND IXL*
 		0xDDA6:function () { // AND (IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IX",displ);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IX+displ;
 			this._s.A &= this._mmu.r8(addr);
 			this._s.F = SZ53Ptable[this._s.A] | F_H;
 		},
@@ -2935,7 +2926,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDAE:function () { // XOR (IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var addr = this._s.getSS("IX", this._mmu.r8s(this._s.getSS("PC", 2)));
+			var addr = this._s.IX + this._mmu.r8s(this._s.PC+2);
 			this._s.A ^= this._mmu.r8(addr);
 			this._s.F = SZ53Ptable[this._s.A];
 		},
@@ -2944,8 +2935,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDB6:function () { // OR (IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var val = this._mmu.r8(this._s.getSS("IX",displ));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var val = this._mmu.r8(this._s.IX+displ);
 			this._s.A |= val;
 			this._s.F = SZ53Ptable[this._s.A];
 		},
@@ -2954,10 +2945,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDBE:function () { // CP (IX+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var rhs = this._mmu.r8(this._s.getSS("IX",displ));
-			var res = sub8(this._s.A, rhs, 0);
-			this._s.F = (res[1] & ~(F_5|F_3)) | (rhs & (F_5|F_3));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var rhs = this._mmu.r8(this._s.IX+displ);
+			sub8(this._s.A, rhs, 0, this._op_alures);
+			this._s.F = (this._op_alures[1] & ~(F_5|F_3)) | (rhs & (F_5|F_3));
 		},
 		0xDDCB00: ld_r_rlc_xd("B", "IX"), // LD B,RLC (IX+d)*
 		0xDDCB01: ld_r_rlc_xd("C", "IX"), // LD C,RLC (IX+d)*
@@ -2968,11 +2959,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB06:function () { // RLC (IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			var val = this._mmu.r8(addr);
-			var res = shl8(val, val & 0x80);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shl8(val, val & 0x80, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xDDCB07: ld_r_rlc_xd("A", "IX"), // LD A,RLC (IX+d)*
 		0xDDCB08: ld_r_rrc_xd("B", "IX"), // LD B,RRC (IX+d)*
@@ -2984,11 +2975,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB0E:function () { // RRC (IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			var memval = this._mmu.r8(addr);
-			var res = shr8(memval, memval & 1);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(memval, memval & 1, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xDDCB0F: ld_r_rrc_xd("A", "IX"), // LD A,RRC (IX+d)*
 		0xDDCB10: ld_r_rl_xd("B", "IX"), // LD B,RL (IX+d)*
@@ -3000,10 +2991,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB16:function () { // RL (IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
-			var res = shl8(this._mmu.r8(addr), this._s.F & F_C);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IX+this._op_displ;
+			shl8(this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xDDCB17: ld_r_rl_xd("A", "IX"), // LD A,RL (IX+d)*
 		0xDDCB18: ld_r_rr_xd("B", "IX"), // LD B,RR (IX+d)*
@@ -3015,10 +3006,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB1E:function () { // RR (IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
-			var res = shr8(this._mmu.r8(addr), this._s.F & F_C);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IX+this._op_displ;
+			shr8(this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xDDCB1F: ld_r_rr_xd("A", "IX"), // LD A,RR (IX+d)*
 		0xDDCB20: ld_r_sla_xd("B", "IX"), // LD B,SLA (IX+d)*
@@ -3030,10 +3021,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB26:function () { // SLA (IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
-			var res = shl8(this._mmu.r8(addr), 0);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IX+this._op_displ;
+			shl8(this._mmu.r8(addr), 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xDDCB27: ld_r_sla_xd("A", "IX"), // LD A,SLA (IX+d)*
 		0xDDCB28: ld_r_sra_xd("B", "IX"), // LD B,SRA (IX+d)*
@@ -3045,11 +3036,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB2E:function () { // SRA (IX+d)
 			this._op_t = 23
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			var memval = this._mmu.r8(addr);
-			var res = shr8(memval, memval & 0x80);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(memval, memval & 0x80, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xDDCB2F: ld_r_sra_xd("A", "IX"), // LD A,SRA (IX+d)*
 		0xDDCB30: ld_r_sll_xd("B", "IX"), // LD B,SLL (IX+d)*
@@ -3061,10 +3052,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB36:function () { // SLL (IX+d)*
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
-			var res = shl8(this._mmu.r8(addr), 1);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IX+this._op_displ;
+			shl8(this._mmu.r8(addr), 1, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xDDCB37: ld_r_sll_xd("A", "IX"), // LD A,SLL (IX+d)*
 		0xDDCB38: ld_r_srl_xd("B", "IX"), // LD B,SRL (IX+d)*
@@ -3076,76 +3067,76 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB3E:function () { // SRL (IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
-			var res = shr8(this._mmu.r8(addr), 0);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IX+this._op_displ;
+			shr8(this._mmu.r8(addr), 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xDDCB3F: ld_r_srl_xd("A", "IX"), // LD A,SRL (IX+d)*
-		0xDDCB40: bit_n_xd(0, "IX"), // BIT 0,(IX+d)*
-		0xDDCB41: bit_n_xd(0, "IX"), // BIT 0,(IX+d)*
-		0xDDCB42: bit_n_xd(0, "IX"), // BIT 0,(IX+d)*
-		0xDDCB43: bit_n_xd(0, "IX"), // BIT 0,(IX+d)*
-		0xDDCB44: bit_n_xd(0, "IX"), // BIT 0,(IX+d)*
-		0xDDCB45: bit_n_xd(0, "IX"), // BIT 0,(IX+d)*
-		0xDDCB46: bit_n_xd(0, "IX"), // BIT 0,(IX+d)
-		0xDDCB47: bit_n_xd(0, "IX"), // BIT 0,(IX+d)*
-		0xDDCB48: bit_n_xd(1, "IX"), // BIT 1,(IX+d)*
-		0xDDCB49: bit_n_xd(1, "IX"), // BIT 1,(IX+d)*
-		0xDDCB4A: bit_n_xd(1, "IX"), // BIT 1,(IX+d)*
-		0xDDCB4B: bit_n_xd(1, "IX"), // BIT 1,(IX+d)*
-		0xDDCB4C: bit_n_xd(1, "IX"), // BIT 1,(IX+d)*
-		0xDDCB4D: bit_n_xd(1, "IX"), // BIT 1,(IX+d)*
-		0xDDCB4E: bit_n_xd(1, "IX"), // BIT 1,(IX+d)
-		0xDDCB4F: bit_n_xd(1, "IX"), // BIT 1,(IX+d)*
-		0xDDCB50: bit_n_xd(2, "IX"), // BIT 2,(IX+d)*
-		0xDDCB51: bit_n_xd(2, "IX"), // BIT 2,(IX+d)*
-		0xDDCB52: bit_n_xd(2, "IX"), // BIT 2,(IX+d)*
-		0xDDCB53: bit_n_xd(2, "IX"), // BIT 2,(IX+d)*
-		0xDDCB54: bit_n_xd(2, "IX"), // BIT 2,(IX+d)*
-		0xDDCB55: bit_n_xd(2, "IX"), // BIT 2,(IX+d)*
-		0xDDCB56: bit_n_xd(2, "IX"), // BIT 2,(IX+d)
-		0xDDCB57: bit_n_xd(2, "IX"), // BIT 2,(IX+d)*
-		0xDDCB58: bit_n_xd(3, "IX"), // BIT 3,(IX+d)*
-		0xDDCB59: bit_n_xd(3, "IX"), // BIT 3,(IX+d)*
-		0xDDCB5A: bit_n_xd(3, "IX"), // BIT 3,(IX+d)*
-		0xDDCB5B: bit_n_xd(3, "IX"), // BIT 3,(IX+d)*
-		0xDDCB5C: bit_n_xd(3, "IX"), // BIT 3,(IX+d)*
-		0xDDCB5D: bit_n_xd(3, "IX"), // BIT 3,(IX+d)*
-		0xDDCB5E: bit_n_xd(3, "IX"), // BIT 3,(IX+d)
-		0xDDCB5F: bit_n_xd(3, "IX"), // BIT 3,(IX+d)*
-		0xDDCB60: bit_n_xd(4, "IX"), // BIT 4,(IX+d)*
-		0xDDCB61: bit_n_xd(4, "IX"), // BIT 4,(IX+d)*
-		0xDDCB62: bit_n_xd(4, "IX"), // BIT 4,(IX+d)*
-		0xDDCB63: bit_n_xd(4, "IX"), // BIT 4,(IX+d)*
-		0xDDCB64: bit_n_xd(4, "IX"), // BIT 4,(IX+d)*
-		0xDDCB65: bit_n_xd(4, "IX"), // BIT 4,(IX+d)*
-		0xDDCB66: bit_n_xd(4, "IX"), // BIT 4,(IX+d)
-		0xDDCB67: bit_n_xd(4, "IX"), // BIT 4,(IX+d)*
-		0xDDCB68: bit_n_xd(5, "IX"), // BIT 5,(IX+d)*
-		0xDDCB69: bit_n_xd(5, "IX"), // BIT 5,(IX+d)*
-		0xDDCB6A: bit_n_xd(5, "IX"), // BIT 5,(IX+d)*
-		0xDDCB6B: bit_n_xd(5, "IX"), // BIT 5,(IX+d)*
-		0xDDCB6C: bit_n_xd(5, "IX"), // BIT 5,(IX+d)*
-		0xDDCB6D: bit_n_xd(5, "IX"), // BIT 5,(IX+d)*
-		0xDDCB6E: bit_n_xd(5, "IX"), // BIT 5,(IX+d)
-		0xDDCB6F: bit_n_xd(5, "IX"), // BIT 5,(IX+d)*
-		0xDDCB70: bit_n_xd(6, "IX"), // BIT 6,(IX+d)*
-		0xDDCB71: bit_n_xd(6, "IX"), // BIT 6,(IX+d)*
-		0xDDCB72: bit_n_xd(6, "IX"), // BIT 6,(IX+d)*
-		0xDDCB73: bit_n_xd(6, "IX"), // BIT 6,(IX+d)*
-		0xDDCB74: bit_n_xd(6, "IX"), // BIT 6,(IX+d)*
-		0xDDCB75: bit_n_xd(6, "IX"), // BIT 6,(IX+d)*
-		0xDDCB76: bit_n_xd(6, "IX"), // BIT 6,(IX+d)
-		0xDDCB77: bit_n_xd(6, "IX"), // BIT 6,(IX+d)*
-		0xDDCB78: bit_n_xd(7, "IX"), // BIT 7,(IX+d)*
-		0xDDCB79: bit_n_xd(7, "IX"), // BIT 7,(IX+d)*
-		0xDDCB7A: bit_n_xd(7, "IX"), // BIT 7,(IX+d)*
-		0xDDCB7B: bit_n_xd(7, "IX"), // BIT 7,(IX+d)*
-		0xDDCB7C: bit_n_xd(7, "IX"), // BIT 7,(IX+d)*
-		0xDDCB7D: bit_n_xd(7, "IX"), // BIT 7,(IX+d)*
-		0xDDCB7E: bit_n_xd(7, "IX"), // BIT 7,(IX+d)
-		0xDDCB7F: bit_n_xd(7, "IX"), // BIT 7,(IX+d)*
+		0xDDCB40: bit_n_ixyd(0, "IX"), // BIT 0,(IX+d)*
+		0xDDCB41: bit_n_ixyd(0, "IX"), // BIT 0,(IX+d)*
+		0xDDCB42: bit_n_ixyd(0, "IX"), // BIT 0,(IX+d)*
+		0xDDCB43: bit_n_ixyd(0, "IX"), // BIT 0,(IX+d)*
+		0xDDCB44: bit_n_ixyd(0, "IX"), // BIT 0,(IX+d)*
+		0xDDCB45: bit_n_ixyd(0, "IX"), // BIT 0,(IX+d)*
+		0xDDCB46: bit_n_ixyd(0, "IX"), // BIT 0,(IX+d)
+		0xDDCB47: bit_n_ixyd(0, "IX"), // BIT 0,(IX+d)*
+		0xDDCB48: bit_n_ixyd(1, "IX"), // BIT 1,(IX+d)*
+		0xDDCB49: bit_n_ixyd(1, "IX"), // BIT 1,(IX+d)*
+		0xDDCB4A: bit_n_ixyd(1, "IX"), // BIT 1,(IX+d)*
+		0xDDCB4B: bit_n_ixyd(1, "IX"), // BIT 1,(IX+d)*
+		0xDDCB4C: bit_n_ixyd(1, "IX"), // BIT 1,(IX+d)*
+		0xDDCB4D: bit_n_ixyd(1, "IX"), // BIT 1,(IX+d)*
+		0xDDCB4E: bit_n_ixyd(1, "IX"), // BIT 1,(IX+d)
+		0xDDCB4F: bit_n_ixyd(1, "IX"), // BIT 1,(IX+d)*
+		0xDDCB50: bit_n_ixyd(2, "IX"), // BIT 2,(IX+d)*
+		0xDDCB51: bit_n_ixyd(2, "IX"), // BIT 2,(IX+d)*
+		0xDDCB52: bit_n_ixyd(2, "IX"), // BIT 2,(IX+d)*
+		0xDDCB53: bit_n_ixyd(2, "IX"), // BIT 2,(IX+d)*
+		0xDDCB54: bit_n_ixyd(2, "IX"), // BIT 2,(IX+d)*
+		0xDDCB55: bit_n_ixyd(2, "IX"), // BIT 2,(IX+d)*
+		0xDDCB56: bit_n_ixyd(2, "IX"), // BIT 2,(IX+d)
+		0xDDCB57: bit_n_ixyd(2, "IX"), // BIT 2,(IX+d)*
+		0xDDCB58: bit_n_ixyd(3, "IX"), // BIT 3,(IX+d)*
+		0xDDCB59: bit_n_ixyd(3, "IX"), // BIT 3,(IX+d)*
+		0xDDCB5A: bit_n_ixyd(3, "IX"), // BIT 3,(IX+d)*
+		0xDDCB5B: bit_n_ixyd(3, "IX"), // BIT 3,(IX+d)*
+		0xDDCB5C: bit_n_ixyd(3, "IX"), // BIT 3,(IX+d)*
+		0xDDCB5D: bit_n_ixyd(3, "IX"), // BIT 3,(IX+d)*
+		0xDDCB5E: bit_n_ixyd(3, "IX"), // BIT 3,(IX+d)
+		0xDDCB5F: bit_n_ixyd(3, "IX"), // BIT 3,(IX+d)*
+		0xDDCB60: bit_n_ixyd(4, "IX"), // BIT 4,(IX+d)*
+		0xDDCB61: bit_n_ixyd(4, "IX"), // BIT 4,(IX+d)*
+		0xDDCB62: bit_n_ixyd(4, "IX"), // BIT 4,(IX+d)*
+		0xDDCB63: bit_n_ixyd(4, "IX"), // BIT 4,(IX+d)*
+		0xDDCB64: bit_n_ixyd(4, "IX"), // BIT 4,(IX+d)*
+		0xDDCB65: bit_n_ixyd(4, "IX"), // BIT 4,(IX+d)*
+		0xDDCB66: bit_n_ixyd(4, "IX"), // BIT 4,(IX+d)
+		0xDDCB67: bit_n_ixyd(4, "IX"), // BIT 4,(IX+d)*
+		0xDDCB68: bit_n_ixyd(5, "IX"), // BIT 5,(IX+d)*
+		0xDDCB69: bit_n_ixyd(5, "IX"), // BIT 5,(IX+d)*
+		0xDDCB6A: bit_n_ixyd(5, "IX"), // BIT 5,(IX+d)*
+		0xDDCB6B: bit_n_ixyd(5, "IX"), // BIT 5,(IX+d)*
+		0xDDCB6C: bit_n_ixyd(5, "IX"), // BIT 5,(IX+d)*
+		0xDDCB6D: bit_n_ixyd(5, "IX"), // BIT 5,(IX+d)*
+		0xDDCB6E: bit_n_ixyd(5, "IX"), // BIT 5,(IX+d)
+		0xDDCB6F: bit_n_ixyd(5, "IX"), // BIT 5,(IX+d)*
+		0xDDCB70: bit_n_ixyd(6, "IX"), // BIT 6,(IX+d)*
+		0xDDCB71: bit_n_ixyd(6, "IX"), // BIT 6,(IX+d)*
+		0xDDCB72: bit_n_ixyd(6, "IX"), // BIT 6,(IX+d)*
+		0xDDCB73: bit_n_ixyd(6, "IX"), // BIT 6,(IX+d)*
+		0xDDCB74: bit_n_ixyd(6, "IX"), // BIT 6,(IX+d)*
+		0xDDCB75: bit_n_ixyd(6, "IX"), // BIT 6,(IX+d)*
+		0xDDCB76: bit_n_ixyd(6, "IX"), // BIT 6,(IX+d)
+		0xDDCB77: bit_n_ixyd(6, "IX"), // BIT 6,(IX+d)*
+		0xDDCB78: bit_n_ixyd(7, "IX"), // BIT 7,(IX+d)*
+		0xDDCB79: bit_n_ixyd(7, "IX"), // BIT 7,(IX+d)*
+		0xDDCB7A: bit_n_ixyd(7, "IX"), // BIT 7,(IX+d)*
+		0xDDCB7B: bit_n_ixyd(7, "IX"), // BIT 7,(IX+d)*
+		0xDDCB7C: bit_n_ixyd(7, "IX"), // BIT 7,(IX+d)*
+		0xDDCB7D: bit_n_ixyd(7, "IX"), // BIT 7,(IX+d)*
+		0xDDCB7E: bit_n_ixyd(7, "IX"), // BIT 7,(IX+d)
+		0xDDCB7F: bit_n_ixyd(7, "IX"), // BIT 7,(IX+d)*
 		0xDDCB80: ld_r_res_n_xd("B", 0, "IX"),// LD B,RES 0,(IX+d)*
 		0xDDCB81: ld_r_res_n_xd("C", 0, "IX"), // LD C,RES 0,(IX+d)*
 		0xDDCB82: ld_r_res_n_xd("D", 0, "IX"), // LD D,RES 0,(IX+d)*
@@ -3155,7 +3146,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB86:function () { // RES 0,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x01);
 		},
 		0xDDCB87: ld_r_res_n_xd("A", 0, "IX"), // LD A,RES 0,(IX+d)*
@@ -3168,7 +3159,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB8E:function () { // RES 1,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x02);
 		},
 		0xDDCB8F: ld_r_res_n_xd("A", 1, "IX"), // LD A,RES 1,(IX+d)*
@@ -3181,7 +3172,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB96:function () { // RES 2,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x04);
 		},
 		0xDDCB97: ld_r_res_n_xd("A", 2, "IX"), // LD A,RES 2,(IX+d)*
@@ -3194,7 +3185,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCB9E:function () { // RES 3,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x08);
 		},
 		0xDDCB9F: ld_r_res_n_xd("A", 3, "IX"), // LD A,RES 3,(IX+d)*
@@ -3207,7 +3198,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBA6:function () { // RES 4,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x10);
 		},
 		0xDDCBA7: ld_r_res_n_xd("A", 4, "IX"), // LD A,RES 4,(IX+d)*
@@ -3220,7 +3211,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBAE:function () { // RES 5,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x20);
 		},
 		0xDDCBAF: ld_r_res_n_xd("A", 5, "IX"), // LD A,RES 5,(IX+d)*
@@ -3233,7 +3224,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBB6:function () { // RES 6,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x40);
 		},
 		0xDDCBB7: ld_r_res_n_xd("A", 6, "IX"), // LD A,RES 6,(IX+d)*
@@ -3246,7 +3237,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBBE:function () { // RES 7,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX",this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x80);
 		},
 		0xDDCBBF: ld_r_res_n_xd("A", 7, "IX"), // LD A,RES 7,(IX+d)*
@@ -3259,7 +3250,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBC6:function () { // SET 0,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x01);
 		},
 		0xDDCBC7: ld_r_set_n_xd("A", 0, "IX"), // LD A,SET 0,(IX+d)*
@@ -3272,7 +3263,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBCE:function () { // SET 1,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x02);
 		},
 		0xDDCBCF: ld_r_set_n_xd("A", 1, "IX"), // LD A,SET 1,(IX+d)*
@@ -3285,7 +3276,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBD6:function () { // SET 2,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x04);
 		},
 		0xDDCBD7: ld_r_set_n_xd("A", 2, "IX"), // LD A,SET 2,(IX+d)*
@@ -3298,7 +3289,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBDE:function () { // SET 3,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x08);
 		},
 		0xDDCBDF: ld_r_set_n_xd("A", 3, "IX"), // LD A,SET 3,(IX+d)*
@@ -3311,7 +3302,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBE6:function () { // SET 4,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x10);
 		},
 		0xDDCBE7: ld_r_set_n_xd("A", 4, "IX"), // LD A,SET 4,(IX+d)*
@@ -3324,7 +3315,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBEE:function () { // SET 5,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x20);
 		},
 		0xDDCBEF: ld_r_set_n_xd("A", 5, "IX"), // LD A,SET 5,(IX+d)*
@@ -3337,7 +3328,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBF6:function () { // SET 6,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x40);
 		},
 		0xDDCBF7: ld_r_set_n_xd("A", 6, "IX"), // LD A,SET 6,(IX+d)*
@@ -3350,53 +3341,53 @@ define(["scripts/utils.js"], function (Utils) {
 		0xDDCBFE:function () { // SET 7,(IX+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IX", this._op_displ);
+			var addr = this._s.IX+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x80);
 		},
 		0xDDCBFF: ld_r_set_n_xd("A", 7, "IX"), // LD A,SET 7,(IX+d)*
 		0xDDE1:function () { // POP IX
 			this._op_t = 14;
 			this._op_m = 2;
-			this._s.setSS("IX", this.pop16());
+			this._s.IX = this.pop16();
 		},
 		0xDDE3:function () { // EX (SP),IX
 			this._op_t = 23;
 			this._op_m = 2;
-			var addr = this._s.getSS("SP");
+			var addr = this._s.SP;
 			var memval = this._mmu.r16(addr);
-			this._mmu.w16reverse(addr, this._s.getSS("IX"));
-			this._s.setSS("IX", memval);
+			this._mmu.w16reverse(addr, this._s.IX);
+			this._s.IX = memval;
 		},
 		0xDDE5:function () { // PUSH IX
 			this._op_t = 15;
 			this._op_m = 2;
-			this.push16(this._s.getSS("IX"));
+			this.push16(this._s.IX);
 		},
 		0xDDE9:function () { // JP (IX)
 			this._op_t = 8;
 			this._op_m = 0;
-			this._s.setSS("PC", this._s.getSS("IX"));
+			this._s.PC = this._s.IX;
 		},
 		0xDDF9:function () { // LD SP,IX
 			this._op_t = 10;
 			this._op_m = 2;
-			this._s.setSS("SP", this._s.getSS("IX"));
+			this._s.SP = this._s.IX;
 		},
-		0xDE:function () { // SBC	A,n
+		0xDE:function () { // SBC A,n
 			this._op_t = 7;
 			this._op_m = 2;
-			var memval = this._mmu.r8(this._s.getSS("PC", 1));
-			var res = sub8(this._s.A, memval, this._s.F & F_C);
-			this._s.A = res[0]
-			this._s.F = res[1];
+			var memval = this._mmu.r8(this._s.PC+1);
+			sub8(this._s.A, memval, this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0]
+			this._s.F = this._op_alures[1];
 		},
-		0xDF:function () { // RST	18H
+		0xDF:function () { // RST 18H
 			this._op_t = 11;
 			this._op_m = 0;
-			this.push16(this._s.getSS("PC", 1));
-			this._s.setSS("PC", 0x18);
+			this.push16(this._s.PC+1);
+			this._s.PC = 0x18;
 		},
-		0xE0:function () { // RET	PO
+		0xE0:function () { // RET PO
 			if (this._s.F & F_PV) {
 				this._op_t = 5;
 				this._op_m = 1;
@@ -3404,32 +3395,32 @@ define(["scripts/utils.js"], function (Utils) {
 			else {
 				this._op_t = 11;
 				this._op_m = 0;
-				this._s.setSS("PC", this.pop16());
+				this._s.PC = this.pop16();
 			}
 		},
-		0xE1:function () { // POP	HL
+		0xE1:function () { // POP HL
 			this._op_t = 10;
 			this._op_m = 1;
-			this._s.setSS("HL", this.pop16());
+			this._s.HL = this.pop16();
 		},
-		0xE2:function () { // JP	PO,nn
+		0xE2:function () { // JP PO,nn
 			this._op_t = 10;
 			if (this._s.F & F_PV) {
 				this._op_m = 3;
 			}
 			else {
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this._s.PC = addr;
 				this._op_m = 0;
 			}
 		},
-		0xE3:function () { // EX	(SP),HL
+		0xE3:function () { // EX (SP),HL
 			this._op_t = 19;
 			this._op_m = 1;
-			var addr = this._s.getSS("SP");
+			var addr = this._s.SP;
 			var memval = this._mmu.r16(addr);
-			this._mmu.w16reverse(addr, this._s.getSS("HL"));
-			this._s.setSS("HL", memval);
+			this._mmu.w16reverse(addr, this._s.HL);
+			this._s.HL = memval;
 		},
 		0xE4:function () { // CALL PO,nn
 			if (this._s.F & F_PV) {
@@ -3439,69 +3430,69 @@ define(["scripts/utils.js"], function (Utils) {
 			else {
 				this._op_t = 17;
 				this._op_m = 0;
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this.push16(this._s.getSS("PC", 3));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this.push16(this._s.PC+3);
+				this._s.PC = addr;
 			}
 		},
-		0xE5:function () { // PUSH	HL
+		0xE5:function () { // PUSH HL
 			this._op_t = 11;
 			this._op_m = 1;
-			this.push16(this._s.getSS("HL"));
+			this.push16(this._s.HL);
 		},
-		0xE6:function () { // AND	n
+		0xE6:function () { // AND n
 			this._op_t = 7;
 			this._op_m = 2;
-			this._s.A &= this._mmu.r8(this._s.getSS("PC", 1));
+			this._s.A &= this._mmu.r8(this._s.PC+1);
 			this._s.F = SZ53Ptable[this._s.A] | F_H;
 		},
-		0xE7:function () { // RST	20H
+		0xE7:function () { // RST 20H
 			this._op_t = 11;
 			this._op_m = 0;
-			this.push16(this._s.getSS("PC", 1));
-			this._s.setSS("PC", 0x20);
+			this.push16(this._s.PC+1);
+			this._s.PC = 0x20;
 		},
-		0xE8:function () { // RET	PE
+		0xE8:function () { // RET PE
 			if (this._s.F & F_PV) {
 				this._op_t = 11;
 				this._op_m = 0;
-				this._s.setSS("PC", this.pop16());
+				this._s.PC = this.pop16();
 			}
 			else {
 				this._op_t = 5;
 				this._op_m = 1;
 			}
 		},
-		0xE9:function () { // JP	(HL)
+		0xE9:function () { // JP (HL)
 			this._op_t = 4;
 			this._op_m = 0;
-			this._s.setSS("PC", this._s.getSS("HL"));
+			this._s.PC = this._s.HL;
 		},
-		0xEA:function () { // JP	PE,nn
+		0xEA:function () { // JP PE,nn
 			this._op_t = 10;
 			if (this._s.F & F_PV) {
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this._s.PC = addr;
 				this._op_m = 0;
 			}
 			else {
 				this._op_m = 3;
 			}
 		},
-		0xEB:function () { // EX	DE,HL
+		0xEB:function () { // EX DE,HL
 			this._op_t = 4;
 			this._op_m = 1;
-			var DE = this._s.getSS("DE");
-			this._s.setSS("DE", this._s.getSS("HL"));
-			this._s.setSS("HL", DE);
+			var DE = this._s.DE;
+			this._s.DE = this._s.HL;
+			this._s.HL = DE;
 		},
-		0xEC:function () { // CALL	PE,nn
+		0xEC:function () { // CALL PE,nn
 			if (this._s.F & F_PV) {
 				this._op_t = 17;
 				this._op_m = 0;
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this.push16(this._s.getSS("PC", 3));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this.push16(this._s.PC+3);
+				this._s.PC = addr;
 			}
 			else {
 				this._op_t = 10;
@@ -3831,104 +3822,104 @@ define(["scripts/utils.js"], function (Utils) {
 			this._op_m = 0;
 			throw ("not implemented 0xED3F");
 		},
-		0xED40: in_r_c("B"), // IN	B,(C)
-		0xED41: out_c_r("B"), // OUT	(C),B
-		0xED42: sbc_ss_ss("HL", "BC"), // SBC	HL,BC
-		0xED43:function () { // LD	(nn),BC
+		0xED40: in_r_c("B"), // IN B,(C)
+		0xED41: out_c_r("B"), // OUT (C),B
+		0xED42: sbc_ss_ss("HL", "BC"), // SBC HL,BC
+		0xED43:function () { // LD (nn),BC
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._mmu.w16(addr, this._s.getSS("BC"));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._mmu.w16(addr, this._s.BC);
 		},
 		0xED44: neg_a(), // NEG
 		0xED45: retn(), // RETN
-		0xED46:function () { // IM	0
+		0xED46:function () { // IM 0
 			this._op_t = 8;
 			this._op_m = 2;
 			this._s.im = 0;
 		},
-		0xED47:function () { // LD	I,A
+		0xED47:function () { // LD I,A
 			this._op_t = 9;
 			this._op_m = 2;
 			this._s.I = this._s.A;
 		},
-		0xED48: in_r_c("C"), // IN	C,(C)
-		0xED49: out_c_r("C"), // OUT	(C),C
-		0xED4A: adc_ss_ss("HL", "BC"), // ADC	HL,BC
-		0xED4B:function () { // LD	BC,(nn)
+		0xED48: in_r_c("C"), // IN C,(C)
+		0xED49: out_c_r("C"), // OUT (C),C
+		0xED4A: adc_ss_ss("HL", "BC"), // ADC HL,BC
+		0xED4B:function () { // LD BC,(nn)
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._s.setSS("BC", this._mmu.r16(addr));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._s.BC = this._mmu.r16(addr);
 		},
 		0xED4C: neg_a(), // NEG*
 		0xED4D:function () { // RETI
 			this._op_t = 14;
 			this._op_m = 0;
-			this._s.setSS("PC", this.pop16());
+			this._s.PC = this.pop16();
 		},
 		0xED4E:function () { // IM 0*
 			this._op_t = 8;
 			this._op_m = 2;
 			this._s.im = 0;
 		},
-		0xED4F:function () { // LD	R,A
+		0xED4F:function () { // LD R,A
 			this._op_t = 9;
 			this._op_m = 2;
 			this._s.R = this._s.A;
 		},
-		0xED50: in_r_c("D"), // IN	D,(C)
-		0xED51: out_c_r("D"), // OUT	(C),D
-		0xED52: sbc_ss_ss("HL", "DE"), // SBC	HL,DE
-		0xED53:function () { // LD	(nn),DE
+		0xED50: in_r_c("D"), // IN D,(C)
+		0xED51: out_c_r("D"), // OUT (C),D
+		0xED52: sbc_ss_ss("HL", "DE"), // SBC HL,DE
+		0xED53:function () { // LD (nn),DE
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._mmu.w16(addr, this._s.getSS("DE"));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._mmu.w16(addr, this._s.DE);
 		},
 		0xED54: neg_a(), // NEG*
 		0xED55: retn(), // RETN*
-		0xED56:function () { // IM	1
+		0xED56:function () { // IM 1
 			this._op_t = 8;
 			this._op_m = 2;
 			this._s.im = 1;
 		},
-		0xED57:function () { // LD	A,I
+		0xED57:function () { // LD A,I
 			this._op_t = 9;
 			this._op_m = 2;
 			this._s.A = this._s.I;
 			this._s.F = (this._s.F & F_C) | SZ53table[this._s.A] | (this._s.IFF2 ? F_PV : 0);
 		},
-		0xED58: in_r_c("E"), // IN	E,(C)
-		0xED59: out_c_r("E"), // OUT	(C),E
-		0xED5A: adc_ss_ss("HL", "DE"), // ADC	HL,DE
-		0xED5B:function () { // LD	DE,(nn)
+		0xED58: in_r_c("E"), // IN E,(C)
+		0xED59: out_c_r("E"), // OUT (C),E
+		0xED5A: adc_ss_ss("HL", "DE"), // ADC HL,DE
+		0xED5B:function () { // LD DE,(nn)
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._s.setSS("DE", this._mmu.r16(addr));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._s.DE = this._mmu.r16(addr);
 		},
 		0xED5C: neg_a(), // NEG*
 		0xED5D: retn(), // RETN*
-		0xED5E:function () { // IM	2
+		0xED5E:function () { // IM 2
 			this._op_t = 8;
 			this._op_m = 2;
 			this._s.im = 2;
 		},
-		0xED5F:function () { // LD	A,R
+		0xED5F:function () { // LD A,R
 			this._op_t = 9;
 			this._op_m = 2;
 			this._s.A = this._s.R;
 			this._s.F = (this._s.F & F_C) | SZ53table[this._s.A] | (this._s.IFF2 ? F_PV : 0);
 		},
-		0xED60: in_r_c("H"), // IN	H,(C)
-		0xED61: out_c_r("H"), // OUT	(C),H
-		0xED62: sbc_ss_ss("HL", "HL"), // SBC	HL,HL
+		0xED60: in_r_c("H"), // IN H,(C)
+		0xED61: out_c_r("H"), // OUT (C),H
+		0xED62: sbc_ss_ss("HL", "HL"), // SBC HL,HL
 		0xED63:function () { // LD (nn), HL
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._mmu.w16(addr, this._s.getSS("HL"));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._mmu.w16(addr, this._s.HL);
 		},
 		0xED64: neg_a(), // NEG*
 		0xED65: retn(), // RETN*
@@ -3940,20 +3931,20 @@ define(["scripts/utils.js"], function (Utils) {
 		0xED67:function () { // RRD
 			this._op_t = 18;
 			this._op_m = 2;
-			var HL = this._s.getSS("HL")
+			var HL = this._s.HL
 			var memval = this._mmu.r8(HL);
 			this._mmu.w8(HL, ((this._s.A & 0x0F) << 4) | (memval >>> 4));
 			this._s.A = (this._s.A & 0xF0) | (memval & 0x0F);
 			this._s.F = (this._s.F & F_C) | SZ53Ptable[this._s.A];
 		},
-		0xED68: in_r_c("L"), // IN	L,(C)
-		0xED69: out_c_r("L"), // OUT	(C),L
-		0xED6A: adc_ss_ss("HL", "HL"), // ADC	HL,HL
+		0xED68: in_r_c("L"), // IN L,(C)
+		0xED69: out_c_r("L"), // OUT (C),L
+		0xED6A: adc_ss_ss("HL", "HL"), // ADC HL,HL
 		0xED6B:function () { // LD HL,(nn)
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._s.setSS("HL", this._mmu.r16(addr));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._s.HL = this._mmu.r16(addr);
 		},
 		0xED6C: neg_a(), // NEG*
 		0xED6D: retn(), // RETN*
@@ -3965,7 +3956,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xED6F:function () { // RLD
 			this._op_t = 18;
 			this._op_m = 2;
-			var HL = this._s.getSS("HL")
+			var HL = this._s.HL
 			var memval = this._mmu.r8(HL);
 			this._mmu.w8(HL, ((memval & 0x0F) << 4) | (this._s.A & 0x0F));
 			this._s.A = (this._s.A & 0xF0) | (memval >>> 4);
@@ -3982,12 +3973,12 @@ define(["scripts/utils.js"], function (Utils) {
 			this._op_m = 2;
 			this._out(this._s.C, 0, this._s.B);
 		},
-		0xED72: sbc_ss_ss("HL", "SP"), // SBC	HL,SP
-		0xED73:function () { // LD	(nn),SP
+		0xED72: sbc_ss_ss("HL", "SP"), // SBC HL,SP
+		0xED73:function () { // LD (nn),SP
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._mmu.w16(addr, this._s.getSS("SP"));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._mmu.w16(addr, this._s.SP);
 		},
 		0xED74: neg_a(), // NEG*
 		0xED75: retn(), // RETN*
@@ -4000,14 +3991,14 @@ define(["scripts/utils.js"], function (Utils) {
 			this._op_t = 4;
 			this._op_m = 2;
 		},
-		0xED78: in_r_c("A"), // IN	A,(C)
-		0xED79: out_c_r("A"), // OUT	(C),A
-		0xED7A: adc_ss_ss("HL", "SP"), // ADC	HL,SP
-		0xED7B:function () { // LD	SP,(nn)
+		0xED78: in_r_c("A"), // IN A,(C)
+		0xED79: out_c_r("A"), // OUT (C),A
+		0xED7A: adc_ss_ss("HL", "SP"), // ADC HL,SP
+		0xED7B:function () { // LD SP,(nn)
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._s.setSS("SP", this._mmu.r16(addr));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._s.SP = this._mmu.r16(addr);
 		},
 		0xED7C: neg_a(), // NEG*
 		0xED7D: retn(), // RETN*
@@ -4183,17 +4174,17 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDA0:function () { // LDI
 			this._op_t = 16;
 			this._op_m = 2;
-			var DE = this._s.getSS("DE");
-			var HL = this._s.getSS("HL");
-			var BC = this._s.getSS("BC");
+			var DE = this._s.DE;
+			var HL = this._s.HL;
+			var BC = this._s.BC;
 			var memval = this._mmu.r8(HL);
 			this._mmu.w8(DE, memval);
 			DE++;
 			HL++;
 			BC--;
-			this._s.setSS("DE", DE);
-			this._s.setSS("HL", HL);
-			this._s.setSS("BC", BC);
+			this._s.DE = DE;
+			this._s.HL = HL;
+			this._s.BC = BC;
 			memval = (memval + this._s.A) & 0xFF;
 			this._s.F =
 				(this._s.F & (F_S|F_Z|F_C)) |
@@ -4204,19 +4195,19 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDA1:function () { // CPI
 			this._op_t = 16;
 			this._op_m = 2;
-			var BC = this._s.getSS("BC");
-			var HL = this._s.getSS("HL");
+			var BC = this._s.BC;
+			var HL = this._s.HL;
 			var memval = this._mmu.r8(HL);
-			var res = sub8(this._s.A, memval, 0);
+			sub8(this._s.A, memval, 0, this._op_alures);
 			HL++;
 			BC--;
-			this._s.setSS("HL", HL);
-			this._s.setSS("BC", BC);
-			memval = (this._s.A - memval - ((res[1] & F_H) ? 1 : 0)) & 0xFF;
+			this._s.HL = HL;
+			this._s.BC = BC;
+			memval = (this._s.A - memval - ((this._op_alures[1] & F_H) ? 1 : 0)) & 0xFF;
 			this._s.F =
 				F_N |
 				(this._s.F & F_C) |
-				(res[1] & (F_S|F_Z|F_H)) |
+				(this._op_alures[1] & (F_S|F_Z|F_H)) |
 				(memval & F_3) |
 				((memval & 0x02) ? F_5 : 0) |
 				(BC != 0 ? F_PV : 0);
@@ -4224,16 +4215,16 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDA2:function () { // INI
 			this._op_t = 16;
 			this._op_m = 2;
-			var BC = this._s.getSS("BC");
-			var HL = this._s.getSS("HL");
+			var BC = this._s.BC;
+			var HL = this._s.HL;
 			var regval = this._in(this._s.C, this._s.B);
 			this._mmu.w8(HL, regval);
 			HL++;
-			this._s.setSS("HL", HL);
-			var decres = sub8(this._s.B, 1, 0);
-			this._s.B = decres[0];
+			this._s.HL = HL;
+			sub8(this._s.B, 1, 0, this._op_alures);
+			this._s.B = this._op_alures[0];
 			this._s.F =
-				(decres[1] & (F_S|F_Z|F_5|F_3)) |
+				(this._op_alures[1] & (F_S|F_Z|F_5|F_3)) |
 				((regval & 0x80) ? F_N : 0) |
 				((regval + ((BC+1) & 0xFF)) > 0xFF ? (F_H|F_C) : 0) |
 				(SZ53Ptable[((regval + ((BC+1) & 0xFF)) & 7) ^ this._s.B] & F_PV);
@@ -4241,16 +4232,16 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDA3:function () { // OUTI
 			this._op_t = 16;
 			this._op_m = 2;
-			var BC = this._s.getSS("BC");
-			var HL = this._s.getSS("HL");
+			var BC = this._s.BC;
+			var HL = this._s.HL;
 			var memval = this._mmu.r8(HL);
 			HL++;
-			this._s.setSS("HL", HL);
-			var decres = sub8(this._s.B, 1, 0);
-			this._s.B = decres[0];
+			this._s.HL = HL;
+			sub8(this._s.B, 1, 0, this._op_alures);
+			this._s.B = this._op_alures[0];
 			this._out(this._s.C, memval, this._s.B);
 			this._s.F =
-				(decres[1] & (F_S|F_Z|F_5|F_3)) |
+				(this._op_alures[1] & (F_S|F_Z|F_5|F_3)) |
 				((memval & 0x80) ? F_N : 0) |
 				((memval + this._s.L) > 0xFF ? (F_H|F_C) : 0) |
 				(SZ53Ptable[((memval + this._s.L) & 7) ^ this._s.B] & F_PV);
@@ -4278,17 +4269,17 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDA8:function () { // LDD
 			this._op_t = 16;
 			this._op_m = 2;
-			var DE = this._s.getSS("DE");
-			var HL = this._s.getSS("HL");
-			var BC = this._s.getSS("BC");
+			var DE = this._s.DE;
+			var HL = this._s.HL;
+			var BC = this._s.BC;
 			var memval = this._mmu.r8(HL);
 			this._mmu.w8(DE, memval);
 			DE--;
 			HL--;
 			BC--;
-			this._s.setSS("DE", DE);
-			this._s.setSS("HL", HL);
-			this._s.setSS("BC", BC);
+			this._s.DE = DE;
+			this._s.HL = HL;
+			this._s.BC = BC;
 			memval = (memval + this._s.A) & 0xFF;
 			this._s.F =
 				(this._s.F & (F_S|F_Z|F_C)) |
@@ -4299,19 +4290,19 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDA9:function () { // CPD
 			this._op_t = 16;
 			this._op_m = 2;
-			var BC = this._s.getSS("BC");
-			var HL = this._s.getSS("HL");
+			var BC = this._s.BC;
+			var HL = this._s.HL;
 			var memval = this._mmu.r8(HL);
-			var res = sub8(this._s.A, memval, 0);
+			sub8(this._s.A, memval, 0, this._op_alures);
 			HL--;
 			BC--;
-			this._s.setSS("HL", HL);
-			this._s.setSS("BC", BC);
-			memval = (this._s.A - memval - ((res[1] & F_H) ? 1 : 0)) & 0xFF;
+			this._s.HL = HL;
+			this._s.BC = BC;
+			memval = (this._s.A - memval - ((this._op_alures[1] & F_H) ? 1 : 0)) & 0xFF;
 			this._s.F =
 				F_N |
 				(this._s.F & F_C) |
-				(res[1] & (F_S|F_Z|F_H)) |
+				(this._op_alures[1] & (F_S|F_Z|F_H)) |
 				(memval & F_3) |
 				((memval & 0x02) ? F_5 : 0) |
 				(BC != 0 ? F_PV : 0);
@@ -4319,16 +4310,16 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDAA:function () { // IND
 			this._op_t = 16;
 			this._op_m = 2;
-			var BC = this._s.getSS("BC");
-			var HL = this._s.getSS("HL");
+			var BC = this._s.BC;
+			var HL = this._s.HL;
 			var regval = this._in(this._s.C, this._s.B);
 			this._mmu.w8(HL, regval);
 			HL--;
-			this._s.setSS("HL", HL);
-			var decres = sub8(this._s.B, 1, 0);
-			this._s.B = decres[0];
+			this._s.HL = HL;
+			sub8(this._s.B, 1, 0, this._op_alures);
+			this._s.B = this._op_alures[0];
 			this._s.F =
-				(decres[1] & (F_S|F_Z|F_5|F_3)) |
+				(this._op_alures[1] & (F_S|F_Z|F_5|F_3)) |
 				((regval & 0x80) ? F_N : 0) |
 				((regval + ((BC-1) & 0xFF)) > 0xFF ? (F_H|F_C) : 0) |
 				(SZ53Ptable[((regval + ((BC-1) & 0xFF)) & 7) ^ this._s.B] & F_PV);
@@ -4336,16 +4327,16 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDAB:function () { // OUTD
 			this._op_t = 16;
 			this._op_m = 2;
-			var BC = this._s.getSS("BC");
-			var HL = this._s.getSS("HL");
+			var BC = this._s.BC;
+			var HL = this._s.HL;
 			var memval = this._mmu.r8(HL);
 			HL--;
-			this._s.setSS("HL", HL);
-			var decres = sub8(this._s.B, 1, 0);
-			this._s.B = decres[0];
+			this._s.HL = HL;
+			sub8(this._s.B, 1, 0, this._op_alures);
+			this._s.B = this._op_alures[0];
 			this._out(this._s.C, memval, this._s.B);
 			this._s.F =
-				(decres[1] & (F_S|F_Z|F_5|F_3)) |
+				(this._op_alures[1] & (F_S|F_Z|F_5|F_3)) |
 				((memval & 0x80) ? F_N : 0) |
 				((memval + this._s.L) > 0xFF ? (F_H|F_C) : 0) |
 				(SZ53Ptable[((memval + this._s.L) & 7) ^ this._s.B] & F_PV);
@@ -4373,7 +4364,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDB0:function () { // LDIR
 			this._opcodes[0xEDA0].call(this);
 
-			if (this._s.getSS("BC") !== 0) { // repeat
+			if (this._s.BC !== 0) { // repeat
 				this._op_t = 21;
 				this._op_m = 0; // repeat this instruction
 			}
@@ -4381,7 +4372,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDB1:function () { // CPIR
 			this._opcodes[0xEDA1].call(this);
 
-			if (this._s.getSS("BC") != 0 && !(this._s.F & F_Z)) {
+			if (this._s.BC != 0 && !(this._s.F & F_Z)) {
 				this._op_t = 21;
 				this._op_m = 0;
 			}
@@ -4425,7 +4416,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDB8:function () { // LDDR
 			this._opcodes[0xEDA8].call(this);
 
-			if (this._s.getSS("BC") !== 0) { // repeat
+			if (this._s.BC !== 0) { // repeat
 				this._op_t = 21;
 				this._op_m = 0; // repeat this instruction
 			}
@@ -4433,7 +4424,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xEDB9:function () { // CPDR
 			this._opcodes[0xEDA9].call(this);
 
-			if (this._s.getSS("BC") != 0 && !(this._s.F & F_Z)) {
+			if (this._s.BC != 0 && !(this._s.F & F_Z)) {
 				this._op_t = 21;
 				this._op_m = 0;
 			}
@@ -4794,20 +4785,20 @@ define(["scripts/utils.js"], function (Utils) {
 			this._op_m = 0;
 			throw ("not implemented 0xEDFF");
 		},
-		0xEE:function () { // XOR	n
+		0xEE:function () { // XOR n
 			this._op_t = 7;
 			this._op_m = 2;
-			var addr = this._s.getSS("PC", 1);
+			var addr = this._s.PC+1;
 			this._s.A = (this._s.A ^ this._mmu.r8(addr)) & 0xFF;
 			this._s.F = SZ53Ptable[this._s.A];
 		},
-		0xEF:function () { // RST	28H
+		0xEF:function () { // RST 28H
 			this._op_t = 11;
 			this._op_m = 0;
-			this.push16(this._s.getSS("PC", 1));
-			this._s.setSS("PC", 0x28);
+			this.push16(this._s.PC+1);
+			this._s.PC = 0x28;
 		},
-		0xF0:function () { // RET	P
+		0xF0:function () { // RET P
 			if (this._s.F & F_S) {
 				this._op_t = 5;
 				this._op_m = 1;
@@ -4815,22 +4806,22 @@ define(["scripts/utils.js"], function (Utils) {
 			else {
 				this._op_t = 11;
 				this._op_m = 0;
-				this._s.setSS("PC", this.pop16());
+				this._s.PC = this.pop16();
 			}
 		},
-		0xF1:function () { // POP	AF
+		0xF1:function () { // POP AF
 			this._op_t = 10;
 			this._op_m = 1;
-			this._s.setSS("AF", this.pop16());
+			this._s.AF = this.pop16();
 		},
-		0xF2:function () { // JP	P,nn
+		0xF2:function () { // JP P,nn
 			this._op_t = 10;
 			if (this._s.F & F_S) {
 				this._op_m = 3;
 			}
 			else {
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this._s.PC = addr;
 				this._op_m = 0;
 			}
 		},
@@ -4840,7 +4831,7 @@ define(["scripts/utils.js"], function (Utils) {
 			this._s.IFF1 = 0;
 			this._s.IFF2 = 0;
 		},
-		0xF4:function () { // CALL	P,nn
+		0xF4:function () { // CALL P,nn
 			if (this._s.F & F_S) {
 				this._op_t = 10;
 				this._op_m = 3;
@@ -4848,49 +4839,49 @@ define(["scripts/utils.js"], function (Utils) {
 			else {
 				this._op_t = 17;
 				this._op_m = 0;
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this.push16(this._s.getSS("PC", 3));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this.push16(this._s.PC+3);
+				this._s.PC = addr;
 			}
 		},
-		0xF5:function () { // PUSH	AF
+		0xF5:function () { // PUSH AF
 			this._op_t = 11;
 			this._op_m = 1;
-			this.push16(this._s.getSS("AF"));
+			this.push16(this._s.AF);
 		},
-		0xF6:function () { // OR	n
+		0xF6:function () { // OR n
 			this._op_t = 7;
 			this._op_m = 2;
-			this._s.A = this._s.A | this._mmu.r8(this._s.getSS("PC", 1));
+			this._s.A = this._s.A | this._mmu.r8(this._s.PC+1);
 			this._s.F = SZ53Ptable[this._s.A];
 		},
-		0xF7:function () { // RST	30H
+		0xF7:function () { // RST 30H
 			this._op_t = 11;
 			this._op_m = 0;
-			this.push16(this._s.getSS("PC", 1));
-			this._s.setSS("PC", 0x30);
+			this.push16(this._s.PC+1);
+			this._s.PC = 0x30;
 		},
-		0xF8:function () { // RET	M
+		0xF8:function () { // RET M
 			if (this._s.F & F_S) {
 				this._op_t = 11;
 				this._op_m = 0;
-				this._s.setSS("PC", this.pop16());
+				this._s.PC = this.pop16();
 			}
 			else {
 				this._op_t = 5;
 				this._op_m = 1;
 			}
 		},
-		0xF9:function () { // LD	SP,HL
+		0xF9:function () { // LD SP,HL
 			this._op_t = 6;
 			this._op_m = 1;
-			this._s.setSS("SP", this._s.getSS("HL"));
+			this._s.SP = this._s.HL;
 		},
-		0xFA:function () { // JP	M,nn
+		0xFA:function () { // JP M,nn
 			this._op_t = 10;
 			if (this._s.F & F_S) {
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this._s.PC = addr;
 				this._op_m = 0;
 			}
 			else {
@@ -4903,13 +4894,13 @@ define(["scripts/utils.js"], function (Utils) {
 			this._s.IFF1 = 1;
 			this._s.IFF2 = 1; //TODO: does not take effect until the end of next instr
 		},
-		0xFC:function () { // CALL	M,nn
+		0xFC:function () { // CALL M,nn
 			if (this._s.F & F_S) {
 				this._op_t = 17;
 				this._op_m = 0;
-				var addr = this._mmu.r16(this._s.getSS("PC", 1));
-				this.push16(this._s.getSS("PC", 3));
-				this._s.setSS("PC", addr);
+				var addr = this._mmu.r16(this._s.PC+1);
+				this.push16(this._s.PC+3);
+				this._s.PC = addr;
 			}
 			else {
 				this._op_t = 10;
@@ -4926,8 +4917,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD22:function () { // LD (nn),IY
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC",2));
-			this._mmu.w16(addr, this._s.getSS("IY"));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._mmu.w16(addr, this._s.IY);
 		},
 		0xFD23: inc_ss("IY"), // INC IY
 		0xFD24: inc_r("IYH"), // INC IYH*
@@ -4937,8 +4928,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD2A:function () { // LD IY,(nn)
 			this._op_t = 20;
 			this._op_m = 4;
-			var addr = this._mmu.r16(this._s.getSS("PC", 2));
-			this._s.setSS("IY", this._mmu.r16(addr));
+			var addr = this._mmu.r16(this._s.PC+2);
+			this._s.IY = this._mmu.r16(addr);
 		},
 		0xFD2B: dec_ss("IY"), // DEC IY
 		0xFD2C: inc_r("IYL"), // INC IYL*
@@ -4947,28 +4938,28 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD34:function () { // INC (IY+d)
 			this._op_t = 23;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IY",displ);
-			var res = add8(this._mmu.r8(addr), 1, 0);
-			this._mmu.w8(addr, res[0]);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IY+displ;
+			add8(this._mmu.r8(addr), 1, 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
 			var mask = F_C;
-			this._s.F = (res[1] & ~mask) | (this._s.F & mask);
+			this._s.F = (this._op_alures[1] & ~mask) | (this._s.F & mask);
 		},
 		0xFD35:function () { // DEC (IY+d)
 			this._op_t = 23;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IY",displ);
-			var res = sub8(this._mmu.r8(addr), 1, 0);
-			this._mmu.w8(addr, res[0]);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IY+displ;
+			sub8(this._mmu.r8(addr), 1, 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
 			var mask = F_C;
-			this._s.F = (res[1] & ~mask) | (this._s.F & mask);
+			this._s.F = (this._op_alures[1] & ~mask) | (this._s.F & mask);
 		},
 		0xFD36:function () { // LD (IY+d),n
 			this._op_t = 19;
 			this._op_m = 4;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IY",displ), this._mmu.r8(this._s.getSS("PC", 3)));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IY+displ, this._mmu.r8(this._s.PC+3));
 		},
 		0xFD39: add_ss_ss("IY", "SP"), // ADD IY,SP
 		0xFD44:function () { // LD B,IYH*
@@ -4984,8 +4975,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD46:function () { // LD B,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8(this._s.getSS("PC", 2));
-			this._s.B = this._mmu.r8(this._s.getSS("IY",disp));
+			var displ = this._mmu.r8(this._s.PC+2);
+			this._s.B = this._mmu.r8(this._s.IY+displ);
 		},
 		0xFD4C:function () { // LD C,IYH*
 			this._op_t = 8;
@@ -5000,8 +4991,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD4E:function () { // LD C,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8(this._s.getSS("PC", 2));
-			this._s.C = this._mmu.r8(this._s.getSS("IY",disp));
+			var displ = this._mmu.r8(this._s.PC+2);
+			this._s.C = this._mmu.r8(this._s.IY+displ);
 		},
 		0xFD54:function () { // LD D,IYH*
 			this._op_t = 8;
@@ -5016,8 +5007,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD56:function () { // LD D,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.D = this._mmu.r8(this._s.getSS("IY",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.D = this._mmu.r8(this._s.IY+displ);
 		},
 		0xFD5C:function () { // LD E,IYH*
 			this._op_t = 8;
@@ -5032,8 +5023,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD5E:function () { // LD E,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.E = this._mmu.r8(this._s.getSS("IY",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.E = this._mmu.r8(this._s.IY+displ);
 		},
 		0xFD60:function () { // LD IYH,B*
 			this._op_t = 8;
@@ -5067,8 +5058,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD66:function () { // LD H,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.H = this._mmu.r8(this._s.getSS("IY",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.H = this._mmu.r8(this._s.IY+displ);
 		},
 		0xFD67:function () { // LD IYH,A*
 			this._op_t = 8;
@@ -5107,8 +5098,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD6E:function () { // LD L,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.L = this._mmu.r8(this._s.getSS("IY",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.L = this._mmu.r8(this._s.IY+displ);
 		},
 		0xFD6F:function () { // LD IYL,A*
 			this._op_t = 8;
@@ -5118,44 +5109,44 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD70:function () { // LD (IY+d),B
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IY",displ), this._s.B);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IY+displ, this._s.B);
 		},
 		0xFD71:function () { // LD (IY+d),C
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IY",displ), this._s.C);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IY+displ, this._s.C);
 		},
 		0xFD72:function () { // LD (IY+d),D
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IY",displ), this._s.D);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IY+displ, this._s.D);
 		},
 		0xFD73:function () { // LD (IY+d),E
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IY",displ), this._s.E);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IY+displ, this._s.E);
 		},
 		0xFD74:function () { // LD (IY+d),H
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IY",displ), this._s.H);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IY+displ, this._s.H);
 		},
 		0xFD75:function () { // LD (IY+d),L
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IY",displ), this._s.L);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IY+displ, this._s.L);
 		},
 		0xFD77:function () { // LD (IY+d),A
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._mmu.w8(this._s.getSS("IY",displ), this._s.A);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._mmu.w8(this._s.IY+displ, this._s.A);
 		},
 		0xFD7C:function () { // LD A,IYH*
 			this._op_t = 8;
@@ -5170,59 +5161,59 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFD7E:function () { // LD A,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var disp = this._mmu.r8s(this._s.getSS("PC", 2));
-			this._s.A = this._mmu.r8(this._s.getSS("IY",disp));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			this._s.A = this._mmu.r8(this._s.IY+displ);
 		},
 		0xFD84: add_a_r("IYH"), // ADD A,IYH*
 		0xFD85: add_a_r("IYL"), // ADD A,IYL*
 		0xFD86:function () { // ADD A,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var res = add8(this._s.A, this._mmu.r8(this._s.getSS("IY",displ)), 0);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			var displ = this._mmu.r8s(this._s.PC+2);
+			add8(this._s.A, this._mmu.r8(this._s.IY+displ), 0, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
 		0xFD8C: adc_a_r("IYH"), // ADC A,IYH*
 		0xFD8D: adc_a_r("IYL"), // ADC A,IYL*
 		0xFD8E:function () { // ADC A,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IY",displ);
-			var res = add8(this._s.A, this._mmu.r8(addr), this._s.F & F_C);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IY+displ;
+			add8(this._s.A, this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
 		0xFD94: sub_r("IYH"), // SUB IYH*
 		0xFD95: sub_r("IYL"), // SUB IYL*
 		0xFD96:function () { // SUB (IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IY",displ);
-			var res = sub8(this._s.A, this._mmu.r8(addr), 0);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IY+displ;
+			sub8(this._s.A, this._mmu.r8(addr), 0, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
 		0xFD9C: sbc_a_r("IYH"), // SBC A,IYH*
 		0xFD9D: sbc_a_r("IYL"), // SBC A,IYL*
 		0xFD9E:function () { // SBC A,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IY",displ);
-			var res = sub8(this._s.A, this._mmu.r8(addr), this._s.F & F_C);
-			this._s.A = res[0];
-			this._s.F = res[1];
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IY+displ;
+			sub8(this._s.A, this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._s.A = this._op_alures[0];
+			this._s.F = this._op_alures[1];
 		},
 		0xFDA4: and_r("IYH"), // AND IYH*
 		0xFDA5: and_r("IYL"), // AND IYL*
 		0xFDA6:function () { // AND (IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var addr = this._s.getSS("IY",displ);
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var addr = this._s.IY+displ;
 			this._s.A = this._s.A & this._mmu.r8(addr);
 			this._s.F = SZ53Ptable[this._s.A] | F_H;
 		},
@@ -5231,7 +5222,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDAE:function () { // XOR (IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var addr = this._s.getSS("IY",this._mmu.r8s(this._s.getSS("PC", 2)));
+			var addr = this._s.IY + this._mmu.r8s(this._s.PC+2);
 			this._s.A = (this._s.A ^ this._mmu.r8(addr)) & 0xFF;
 			this._s.F = SZ53Ptable[this._s.A];
 		},
@@ -5240,8 +5231,8 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDB6:function () { // OR (IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var val = this._mmu.r8(this._s.getSS("IY",displ));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var val = this._mmu.r8(this._s.IY+displ);
 			this._s.A = (this._s.A | val) & 0xFF;
 			this._s.F = SZ53Ptable[this._s.A];
 		},
@@ -5250,10 +5241,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDBE:function () { // CP (IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			var displ = this._mmu.r8s(this._s.getSS("PC", 2));
-			var rhs = this._mmu.r8(this._s.getSS("IY",displ));
-			var res = sub8(this._s.A, rhs, 0);
-			this._s.F = (res[1] & ~(F_5|F_3)) | (rhs & (F_5|F_3));
+			var displ = this._mmu.r8s(this._s.PC+2);
+			var rhs = this._mmu.r8(this._s.IY+displ);
+			sub8(this._s.A, rhs, 0, this._op_alures);
+			this._s.F = (this._op_alures[1] & ~(F_5|F_3)) | (rhs & (F_5|F_3));
 		},
 		0xFDCB00: ld_r_rlc_xd("B", "IY"), // LD B,RLC (IY+d)*
 		0xFDCB01: ld_r_rlc_xd("C", "IY"), // LD C,RLC (IY+d)*
@@ -5264,11 +5255,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB06:function () { // RLC (IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			var val = this._mmu.r8(addr);
-			var res = shl8(val, val & 0x80);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shl8(val, val & 0x80, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xFDCB07: ld_r_rlc_xd("A", "IY"), // LD A,RLC (IY+d)*
 		0xFDCB08: ld_r_rrc_xd("B", "IY"), // LD B,RRC (IY+d)*
@@ -5280,11 +5271,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB0E:function () { // RRC (IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			var memval = this._mmu.r8(addr);
-			var res = shr8(memval, memval & 1);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(memval, memval & 1, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xFDCB0F: ld_r_rrc_xd("A", "IY"), // LD A,RRC (IY+d)*
 		0xFDCB10: ld_r_rl_xd("B", "IY"), // LD B,RL (IY+d)*
@@ -5296,10 +5287,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB16:function () { // RL (IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
-			var res = shl8(this._mmu.r8(addr), this._s.F & F_C);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IY+this._op_displ;
+			shl8(this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xFDCB17: ld_r_rl_xd("A", "IY"), // LD A,RL (IY+d)*
 		0xFDCB18: ld_r_rr_xd("B", "IY"), // LD B,RR (IY+d)*
@@ -5311,10 +5302,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB1E:function () { // RR (IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
-			var res = shr8(this._mmu.r8(addr), this._s.F & F_C);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IY+this._op_displ;
+			shr8(this._mmu.r8(addr), this._s.F & F_C, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xFDCB1F: ld_r_rr_xd("A", "IY"), // LD A,RR (IY+d)*
 		0xFDCB20: ld_r_sla_xd("B", "IY"), // LD B,SLA (IY+d)*
@@ -5326,10 +5317,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB26:function () { // SLA (IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
-			var res = shl8(this._mmu.r8(addr), 0);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IY+this._op_displ;
+			shl8(this._mmu.r8(addr), 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xFDCB27: ld_r_sla_xd("A", "IY"), // LD A,SLA (IY+d)*
 		0xFDCB28: ld_r_sra_xd("B", "IY"), // LD B,SRA (IY+d)*
@@ -5341,11 +5332,11 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB2E:function () { // SRA (IY+d)
 			this._op_t = 23
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			var memval = this._mmu.r8(addr);
-			var res = shr8(memval, memval & 0x80);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			shr8(memval, memval & 0x80, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xFDCB2F: ld_r_sra_xd("A", "IY"), // LD A,SRA (IY+d)*
 		0xFDCB30: ld_r_sll_xd("B", "IY"), // LD B,SLL (IY+d)*
@@ -5357,10 +5348,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB36:function () { // SLL (IY+d)*
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
-			var res = shl8(this._mmu.r8(addr), 1);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IY+this._op_displ;
+			shl8(this._mmu.r8(addr), 1, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xFDCB37: ld_r_sll_xd("A", "IY"), // LD A,SLL (IY+d)*
 		0xFDCB38: ld_r_srl_xd("B", "IY"), // LD B,SRL (IY+d)*
@@ -5372,10 +5363,10 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB3E:function () { // SRL (IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
-			var res = shr8(this._mmu.r8(addr), 0);
-			this._mmu.w8(addr, res[0]);
-			this._s.F = res[1];
+			var addr = this._s.IY+this._op_displ;
+			shr8(this._mmu.r8(addr), 0, this._op_alures);
+			this._mmu.w8(addr, this._op_alures[0]);
+			this._s.F = this._op_alures[1];
 		},
 		0xFDCB3F: ld_r_srl_xd("A", "IY"), // LD A,SRL (IY+d)*
 		0xFDCB40: bit_n_ixyd(0,"IY"), // BIT 0,(IY+d)*
@@ -5451,7 +5442,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB86:function () { // RES 0,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x01);
 		},
 		0xFDCB87: ld_r_res_n_xd("A", 0, "IY"), // LD A,RES 0,(IY+d)*
@@ -5464,7 +5455,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB8E:function () { // RES 1,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x02);
 		},
 		0xFDCB8F: ld_r_res_n_xd("A", 1, "IY"), // LD A,RES 1,(IY+d)*
@@ -5477,7 +5468,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB96:function () { // RES 2,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x04);
 		},
 		0xFDCB97: ld_r_res_n_xd("A", 2, "IY"), // LD A,RES 2,(IY+d)*
@@ -5490,7 +5481,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCB9E:function () { // RES 3,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x08);
 		},
 		0xFDCB9F: ld_r_res_n_xd("A", 3, "IY"), // LD A,RES 3,(IY+d)*
@@ -5503,7 +5494,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBA6:function () { // RES 4,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x10);
 		},
 		0xFDCBA7: ld_r_res_n_xd("A", 4, "IY"), // LD A,RES 4,(IY+d)*
@@ -5516,7 +5507,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBAE:function () { // RES 5,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x20);
 		},
 		0xFDCBAF: ld_r_res_n_xd("A", 5, "IY"), // LD A,RES 5,(IY+d)*
@@ -5529,7 +5520,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBB6:function () { // RES 6,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x40);
 		},
 		0xFDCBB7: ld_r_res_n_xd("A", 6, "IY"), // LD A,RES 6,(IY+d)*
@@ -5542,7 +5533,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBBE:function () { // RES 7,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) & ~0x80);
 		},
 		0xFDCBBF: ld_r_res_n_xd("A", 7, "IY"), // LD A,RES 7,(IY+d)*
@@ -5555,7 +5546,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBC6:function () { // SET 0,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x01);
 		},
 		0xFDCBC7: ld_r_set_n_xd("A", 0, "IY"), // LD A,SET 0,(IY+d)*
@@ -5568,7 +5559,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBCE:function () { // SET 1,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x02);
 		},
 		0xFDCBCF: ld_r_set_n_xd("A", 1, "IY"), // LD A,SET 1,(IY+d)*
@@ -5581,7 +5572,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBD6:function () { // SET 2,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x04);
 		},
 		0xFDCBD7: ld_r_set_n_xd("A", 2, "IY"), // LD A,SET 2,(IY+d)*
@@ -5594,7 +5585,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBDE:function () { // SET 3,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x08);
 		},
 		0xFDCBDF: ld_r_set_n_xd("A", 3, "IY"), // LD A,SET 3,(IY+d)*
@@ -5607,7 +5598,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBE6:function () { // SET 4,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x10);
 		},
 		0xFDCBE7: ld_r_set_n_xd("A", 4, "IY"), // LD A,SET 4,(IY+d)*
@@ -5620,7 +5611,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBEE:function () { // SET 5,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x20);
 		},
 		0xFDCBEF: ld_r_set_n_xd("A", 5, "IY"), // LD A,SET 5,(IY+d)*
@@ -5633,7 +5624,7 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBF6:function () { // SET 6,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x40);
 		},
 		0xFDCBF7: ld_r_set_n_xd("A", 6, "IY"), // LD A,SET 6,(IY+d)*
@@ -5646,55 +5637,55 @@ define(["scripts/utils.js"], function (Utils) {
 		0xFDCBFE:function () { // SET 7,(IY+d)
 			this._op_t = 23;
 			this._op_m = 4;
-			var addr = this._s.getSS("IY",this._op_displ);
+			var addr = this._s.IY+this._op_displ;
 			this._mmu.w8(addr, this._mmu.r8(addr) | 0x80);
 		},
 		0xFDCBFF: ld_r_set_n_xd("A", 7, "IY"), // LD A,SET 7,(IY+d)*
 		0xFDE1:function () { // POP IY
 			this._op_t = 14;
 			this._op_m = 2;
-			this._s.setSS("IY", this.pop16());
+			this._s.IY = this.pop16();
 		},
 		0xFDE3:function () { // EX (SP),IY
 			this._op_t = 23;
 			this._op_m = 2;
-			var addr = this._s.getSS("SP");
+			var addr = this._s.SP;
 			var memval = this._mmu.r16(addr);
-			this._mmu.w16reverse(addr, this._s.getSS("IY"));
-			this._s.setSS("IY", memval);
+			this._mmu.w16reverse(addr, this._s.IY);
+			this._s.IY = memval;
 		},
 		0xFDE5:function () { // PUSH IY
 			this._op_t = 15;
 			this._op_m = 2;
-			this.push16(this._s.getSS("IY"));
+			this.push16(this._s.IY);
 		},
 		0xFDE9:function () { // JP (IY)
 			this._op_t = 8;
 			this._op_m = 0;
-			this._s.setSS("PC", this._s.getSS("IY"));
+			this._s.PC = this._s.IY;
 		},
 		0xFDF9:function () { // LD SP,IY
 			this._op_t = 10;
 			this._op_m = 2;
-			this._s.setSS("SP", this._s.getSS("IY"));
+			this._s.SP = this._s.IY;
 		},
-		0xFE:function () { // CP	n
+		0xFE:function () { // CP n
 			this._op_t = 7;
 			this._op_m = 2;
-			var rhs = this._mmu.r8(this._s.getSS("PC", 1));
-			var res = sub8(this._s.A, rhs, 0);
-			this._s.F = (res[1] & ~(F_5|F_3)) | (rhs & (F_5|F_3));
+			var rhs = this._mmu.r8(this._s.PC+1);
+			sub8(this._s.A, rhs, 0, this._op_alures);
+			this._s.F = (this._op_alures[1] & ~(F_5|F_3)) | (rhs & (F_5|F_3));
 		},
-		0xFF:function () { // RST	38H
+		0xFF:function () { // RST 38H
 			this._op_t = 11;
 			this._op_m = 0;
-			this.push16(this._s.getSS("PC", 1));
-			this._s.setSS("PC", 0x38);
+			this.push16(this._s.PC+1);
+			this._s.PC = 0x38;
 		}
 	};
 
 	Z80.prototype.step = function () {
-		var pc = this._s.getSS("PC");
+		var pc = this._s.PC;
 		this.bt.push(pc);
 		if (this.bt.length > 5) this.bt.shift();
 		var rAdd = 0;
@@ -5703,9 +5694,9 @@ define(["scripts/utils.js"], function (Utils) {
 		this._op_displ = 0;
 		var opcode,opcodeb2;
 		opcode = this._mmu.r8(pc);
-		for(;;) {
-			// DD* FD*
-			if (opcode == 0xDD || opcode == 0xFD) {
+		if (opcode == 0xDD || opcode == 0xFD) {
+			do {
+				// DD* FD*
 				opcodeb2 = this._mmu.r8(pc + 1);
 				// DDDD, DDFD, FDDD, FDFD handle first byte as NOP
 				if (opcodeb2 == 0xDD || opcodeb2 == 0xFD) {
@@ -5713,31 +5704,30 @@ define(["scripts/utils.js"], function (Utils) {
 					tAdd += 4;
 					pc += 1;
 					rAdd += 1;
-					continue;
 				}
-				opcode = (opcode << 8) | opcodeb2;
-				// DDCB????, FDCB????
-				if (opcode == 0xFDCB || opcode == 0xDDCB) {
-					rAdd += 2;
-					this._op_displ = this._mmu.r8s(pc + 2);
-					opcode = (opcode << 8) | this._mmu.r8(pc + 3);
-				}
-				// DD??, FD??
 				else {
-					rAdd += 2;
-					isFDorDD = true;
+					opcode = (opcode << 8) | opcodeb2;
+					// DDCB????, FDCB????
+					if (opcode == 0xFDCB || opcode == 0xDDCB) {
+						rAdd += 2;
+						this._op_displ = this._mmu.r8s(pc + 2);
+						opcode = (opcode << 8) | this._mmu.r8(pc + 3);
+					}
+					// DD??, FD??
+					else {
+						rAdd += 2;
+						isFDorDD = true;
+					}
 				}
-			}
-			// ED* CB*
-			else if (opcode == 0xED || opcode == 0xCB) {
-				opcode = (opcode << 8) | this._mmu.r8(pc + 1);
-				rAdd += 2;
-			}
-			// single byte op
-			else {
-				rAdd += 1;
-			}
-			break;
+			} while (opcode == 0xDD || opcode == 0xFD);
+		}
+		else if (opcode == 0xED || opcode == 0xCB) {
+			opcode = (opcode << 8) | this._mmu.r8(pc + 1);
+			rAdd += 2;
+		}
+		// single byte op
+		else {
+			rAdd += 1;
 		}
 		this._s.R = (this._s.R & 0x80) | ((this._s.R + rAdd) & 0x7F);
 		var f = this._opcodes[opcode];
@@ -5745,7 +5735,7 @@ define(["scripts/utils.js"], function (Utils) {
 			if (isFDorDD) {
 				f = this._opcodes[opcode & 0xFF];
 				pc += 1;
-				this._s.setSS("PC", pc);
+				this._s.PC = pc;
 				tAdd += 4;
 			}
 		}
@@ -5755,11 +5745,12 @@ define(["scripts/utils.js"], function (Utils) {
 		}
 		//this.logasm();
 		f.call(this);
+		f = undefined;
 		if (this._op_t === 0) {
 			throw ("you forgot something!");
 		}
 		if (this._op_m && !this._s.halted) {
-			this._s.setSS("PC", pc + this._op_m);
+			this._s.PC = pc + this._op_m;
 		}
 		return this._op_t + tAdd;
 	};

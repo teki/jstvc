@@ -7,21 +7,29 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	function MMU() {
 		this._u0 = new Uint8Array(16384);
 		this._u0.name = "U0";
+		this._u0.isRam = true;
 		this._u1 = new Uint8Array(16384);
 		this._u1.name = "U1";
+		this._u1.isRam = true;
 		this._u2 = new Uint8Array(16384);
 		this._u2.name = "U2";
+		this._u2.isRam = true;
 		this._u3 = new Uint8Array(16384);
 		this._u3.name = "U3";
+		this._u3.isRam = true;
 		this._sys = [];
 		this._sys.name = "SYS";
+		this._sys.isRam = false;
 		//this._cart = Uint8Array(new ArrayBuffer(16384));
 		this._cart = new Uint8Array(16384);//this._sys;
 		this._cart.name = "CART";
+		this._cart.isRam = false;
 		this._ext = new Uint8Array(16384);
 		this._ext.name = "EXT";
+		this._ext.isRam = false;
 		this._vid = new Uint8Array(16384);
 		this._vid.name = "VID";
+		this._vid.isRam = true;
 		this._map = [];
 		this._mapVal = -1;
 		this._log = false;
@@ -67,12 +75,20 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	MMU.prototype.reset = function() {
 		this.setMap(0);
 	};
+
 	MMU.prototype.setMap = function(val) {
 		if (val == this._mapVal) return;
 
-		// page 3
-		var page3 = (val & 0xc0) >> 6;
-		this._map[3] = [this._cart, this._sys, this._u3, this._ext][page3];
+		// page 0
+		switch ((val & 0x18) >> 3) {
+		case 0: this._map[0] = this._sys; break;
+		case 1: this._map[0] = this._cart; break;
+		case 2: this._map[0] = this._u0; break;
+		case 3: this._map[0] = this._u3; break; // tvc32 & 64k+
+		}
+
+		// page 1 is always u1 (64k+ can have vid)
+		this._map[1] = this._u1;
 
 		// page 2
 		if (val & 0x20)
@@ -80,51 +96,47 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		else
 			this._map[2] = this._vid;
 
-		// page 1 is always u1
-		this._map[1] = this._u1;
+		// page 3
+		switch ((val & 0xc0) >> 6) {
+		case 0: this._map[3] = this._cart; break;
+		case 1: this._map[3] = this._sys; break;
+		case 2: this._map[3] = this._u3; break;
+		case 3: this._map[3] = this._ext; break;
+		}
 
-		// page 0
-		var page0 = (val & 0x18) >> 3;
-		this._map[0] = [this._sys, this._cart, this._u0, undefined][page0];
-		if (page0 === 3)
-			throw "do not know";
-
-		var maplog = "";
-		for (var m in this._map) {
-			maplog += this._map[m].name + " ";
-		};
-		console.log(maplog);
+//		var maplog = "";
+//		for (var m in this._map) {
+//			maplog += this._map[m].name + " ";
+//		};
+//		console.log(maplog);
+		this._mapVal = val;
 	};
+
 	MMU.prototype.getMap = function() {
 		return this._mapVal;
 	};
+
 	MMU.prototype.w8 = function(addr, val) {
-		addr = addr & 0xFFFF;
-		val = val & 0xFF;
-		if (this._log) {
-			console.log("MW: " + Utils.toHex16(addr) + " " + Utils.toHex8(val));
-		}
-		var mapIdx = addr >>> 14;
+		var mapIdx = (addr & 0xC000) >>> 14;
 		var block = this._map[mapIdx];
-		if (block === this._sys || block === this._ext) return;
-		if (!block)
-			throw("invalid block: " + Utils.toHex16(addr) + " mapIdx:" + mapIdx + " mapping: " + this._map);
-		block[addr & 0x3FFF] = val;
+		if (block.isRam) {
+			block[addr & 0x3FFF] = val & 0xFF;
+		}
 	};
 	MMU.prototype.w16 = function(addr, val) {
-		this.w8(addr, val & 0xFF);
+		this.w8(addr, val);
 		this.w8(addr + 1, val >>> 8);
 	};
+	MMU.prototype.w16reverse = function(addr, val) {
+		this.w8(addr + 1, val >>> 8);
+		this.w8(addr, val);
+	};
 	MMU.prototype.r8 = function(addr) {
-		addr = addr & 0xFFFF;
-		var mapIdx = addr >>> 14;
-		return this._map[mapIdx][addr & 0x3FFF];
+		return this._map[(addr & 0xC000) >>> 14][addr & 0x3FFF];
 	};
 	MMU.prototype.r8s = function(addr) {
-		addr = addr & 0xFFFF;
-		var mapIdx = addr >>> 14;
-		var val = this._map[mapIdx][addr & 0x3FFF];
-		if (val & 0x80) return -1 * (0x80 - (val & 0x7f));
+		var val = this._map[(addr & 0xC000) >>> 14][addr & 0x3FFF];
+		if (val & 0x80) val = -((~val + 1) & 0xFF);
 		return val;
 	};
 	MMU.prototype.r16 = function(addr) {
@@ -220,8 +232,8 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 
 		var i,j,k,val1,val2,val3,val4,pixelIdx,pixelData,addr;
 		var fbd = this._fb.data.data;
-		var fbw = this._fb.width;
-		var fbh = this._fb.height;
+		var fbw = ~~this._fb.width;
+		var fbh = ~~this._fb.height;
 
 		switch (this._mode) {
 			case 0: // 2 colors
@@ -274,45 +286,29 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 				}
 				break;
 			case 1: // 4 colors
-				addr = this._startAddress;
+				addr = ~~this._startAddress;
 				for (j = 0; j < 240; j++) {
 					pixelIdx = fbw * j * 4;
 					for (i = 0; i < 64; i++) {
 						pixelData = vidmem[addr++];
 						val1 = this._palettergb[((pixelData&0x08)>>2) | ((pixelData&0x80)>>7)];
-						fbd[pixelIdx++] = val1 >>> 16;
-						fbd[pixelIdx++] = (val1 >>> 8) & 0xFF;
-						fbd[pixelIdx++] = val1 & 0xFF;
-						fbd[pixelIdx++] = 255;
-						fbd[pixelIdx++] = val1 >>> 16;
-						fbd[pixelIdx++] = (val1 >>> 8) & 0xFF;
+						fbd[pixelIdx++] = (val1 & 0xFF0000) >>> 16;
+						fbd[pixelIdx++] = (val1 & 0xFF00) >>> 8;
 						fbd[pixelIdx++] = val1 & 0xFF;
 						fbd[pixelIdx++] = 255;
 						val2 = this._palettergb[((pixelData&0x04)>>1) | ((pixelData&0x40)>>6)];
-						fbd[pixelIdx++] = val2 >>> 16;
-						fbd[pixelIdx++] = (val2 >>> 8) & 0xFF;
-						fbd[pixelIdx++] = val2 & 0xFF;
-						fbd[pixelIdx++] = 255;
-						fbd[pixelIdx++] = val2 >>> 16;
-						fbd[pixelIdx++] = (val2 >>> 8) & 0xFF;
+						fbd[pixelIdx++] = (val2 & 0xFF0000) >>> 16;
+						fbd[pixelIdx++] = (val2 & 0xFF00) >>> 8;
 						fbd[pixelIdx++] = val2 & 0xFF;
 						fbd[pixelIdx++] = 255;
 						val3 = this._palettergb[(pixelData&0x02) | ((pixelData&0x20)>>5)];
-						fbd[pixelIdx++] = val3 >>> 16;
-						fbd[pixelIdx++] = (val3 >>> 8) & 0xFF;
-						fbd[pixelIdx++] = val3 & 0xFF;
-						fbd[pixelIdx++] = 255;
-						fbd[pixelIdx++] = val3 >>> 16;
-						fbd[pixelIdx++] = (val3 >>> 8) & 0xFF;
+						fbd[pixelIdx++] = (val3 & 0xFF0000) >>> 16;
+						fbd[pixelIdx++] = (val3 & 0xFF00) >>> 8;
 						fbd[pixelIdx++] = val3 & 0xFF;
 						fbd[pixelIdx++] = 255;
 						val4 = this._palettergb[((pixelData&0x01)<<1) | ((pixelData&0x10)>>5)];
-						fbd[pixelIdx++] = val4 >>> 16;
-						fbd[pixelIdx++] = (val4 >>> 8) & 0xFF;
-						fbd[pixelIdx++] = val4 & 0xFF;
-						fbd[pixelIdx++] = 255;
-						fbd[pixelIdx++] = val4 >>> 16;
-						fbd[pixelIdx++] = (val4 >>> 8) & 0xFF;
+						fbd[pixelIdx++] = (val4 & 0xFF0000) >>> 16;
+						fbd[pixelIdx++] = (val4 & 0xFF00) >>> 8;
 						fbd[pixelIdx++] = val4 & 0xFF;
 						fbd[pixelIdx++] = 255;
 					}
@@ -505,10 +501,10 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	VID.prototype.setPalette = function(idx, color) {
 		this._palette[idx] = color;
 		if (color & 0x04) {
-			this._palettergb[idx] = ((color&0x04) ? 0xFF0000 : 0) | ((color&0x10) ? 0x00FF00 : 0) | ((color&0x01) ? 0x0000FF : 0);
+			this._palettergb[idx] = ~~(((color&0x04) ? 0xFF0000 : 0) | ((color&0x10) ? 0x00FF00 : 0) | ((color&0x01) ? 0x0000FF : 0));
 		}
 		else {
-			this._palettergb[idx] = ((color&0x04) ? 0x7F0000 : 0) | ((color&0x10) ? 0x007F00 : 0) | ((color&0x01) ? 0x00007F : 0);
+			this._palettergb[idx] = ~~(((color&0x04) ? 0x7F0000 : 0) | ((color&0x10) ? 0x007F00 : 0) | ((color&0x01) ? 0x00007F : 0));
 		}
 	};
 
@@ -577,7 +573,7 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	////////////////////////////////////////////
 	// TVC
 	////////////////////////////////////////////
-	function TVC(fb) {
+	function TVC(fb, vidModeChange) {
 		var TVCthis = this;
 		this._clockfreq = 3125000;
 		this._clockperframe = (1/50) / (1/this._clockfreq);
@@ -590,6 +586,7 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		this._aud_it = false;
 		this._aud_on = false;
 		this._key = new KEY();
+		this._vidModeChange = vidModeChange;
 		this._z80 = new Z80Module.Z80(this._mmu, function(addr, val) {
 			TVCthis.writePort(addr, val);
 		}, function(addr) {
@@ -627,58 +624,68 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	TVC.prototype.writePort = function (addr, val) {
 		var val1, val2, val3;
 		//    console.log("OUT (" + Utils.toHex8(addr) + "), " + Utils.toHex8(val));
-		if (addr == 0x00) {
+		switch(addr) {
+		case 0x00:
 			this._vid.setBorder(val);
-			return;
-		}
-		if (addr == 0x02) {
+			break;
+
+		case 0x02:
 			this._mmu.setMap(val);
-			return;
-		}
-		else if (addr == 0x03) {
+			break;
+
+		case 0x03:
 			this._key.selectRow(val & 0xF);
 			// 2 bits to select I/O memory, ignore it for now
-			return;
-		}
-		else if (addr == 0x04) {
+			break;
+
+		case 0x04:
 			this._aud.setFreqL(val & 0xFF);
-			return;
-		}
-		else if (addr == 0x05) {
+			break;
+
+		case 0x05:
 			this._aud_on = (val & 0x10) !== 0;
 			this._aud_it = (val & 0x20) !== 0;
 			this._aud.setFreqH(val & 0x0F);
-			return;
-		}
-		else if (addr == 0x06) {
+			break;
+
+		case 0x06:
 			val1 = val & 0x80; // Printer ack
 			val2 = (val >>> 2) & 0x0F; // Sound amp
 			val3 = val & 0x03; // video mode
 			this._vid.setMode(val3);
+			this._vidModeChange(1 << val3);
 			this._aud.setAmp(val2);
-			return;
-		}
-		else if (addr == 0x07) {
+			break;
+
+		case 0x07:
 			// cursor/audio irq ack
-			return;
-		}
-		else if (addr >= 0x58 && addr <= 0x5B) {
+			break;
+
+		case 0x58:
+		case 0x59:
+		case 0x5A:
+		case 0x5B:
 			// bit7 : CSTL interrupt enable
-			return;
-		}
-		else if (addr >= 0x60 && addr <= 0x63) {
+			break;
+
+		case 0x60:
+		case 0x61:
+		case 0x62:
+		case 0x63:
 			this._vid.setPalette(addr - 0x60, val);
-			return;
-		}
-		else if (addr == 0x70) {
+			break;
+
+		case 0x70:
 			this._vid.setRegIdx(val);
-			return;
-		}
-		else if (addr == 0x71) {
+			break;
+
+		case 0x71:
 			this._vid.setReg(val);
-			return;
+			break;
+
+		default:
+			throw ("unhandled port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
 		}
-		throw ("unhandled port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
 	};
 
 	TVC.prototype.readPort = function(addr) {

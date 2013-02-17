@@ -39,6 +39,9 @@
 		oReq.send(null);
 		return defer;
 	}
+	function vidModeChange(x) {
+		g.canvas.css("-webkit-transform", "scaleY(1.6) scaleX(" + x + ")");
+	}
 	function emuInit() {
 		(function() {
 		  var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
@@ -47,16 +50,16 @@
 		g.regs = $("#regs")[0];
 		g.lastrefresh = 0;
 		// frame buffer
-		g.canvas = $("#tvc")[0];
-		g.ctx = g.canvas.getContext("2d");
+		g.canvas = $("#tvc");
+		g.ctx = g.canvas[0].getContext("2d");
 		g.fb = {};
-		g.fb.width = g.canvas.width;
-		g.fb.height = g.canvas.height;
+		g.fb.width = g.canvas[0].width;
+		g.fb.height = g.canvas[0].height;
 		g.fb.data = g.ctx.createImageData(g.fb.width, g.fb.height);
 		g.fb.refresh = function() {
 			g.ctx.putImageData(g.fb.data, 0, 0);
 		}
-		g.tvc = new TVCModule.TVC(g.fb);
+		g.tvc = new TVCModule.TVC(g.fb, vidModeChange);
 		// gui
 		$("#run").on("click", function() {
 			g.isRunning = !g.isRunning;
@@ -166,7 +169,13 @@ abbr, acronym
 	#tvc {
 		border: 1px solid black;
 		background-color: red;
-		-webkit-transform: translateY(100px) scaleY(1.6);
+		-webkit-transform-origin: left top 0;
+		-webkit-transform: scaleY(1.6);
+	}
+	#screen {
+		width: 512px;
+		height: 384px;
+		overflow: hidden;
 	}
 	#regs {
 		font-family: "Courier New", Courier, monospace;
