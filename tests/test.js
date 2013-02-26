@@ -71,6 +71,13 @@ requirejs(["scripts/z80.js", "scripts/utils.js"], function(Z80Module, Utils) {
 		this.r16 = function (addr) {
 			return this.r8(addr) | (this.r8(addr + 1) << 8);
 		};
+		this.r16nolog = function (addr) {
+			var log = this.log;
+			this.log = undefined;
+			var val = this.r8(addr) | (this.r8(addr + 1) << 8);
+			this.log = log;
+			return val;
+		};
 		this.w16 = function (addr, val) {
 			this.w8(addr, val & 0xFF);
 			this.w8(addr + 1, val >>> 8);
@@ -172,18 +179,18 @@ requirejs(["scripts/z80.js", "scripts/utils.js"], function(Z80Module, Utils) {
 		}
 
 		val = [];
-		val.push(z80._s.getSS("AF"));
-		val.push(z80._s.getSS("BC"));
-		val.push(z80._s.getSS("DE"));
-		val.push(z80._s.getSS("HL"));
-		val.push(z80._s.getSSa("AF"));
-		val.push(z80._s.getSSa("BC"));
-		val.push(z80._s.getSSa("DE"));
-		val.push(z80._s.getSSa("HL"));
-		val.push(z80._s.getSS("IX"));
-		val.push(z80._s.getSS("IY"));
-		val.push(z80._s.getSS("SP"));
-		val.push(z80._s.getSS("PC"));
+		val.push(z80._s.AF);
+		val.push(z80._s.BC);
+		val.push(z80._s.DE);
+		val.push(z80._s.HL);
+		val.push(z80._s.AFa);
+		val.push(z80._s.BCa);
+		val.push(z80._s.DEa);
+		val.push(z80._s.HLa);
+		val.push(z80._s.IX);
+		val.push(z80._s.IY);
+		val.push(z80._s.SP);
+		val.push(z80._s.PC);
 		result.push(val.map(function(x) {return Utils.toHex16(x);}).join(" "));
 
 		val = [];
@@ -246,18 +253,18 @@ requirejs(["scripts/z80.js", "scripts/utils.js"], function(Z80Module, Utils) {
 				continue;
 			case 1: // registers
 				val = line.split(/\s+/).map(function(x) {return parseInt(x,16);});
-				z80._s.setSS("AF",val[0]);
-				z80._s.setSS("BC",val[1]);
-				z80._s.setSS("DE",val[2]);
-				z80._s.setSS("HL",val[3]);
-				z80._s.setSSa("AF",val[4]);
-				z80._s.setSSa("BC",val[5]);
-				z80._s.setSSa("DE",val[6]);
-				z80._s.setSSa("HL",val[7]);
-				z80._s.setSS("IX",val[8]);
-				z80._s.setSS("IY",val[9]);
-				z80._s.setSS("SP",val[10]);
-				z80._s.setSS("PC",val[11]);
+				z80._s.AF = val[0];
+				z80._s.BC = val[1];
+				z80._s.DE = val[2];
+				z80._s.HL = val[3];
+				z80._s.AFa = val[4];
+				z80._s.BCa = val[5];
+				z80._s.DEa = val[6];
+				z80._s.HLa = val[7];
+				z80._s.IX = val[8];
+				z80._s.IY = val[9];
+				z80._s.SP = val[10];
+				z80._s.PC = val[11];
 				state = 2;
 				continue;
 			case 2: // state

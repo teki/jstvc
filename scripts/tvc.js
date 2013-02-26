@@ -49,10 +49,6 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		this.setMap(0);
 	};
 
-	MMU.prototype.logMemAccess = function(log) {
-		this._log = log;
-	}
-
 	MMU.prototype.getVid = function() {
 		return this._vid;
 	}
@@ -104,11 +100,6 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		case 3: this._map[3] = this._ext; break;
 		}
 
-//		var maplog = "";
-//		for (var m in this._map) {
-//			maplog += this._map[m].name + " ";
-//		};
-//		console.log(maplog);
 		this._mapVal = val;
 	};
 
@@ -142,6 +133,7 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	MMU.prototype.r16 = function(addr) {
 		return this.r8(addr) | (this.r8(addr + 1) << 8);
 	};
+	MMU.prototype.r16nolog = MMU.prototype.r16;
 	MMU.prototype.dasm = function(addr, lines, prefix, noLdir) {
 		var offset = 0,
 			res = [],
@@ -541,7 +533,6 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 
 	VID.prototype.setReg = function(val) {
 		this._reg[this._regIdx] = val;
-		console.log(this._reg);
 	};
 
 	VID.prototype.getReg = function() {
@@ -587,11 +578,23 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	////////////////////////////////////////////
 	function KEY() {
 		this._row = 0;
-		this._state = 0;
+		this._state = [0,0,0,0,0,0,0,0,0,0];
 	}
 
 	KEY.prototype.selectRow = function(val) {
 		this._row = val;
+	}
+
+	KEY.prototype.readRow = function() {
+		if (this._row == 8) return 1 << 5;
+		return this._state[this._row];
+	}
+
+	KEY.prototype.keyDown = function(code) {
+	  this._state[7] = 1 << 5;
+	}
+	KEY.prototype.keyUp = function(code) {
+		this._state[7] = 0
 	}
 	////////////////////////////////////////////
 	// TVC
@@ -602,7 +605,8 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		this._clockperframe = (1/50) / (1/this._clockfreq);
 		console.log(this._clockperframe);
 		this._clock = 0;
-		this._pendIt = 0;	// b4: curs/aud, b3-0 cards
+		this._breakpoints = undefined;
+		this._pendIt = 0x1F;	// b4: curs/aud, b3-0 cards , 0 active
 		this._mmu = new MMU();
 		this._vid = new VID(this._mmu, fb);
 		this._aud = new AUD();
@@ -616,25 +620,53 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		});
 	}
 
-	TVC.prototype.logMemAccess = function(log) {
-		this._mmu.logMemAccess(log);
-	}
-
 	TVC.prototype.addRom = function(name, data) {
 		this._mmu.addRom(name, data);
 	}
 
+	TVC.prototype.keyUp = function(code) {
+		this._key.keyUp(code);
+	}
+
+	TVC.prototype.keyDown = function(code) {
+		this._key.keyDown(code);
+	}
+
+	TVC.prototype.setBreakPoints = function(newlist) {
+		if (newlist.length) {
+			this._breakpoints = newlist;
+		}
+		else {
+			this._breakpoints = undefined;
+		}
+	}
+
 	TVC.prototype.runForAFrame = function() {
-		var times;
-		times = new Date();
-		while (this._clock < this._clockperframe) {
+		var breakPointHit = false;
+		while (!breakPointHit && this._clock < this._clockperframe) {
 			var tinc = this._z80.step();
 			this._vid.step(tinc);
 			this._clock += tinc;
-		}
-		this._clock = 0; //TODO fixme
-		//console.log( (new Date()) - times);
 
+			if (this._breakpoints) {
+				if (this._breakpoints.indexOf(this._z80._s.PC) != -1) {
+					console.log("breakpoint!");
+					breakPointHit = true;
+				}
+			}
+		}
+
+		if (!breakPointHit) {
+			this._clock -= this._clockperframe;
+
+			// cursor interrupt
+			this._vid.step(13);
+			this._clock += 13;
+			this._pendIt &= ~(0x10); // cursor IT
+			this._z80.interrupt();
+		}
+
+		return breakPointHit;
 	};
 
 	TVC.prototype.runOne = function() {
@@ -661,14 +693,12 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 
 		case 0x04:
 			this._aud.setFreqL(val & 0xFF);
-			console.log("Set freq LOW: ", Utils.toHex8(val));
 			break;
 
 		case 0x05:
 			this._aud_on = (val & 0x10) !== 0;
 			this._aud_it = (val & 0x20) !== 0;
 			this._aud.setFreqH(val & 0x0F);
-			console.log("Set freq HIGH: ", Utils.toHex8(val & 0x0F), "AUD IT:",this._aud_it);
 			break;
 
 		case 0x06:
@@ -681,6 +711,7 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 
 		case 0x07:
 			// cursor/audio irq ack
+			this._pendIt |= 0x10;
 			break;
 
 		case 0x58:
@@ -711,15 +742,26 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	};
 
 	TVC.prototype.readPort = function(addr) {
-		if (addr == 0x59) {
+		var result = 0;
+		switch (addr) {
+		case 0x58:
+			result = this._key.readRow();
+			break;
+
+		case 0x59:
 			//    59H     +++43210    R       Pending IT requests
 			//    59H     765+++++    R       7: printer ack, 6: bw0/color1, 5: tape data in
-			return 0x40 | this._pendIt;
+			result = 0x40 | this._pendIt;
+			break;
+
+		case 0x5A:
+			result = 0xFF;
+			break;
+
+		default:
+			throw "unhandled port read " + Utils.toHex8(addr);
 		}
-		else if (addr == 0x5A) {
-			return 0xFF;
-		}
-		throw "unhandled port read " + Utils.toHex8(addr);
+		return result;
 	};
 
 	TVC.prototype.dumpMem = function(addr, lines, bytesPerLine) {

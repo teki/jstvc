@@ -9,7 +9,6 @@
 	var TVCModule;
 	var g = {};
 	g.isRunning = false;
-	g.logMem = false;
 	g.tvc = undefined;
 	g.canvas = undefined;
 	g.regs = undefined;
@@ -39,6 +38,28 @@
 		oReq.send(null);
 		return defer;
 	}
+	function emuBreak() {
+		g.isRunning = false;
+		emuUpdateDbgInfo();
+	}
+	function emuUpdateDbgInfo() {
+		var arr = [];
+		arr.push(g.tvc._z80.toString());
+		arr = arr.concat(g.tvc._z80.btToString());
+		arr[arr.length-1] = '<span class="greenline">' + arr[arr.length-1] + "</span>";
+		g.regs.innerHTML = arr.join("\n");
+	}
+	function emuToggleRun() {
+		g.isRunning = !g.isRunning;
+		if (g.isRunning) {
+			$("#run")[0].value = "stop";
+			emuContinue();
+		}
+		else {
+			$("#run")[0].value = "run";
+			emuUpdateDbgInfo();
+		}
+	}
 	function emuInit() {
 		(function() {
 		  var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
@@ -59,19 +80,25 @@
 		g.tvc = new TVCModule.TVC(g.fb);
 		// gui
 		$("#run").on("click", function() {
-			g.isRunning = !g.isRunning;
-			$("#run")[0].value = g.isRunning ? "stop" : "run";
-			if (g.isRunning) {
-				emuContinue();
-			}
+			emuToggleRun();
 		});
 		$("#step").on("click", function() {
 			emuStep();
 		});
-		$("#log").on("click", function() {
-			g.logMem = !$("#log").is(":checked");
-			g.tvc.logMemAccess(g.logMem);
+		$("#bpoints").change(function (e) {
+			var newbplst = [];
+			var bplst = $("#bpoints")[0].value.split(",");
+			for (var i in bplst) {
+				var addr = parseInt(bplst[i], 16);
+				if (isNaN(addr)) continue;
+
+				newbplst.push(addr & 0xFFFF);
+			}
+			g.tvc.setBreakPoints(newbplst);
+			$("#step").focus();
 		});
+		$(document).keydown(handleKeyDown);
+		$(document).keyup(handleKeyUp);
 
 		// load roms
 		getData("TVC12_D3.64K")
@@ -89,6 +116,16 @@
 				emuContinue();
 				});
 	}
+	function handleKeyDown(e) {
+		if (g.tvc) {
+			g.tvc.keyDown(e.which);
+		}
+	}
+	function handleKeyUp(e) {
+		if (g.tvc) {
+			g.tvc.keyUp(e.which);
+		}
+	}
 	function emuContinue() {
 		window.requestAnimationFrame(emuRunFrame);
 	};
@@ -104,17 +141,20 @@
 			return;
 		}
 		// run + update + continue
-		g.tvc.runForAFrame();
-		g.regs.innerHTML = g.tvc._z80.toString();
-		emuContinue();
+		if (g.tvc.runForAFrame()) {
+			g.isRunning = false;
+			emuUpdateDbgInfo();
+		}
+		else {
+			g.regs.innerHTML = g.tvc._z80.toString();
+			emuContinue();
+		}
 	};
 	function emuStep() {
 		var arr = [];
 		if (!g.isRunning) {
 			g.tvc.runOne();
-			arr.push(g.tvc._z80.toString());
-			arr = arr.concat(g.tvc._z80.btToString());
-			g.regs.innerHTML = arr.join("\n");
+			emuUpdateDbgInfo();
 		}
 	};
 </script>
@@ -175,13 +215,24 @@ abbr, acronym
 		white-space: pre;
 	}
 	#left {
-		width: 640px;
-		height: 640px;
+		width: 522px;
+		height: 400px;
 		float: left;
 		margin: 0px auto;
 	}
 	#dbg {
 		float: left;
+	}
+	.tbitem {
+		width: 60px;
+	}
+	.greenline {
+		color: green;
+		font-weight: bold;
+		border: 1px solid green;
+	}
+	#bpoints {
+		width: 400px;
 	}
 </style>
 
@@ -193,9 +244,13 @@ abbr, acronym
 		</div>
 	</div>
 	<div id="dbg">
-		<input id="run" type="BUTTON" value="run"></input>
-		<input id="log" type="CHECKBOX" >log</input>
-		<input id="step" type="BUTTON" value="step"></input>
+		<div>
+		<input id="run" class="tbitem" type="BUTTON" value="run"></input>
+		<input id="step" class="tbitem" type="BUTTON" value="step"></input>
+		</div>
+		<div>
+			<input id="bpoints" type="TEXT"></input>
+		</div>
 		<div id="regs">
 		</div>
 	</div>
