@@ -1284,31 +1284,31 @@ define(function() {
 			var pc = data[1];
 			var opcodeb2;
 			var op_displ = -1;
-			var opcode = reader(pc);
+			var opcode = reader(pc++);
 			if (opcode == 0xDD || opcode == 0xFD) {
 				do {
 					// DD* FD*
-					opcodeb2 = reader(pc + 1);
+					opcodeb2 = reader(pc++);
 					// DDDD, DDFD, FDDD, FDFD handle first byte as NOP
 					if (opcodeb2 == 0xDD || opcodeb2 == 0xFD) {
 						opcode = opcodeb2;
-						pc += 1;
+						continue;
 					}
+					opcode = (opcode << 8) | opcodeb2;
+					// DDCB????, FDCB????
+					if (opcode == 0xFDCB || opcode == 0xDDCB) {
+						opcode = (opcode << 8) | reader(pc + 1);
+					}
+					// DD??, FD??
 					else {
-						opcode = (opcode << 8) | opcodeb2;
-						// DDCB????, FDCB????
-						if (opcode == 0xFDCB || opcode == 0xDDCB) {
-							op_displ = reader(pc + 2);
-						}
-						// DD??, FD??
-						else {
-							isFDorDD = true;
-						}
+						// DD and FD falls back to regular instructions
+						isFDorDD = true;
 					}
+					break;
 				} while (opcode == 0xDD || opcode == 0xFD);
 			}
 			else if (opcode == 0xED || opcode == 0xCB) {
-				opcode = (opcode << 8) | reader(pc + 1);
+				opcode = (opcode << 8) | reader(pc++);
 			}
 			var op = OpCodes[opcode];
 			if (!op) {
@@ -1371,9 +1371,9 @@ define(function() {
 		}
 		if (rescode.indexOf("n n") != -1) {
 			rescode = rescode.replace("n", toHex8((nn & 0xFF00) >> 8));
-			restxt = restxt.replace("n", toHex8((nn & 0xFF00) >> 8));
 			rescode = rescode.replace("n", toHex8(nn & 0xFF));
 			restxt = restxt.replace("n", toHex8(nn & 0xFF));
+			restxt = restxt.replace("n", toHex8((nn & 0xFF00) >> 8));
 		}
 		if (rescode.indexOf("n") != -1) {
 			rescode = rescode.replace("n", toHex8(n));

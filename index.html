@@ -88,13 +88,7 @@
 		$("#bpoints").change(function (e) {
 			var newbplst = [];
 			var bplst = $("#bpoints")[0].value.split(",");
-			for (var i in bplst) {
-				var addr = parseInt(bplst[i], 16);
-				if (isNaN(addr)) continue;
-
-				newbplst.push(addr & 0xFFFF);
-			}
-			g.tvc.setBreakPoints(newbplst);
+			g.tvc.setBreakPoints(bplst);
 			$("#step").focus();
 		});
 		$(document).keydown(handleKeyDown);

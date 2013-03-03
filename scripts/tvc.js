@@ -578,7 +578,7 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	////////////////////////////////////////////
 	function KEY() {
 		this._row = 0;
-		this._state = [0,0,0,0,0,0,0,0,0,0];
+		this._state = [0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF];
 	}
 
 	KEY.prototype.selectRow = function(val) {
@@ -586,15 +586,14 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	}
 
 	KEY.prototype.readRow = function() {
-		if (this._row == 8) return 1 << 5;
 		return this._state[this._row];
 	}
 
 	KEY.prototype.keyDown = function(code) {
-	  this._state[7] = 1 << 5;
+	  this._state[7] &= ~(1 << 5);
 	}
 	KEY.prototype.keyUp = function(code) {
-		this._state[7] = 0
+		this._state[7] |= (1 << 5);
 	}
 	////////////////////////////////////////////
 	// TVC
@@ -633,8 +632,18 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	}
 
 	TVC.prototype.setBreakPoints = function(newlist) {
+		var bpMap = {"kbd-int" : 0xd62d };
 		if (newlist.length) {
-			this._breakpoints = newlist;
+			var bplst = [];
+			for (var i in newlist) {
+				var addr = parseInt(newlist[i], 16);
+				if (isNaN(addr)) {
+					addr = bpMap[newlist[i]];
+					if (!addr) continue;
+				}
+				bplst.push(addr & 0xFFFF);
+			}
+			this._breakpoints = bplst;
 		}
 		else {
 			this._breakpoints = undefined;
