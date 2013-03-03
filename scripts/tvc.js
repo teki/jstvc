@@ -579,6 +579,36 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	function KEY() {
 		this._row = 0;
 		this._state = [0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF];
+		this._keymap = {};
+		var normmap = [
+			"53206 14",
+			"^89 *  7",
+			"TEW;Z@QR",
+			"]IO [ PU",
+			"GDS\\H<AF",
+			" KL    J",
+			"BCX N YV",
+			" ,.   -M" ];
+		for (var i in normmap) {
+			for(var j = 0; j < 8; j++) {
+				var code = normmap[i][j];
+				if (code != " ") {
+					this._keymap[code.charCodeAt(0)] = [i,j];
+				}
+			}
+		}
+		this._keymap[13] = [5,4]; // return
+		this._keymap[32] = [7,5]; // space
+		this._keymap[8] = [5,0]; // backspace
+		this._keymap[46] = [5,0]; // del
+		this._keymap[16] = [6,3]; // shift
+		this._keymap[20] = [6,5]; // lock
+		this._keymap[27] = [7,3]; // esc
+		this._keymap[17] = [7,4]; // ctrl
+		this._keymap[38] = [8,1]; // up
+		this._keymap[40] = [8,2]; // down
+		this._keymap[37] = [8,6]; // left
+		this._keymap[39] = [8,5]; // right
 	}
 
 	KEY.prototype.selectRow = function(val) {
@@ -586,14 +616,22 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	}
 
 	KEY.prototype.readRow = function() {
-		return this._state[this._row];
+		var res = this._state[this._row];
+		if (!res) return 0xFF;
+		return res;
 	}
 
 	KEY.prototype.keyDown = function(code) {
-	  this._state[7] &= ~(1 << 5);
+		//console.log("DOWN:",code);
+		var m = this._keymap[code];
+		if (!m) return;
+	  this._state[m[0]] &= ~(1 << m[1]);
 	}
 	KEY.prototype.keyUp = function(code) {
-		this._state[7] |= (1 << 5);
+		//console.log("UP:",code);
+		var m = this._keymap[code];
+		if (!m) return;
+	  this._state[m[0]] |= (1 << m[1]);
 	}
 	////////////////////////////////////////////
 	// TVC
@@ -629,6 +667,15 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 
 	TVC.prototype.keyDown = function(code) {
 		this._key.keyDown(code);
+	}
+
+	TVC.prototype.loadCas = function(data) {
+		var savemap = this._mmu.getMap();
+		this._mmu.setMap(0xb0);
+		for (var i = 144; i < data.length; i++) {
+			this._mmu.w8(6639 + i - 144, data[i]);
+		}
+		this._mmu.setMap(savemap);
 	}
 
 	TVC.prototype.setBreakPoints = function(newlist) {

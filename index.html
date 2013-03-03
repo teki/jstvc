@@ -85,6 +85,9 @@
 		$("#step").on("click", function() {
 			emuStep();
 		});
+		$("#lcas").on("click", function() {
+			loadCas();
+		});
 		$("#bpoints").change(function (e) {
 			var newbplst = [];
 			var bplst = $("#bpoints")[0].value.split(",");
@@ -109,6 +112,12 @@
 				// start
 				emuContinue();
 				});
+	}
+	function loadCas() {
+		getData("mralex.cas")
+			.then(function(data) {
+				g.tvc.loadCas(new Uint8Array(data));
+			});
 	}
 	function handleKeyDown(e) {
 		if (g.tvc) {
@@ -218,7 +227,7 @@ abbr, acronym
 		float: left;
 	}
 	.tbitem {
-		width: 60px;
+		width: 50px;
 	}
 	.greenline {
 		color: green;
@@ -241,6 +250,7 @@ abbr, acronym
 		<div>
 		<input id="run" class="tbitem" type="BUTTON" value="run"></input>
 		<input id="step" class="tbitem" type="BUTTON" value="step"></input>
+		<input id="lcas" class="tbitem" type="BUTTON" value="lcas"></input>
 		</div>
 		<div>
 			<input id="bpoints" type="TEXT"></input>
