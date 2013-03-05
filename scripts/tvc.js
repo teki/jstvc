@@ -4,32 +4,20 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	////////////////////////////////////////////
 	// MMU
 	////////////////////////////////////////////
+	function MemBlock(name, isRam, size) {
+	  this.name = name;
+	  this.isRam = isRam;
+	  this.m = new Uint8Array(size);
+	}
 	function MMU() {
-		this._u0 = new Uint8Array(16384);
-		this._u0.name = "U0";
-		this._u0.isRam = true;
-		this._u1 = new Uint8Array(16384);
-		this._u1.name = "U1";
-		this._u1.isRam = true;
-		this._u2 = new Uint8Array(16384);
-		this._u2.name = "U2";
-		this._u2.isRam = true;
-		this._u3 = new Uint8Array(16384);
-		this._u3.name = "U3";
-		this._u3.isRam = true;
-		this._sys = [];
-		this._sys.name = "SYS";
-		this._sys.isRam = false;
-		//this._cart = Uint8Array(new ArrayBuffer(16384));
-		this._cart = new Uint8Array(16384);//this._sys;
-		this._cart.name = "CART";
-		this._cart.isRam = false;
-		this._ext = new Uint8Array(16384);
-		this._ext.name = "EXT";
-		this._ext.isRam = false;
-		this._vid = new Uint8Array(16384);
-		this._vid.name = "VID";
-		this._vid.isRam = true;
+		this._u0 = new MemBlock("U0", true, 16384);
+		this._u1 = new MemBlock("U1", true, 16384);
+		this._u2 = new MemBlock("U2", true, 16384);
+		this._u3 = new MemBlock("U3", true, 16384);
+		this._vid = new MemBlock("VID", true, 16384);
+		this._sys = new MemBlock("SYS", false, 16384);
+		this._cart = new MemBlock("CART", false, 16384);
+		this._ext = new MemBlock("EXT", false, 16384);
 		this._map = [];
 		this._mapVal = -1;
 		this._log = false;
@@ -39,32 +27,34 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 
 	MMU.prototype.init = function() {
 		var i;
-		for (i = 0; i < this._u0.length; i++) this._u0[i] = 0;
-		for (i = 0; i < this._u1.length; i++) this._u1[i] = 0;
-		for (i = 0; i < this._u2.length; i++) this._u2[i] = 0;
-		for (i = 0; i < this._u3.length; i++) this._u3[i] = 0;
-		// for(i=0; i<this._cart.length; i++) this._cart[i] = 0;
-		for (i = 0; i < this._ext.length; i++) this._ext[i] = 0;
+		for (i = 0; i < this._u0.m.length; i++) this._u0.m[i] = 0;
+		for (i = 0; i < this._u1.m.length; i++) this._u1.m[i] = 0;
+		for (i = 0; i < this._u2.m.length; i++) this._u2.m[i] = 0;
+		for (i = 0; i < this._u3.m.length; i++) this._u3.m[i] = 0;
+		// for(i=0; i<this._cart.m.length; i++) this._cart.m[i] = 0;
+		for (i = 0; i < this._ext.m.length; i++) this._ext.m[i] = 0;
 
 		this.setMap(0);
 	};
 
 	MMU.prototype.getVid = function() {
-		return this._vid;
+		return this._vid.m;
 	}
 
 	MMU.prototype.addRom = function(name, data) {
 		var i;
 		if (name == "D7") {
-			for (i = 0; i < data.length; i++) this._ext[0x2000 + i] = data[i];
-			if (this._ext[0x3000] != 0x3e) throw ("ext is not properly initialized!");
+			if (Utils.crc32(data) != 0x1cbbeac6) throw ("invalid rom (D7)!");
+			for (i = 0; i < data.length; i++) this._ext.m[0x2000 + i] = data[i];
 		}
 
 		if (name == "D4") {
-			for (i = 0; i < data.length; i++) this._sys[i] = data[i];
+			if (Utils.crc32(data) != 0x834ca9be) throw ("invalid rom (D4)!");
+			for (i = 0; i < data.length; i++) this._sys.m[i] = data[i];
 		}
 		if (name == "D3") {
-			for (i = 0; i < data.length; i++) this._sys[0x2000+i] = data[i];
+			if (Utils.crc32(data) != 0x71753d02) throw ("invalid rom (D3)!");
+			for (i = 0; i < data.length; i++) this._sys.m[0x2000+i] = data[i];
 		}
 	}
 
@@ -111,7 +101,7 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		var mapIdx = (addr & 0xC000) >>> 14;
 		var block = this._map[mapIdx];
 		if (block.isRam) {
-			block[addr & 0x3FFF] = val & 0xFF;
+			block.m[addr & 0x3FFF] = val & 0xFF;
 		}
 	};
 	MMU.prototype.w16 = function(addr, val) {
@@ -123,10 +113,10 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		this.w8(addr, val);
 	};
 	MMU.prototype.r8 = function(addr) {
-		return this._map[(addr & 0xC000) >>> 14][addr & 0x3FFF];
+		return this._map[(addr & 0xC000) >>> 14].m[addr & 0x3FFF];
 	};
 	MMU.prototype.r8s = function(addr) {
-		var val = this._map[(addr & 0xC000) >>> 14][addr & 0x3FFF];
+		var val = this._map[(addr & 0xC000) >>> 14].m[addr & 0x3FFF];
 		if (val & 0x80) val = -((~val + 1) & 0xFF);
 		return val;
 	};

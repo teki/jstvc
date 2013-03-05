@@ -1372,8 +1372,8 @@ define(function() {
 		if (rescode.indexOf("n n") != -1) {
 			rescode = rescode.replace("n", toHex8((nn & 0xFF00) >> 8));
 			rescode = rescode.replace("n", toHex8(nn & 0xFF));
-			restxt = restxt.replace("n", toHex8(nn & 0xFF));
 			restxt = restxt.replace("n", toHex8((nn & 0xFF00) >> 8));
+			restxt = restxt.replace("n", toHex8(nn & 0xFF));
 		}
 		if (rescode.indexOf("n") != -1) {
 			rescode = rescode.replace("n", toHex8(n));
