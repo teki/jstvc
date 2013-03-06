@@ -96,6 +96,8 @@
 		});
 		$(document).keydown(handleKeyDown);
 		$(document).keyup(handleKeyUp);
+		$(window).focus(handleFocus);
+		$(window).blur(handleFocusLost);
 
 		// load roms
 		getData("TVC12_D3.64K")
@@ -128,6 +130,14 @@
 		if (g.tvc) {
 			g.tvc.keyUp(e.which);
 		}
+	}
+	function handleFocus(e) {
+		if (g.tvc)
+			g.tvc.focusChange(true);
+	}
+	function handleFocusLost(e) {
+		if (g.tvc)
+			g.tvc.focusChange(false);
 	}
 	function emuContinue() {
 		window.requestAnimationFrame(emuRunFrame);
