@@ -672,12 +672,18 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 			m = this._skeymap[code];
 		if (!m)
 			m = this._keymap[code];
-		if (!m) {
-			//console.log("KEY: unhadled keycode");
-			return;
+		if (m) {
+			this.keySet(m[0], m[1], down);
+			this.fixState(m[2], down);
+			// on up release keys from the other table too
+			// to avoid key stuck from early shift release
+			if (!down) {
+				m = (this._shift) ? this._keymap[code] : this._skeymap[code];
+				if (m) {
+					this.keySet(m[0], m[1], down);
+				}
+			}
 		}
-		this.keySet(m[0], m[1], down);
-		this.fixState(m[2], down);
 	}
 
 	KEY.prototype.keyDown = function(code) {
