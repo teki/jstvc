@@ -1,0 +1,45 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=utf-8">
+<title>tvc</title>
+<script src="scripts/jquery-1.9.0.min.js"></script>
+<script src="scripts/require.js"></script>
+<script src="data/datalist.json"></script>
+<script src="frontend.js"></script>
+<link rel="stylesheet" type="text/css" href="view.css">
+</head>
+<body onload="appStart();">
+	<div id="header" class="center">
+		<img src="vtvc.png" />
+		<ul style="padding-top: 1em;">
+			<li><a href="http://tvc.hu/html/inenglish.html">TVC (en)</a></li>
+			<li><a href="http://z80.info">Z80 (en)</a></li>
+			<li><a href="http://www.tvc.hu">tvc.hu (hu)</a></li>
+			<li><a href="https://github.com/teki/jstvc">project (hu)</a></li>
+		</ul>
+		<br style="clear: both'" />
+	</div>
+	<div id="monitor" class="center" tabindex="0">
+	<div id="toolbar" class="center">
+		<button id="breset">reset</button>
+		<select id="scas"></select>
+	</div>
+		<canvas id="tvcanvas" width="512" height="240"></canvas>
+	</div>
+<!--
+	<div id="dbg">
+		<div>
+		<input id="run" class="tbitem" type="BUTTON" value="run"></input>
+		<input id="step" class="tbitem" type="BUTTON" value="step"></input>
+		<input id="lcas" class="tbitem" type="BUTTON" value="lcas"></input>
+		</div>
+		<div>
+			<input id="bpoints" type="TEXT"></input>
+		</div>
+		<div id="regs">
+		</div>
+	</div>
+-->
+</body>
+</html>
