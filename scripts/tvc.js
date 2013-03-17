@@ -172,14 +172,28 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		}
 	}
 
+	function COLOR() {
+		this.color = 0;
+		this.r = 0;
+		this.g = 0;
+		this.b = 0;
+		this.setColor = function(val) {
+			this.color = val;
+			//this.rgb = ~~(((color&0x04) ? 0xFF0000 : 0) | ((color&0x10) ? 0x00FF00 : 0) | ((color&0x01) ? 0x0000FF : 0));
+			var intens = 0x7F | ((val & 0x40) << 1);
+			this.r = (0x100 - ((val >> 2) & 1)) & intens;
+			this.g = (0x100 - ((val >> 4) & 1)) & intens;
+			this.b = (0x100 - (val & 1)) & intens;
+		}
+	}
+
 	function VID(mmu, fb) {
 		this._clockfreq = 3125000;
 		this._clockperframe = (1/50) / (1/this._clockfreq);
 		this._mmu = mmu;
 		this._fb = fb;
 		this._timer = 0;
-		this._palette = [0,0,0,0];
-		this._palettergb = [0,0,0,0];
+		this._palette = [new COLOR(),new COLOR(),new COLOR(),new COLOR()];
 		this._border = 0;
 		this._regIdx = 0;
 		this._reg = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
@@ -217,60 +231,33 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		var fbw = ~~this._fb.width;
 		var fbh = ~~this._fb.height;
 		var p0,p1,p2,p3;
-		var d0,d1,d2,d3;
+		var d0,d1,d2,d3,r,g,b,intens;
 
+		addr = ~~this._startAddress;
 		switch (this._mode) {
 			case 0: // 2 colors
 				for (j = 0; j < 240; j++) {
+					pixelIdx = fbw * j * 4;
 					for (i = 0; i < 64; i++) {
-						addr = this._startAddress + j * 64 + i;
-						pixelData = vidmem[addr];
-						pixelIdx = (j * fbw + i * 8) * 4;
-						val1 = (pixelData & 0x80) ? 255 : 0;
-						fbd[pixelIdx + 0x00] = val1;
-						fbd[pixelIdx + 0x01] = val1;
-						fbd[pixelIdx + 0x02] = val1;
-						fbd[pixelIdx + 0x03] = 255;
-						val1 = (pixelData & 0x40) ? 255 : 0;
-						fbd[pixelIdx + 0x04] = val1;
-						fbd[pixelIdx + 0x05] = val1;
-						fbd[pixelIdx + 0x06] = val1;
-						fbd[pixelIdx + 0x07] = 255;
-						val1 = (pixelData & 0x20) ? 255 : 0;
-						fbd[pixelIdx + 0x08] = val1;
-						fbd[pixelIdx + 0x09] = val1;
-						fbd[pixelIdx + 0x0A] = val1;
-						fbd[pixelIdx + 0x0B] = 255;
-						val1 = (pixelData & 0x10) ? 255 : 0;
-						fbd[pixelIdx + 0x0C] = val1;
-						fbd[pixelIdx + 0x0D] = val1;
-						fbd[pixelIdx + 0x0E] = val1;
-						fbd[pixelIdx + 0x0F] = 255;
-						val1 = (pixelData & 0x08) ? 255 : 0;
-						fbd[pixelIdx + 0x10] = val1;
-						fbd[pixelIdx + 0x11] = val1;
-						fbd[pixelIdx + 0x12] = val1;
-						fbd[pixelIdx + 0x13] = 255;
-						val1 = (pixelData & 0x04) ? 255 : 0;
-						fbd[pixelIdx + 0x14] = val1;
-						fbd[pixelIdx + 0x15] = val1;
-						fbd[pixelIdx + 0x16] = val1;
-						fbd[pixelIdx + 0x17] = 255;
-						val1 = (pixelData & 0x02) ? 255 : 0;
-						fbd[pixelIdx + 0x18] = val1;
-						fbd[pixelIdx + 0x19] = val1;
-						fbd[pixelIdx + 0x1A] = val1;
-						fbd[pixelIdx + 0x1B] = 255;
-						val1 = (pixelData & 0x01) ? 255 : 0;
-						fbd[pixelIdx + 0x1C] = val1;
-						fbd[pixelIdx + 0x1D] = val1;
-						fbd[pixelIdx + 0x1E] = val1;
-						fbd[pixelIdx + 0x1F] = 255;
+						pixelData = vidmem[addr++];
+						p0 = this._palette[(pixelData >> 7) & 1];
+						fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
+						p0 = this._palette[(pixelData >> 6) & 1];
+						fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
+						p0 = this._palette[(pixelData >> 5) & 1];
+						fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
+						p0 = this._palette[(pixelData >> 4) & 1];
+						fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
+						p0 = this._palette[(pixelData >> 3) & 1];
+						fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
+						p0 = this._palette[(pixelData >> 2) & 1];
+						fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
+						p0 = this._palette[(pixelData >> 1) & 1];
+						fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
 					}
 				}
 				break;
 			case 1: // 4 colors
-				addr = ~~this._startAddress;
 				for (j = 0; j < 240; j++) {
 					pixelIdx = fbw * j * 4;
 					for (i = 0; i < 64; i++) {
@@ -287,61 +274,45 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 						pixelData >>= 1;
 						pixelData2 >>= 1;
 						d0 = (pixelData & 2) | (pixelData2 & 1);
-						p0 = this._palettergb[d0];
-						fbd[pixelIdx++] = (p0 >> 16) & 0xFF;
-						fbd[pixelIdx++] = (p0 >> 8) & 0xFF;
-						fbd[pixelIdx++] = (p0) & 0xFF;
-						fbd[pixelIdx++] = 255;
-						fbd[pixelIdx++] = (p0 >> 16) & 0xFF;
-						fbd[pixelIdx++] = (p0 >> 8) & 0xFF;
-						fbd[pixelIdx++] = (p0) & 0xFF;
-						fbd[pixelIdx++] = 255;
-						p1 = this._palettergb[d1];
-						fbd[pixelIdx++] = (p1 >> 16) & 0xFF;
-						fbd[pixelIdx++] = (p1 >> 8) & 0xFF;
-						fbd[pixelIdx++] = (p1) & 0xFF;
-						fbd[pixelIdx++] = 255;
-						fbd[pixelIdx++] = (p1 >> 16) & 0xFF;
-						fbd[pixelIdx++] = (p1 >> 8) & 0xFF;
-						fbd[pixelIdx++] = (p1) & 0xFF;
-						fbd[pixelIdx++] = 255;
-						p2 = this._palettergb[d2];
-						fbd[pixelIdx++] = (p2 >> 16) & 0xFF;
-						fbd[pixelIdx++] = (p2 >> 8) & 0xFF;
-						fbd[pixelIdx++] = (p2) & 0xFF;
-						fbd[pixelIdx++] = 255;
-						fbd[pixelIdx++] = (p2 >> 16) & 0xFF;
-						fbd[pixelIdx++] = (p2 >> 8) & 0xFF;
-						fbd[pixelIdx++] = (p2) & 0xFF;
-						fbd[pixelIdx++] = 255;
-						p3 = this._palettergb[d3];
-						fbd[pixelIdx++] = (p3 >> 16) & 0xFF;
-						fbd[pixelIdx++] = (p3 >> 8) & 0xFF;
-						fbd[pixelIdx++] = (p3) & 0xFF;
-						fbd[pixelIdx++] = 255;
-						fbd[pixelIdx++] = (p3 >> 16) & 0xFF;
-						fbd[pixelIdx++] = (p3 >> 8) & 0xFF;
-						fbd[pixelIdx++] = (p3) & 0xFF;
-						fbd[pixelIdx++] = 255;
+						p0 = this._palette[d0];
+						fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
+						fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
+						p1 = this._palette[d1];
+						fbd[pixelIdx++] = p1.r; fbd[pixelIdx++] = p1.g; fbd[pixelIdx++] = p1.b; fbd[pixelIdx++] = 0xFF;
+						fbd[pixelIdx++] = p1.r; fbd[pixelIdx++] = p1.g; fbd[pixelIdx++] = p1.b; fbd[pixelIdx++] = 0xFF;
+						p2 = this._palette[d2];
+						fbd[pixelIdx++] = p2.r; fbd[pixelIdx++] = p2.g; fbd[pixelIdx++] = p2.b; fbd[pixelIdx++] = 0xFF;
+						fbd[pixelIdx++] = p2.r; fbd[pixelIdx++] = p2.g; fbd[pixelIdx++] = p2.b; fbd[pixelIdx++] = 0xFF;
+						p3 = this._palette[d3];
+						fbd[pixelIdx++] = p3.r; fbd[pixelIdx++] = p3.g; fbd[pixelIdx++] = p3.b; fbd[pixelIdx++] = 0xFF;
+						fbd[pixelIdx++] = p3.r; fbd[pixelIdx++] = p3.g; fbd[pixelIdx++] = p3.b; fbd[pixelIdx++] = 0xFF;
 					}
 				}
 				break;
 			default: // 2 = 16 colors
 				for (j = 0; j < 240; j++) {
+					pixelIdx = fbw * j * 4;
 					for (i = 0; i < 64; i++) {
-						var addr = this._startAddress + j * 64 + i;
-						pixelData = vidmem[addr];
-						pixelIdx = (j * fbw + i * 2) * 4;
-						val = ((pixelData&0x80) ? 1 : 0.5) * ( (pixelData&0x08) ? 0xFF0000 : 0 | (pixelData&0x20) ? 0x00FF00 : 0 | (pixelData&0x02) ? 0x0000FF : 0);
-						fbd[pixelIdx + 0x00] = val >>> 16;
-						fbd[pixelIdx + 0x01] = (val >>> 8) & 0xFF;
-						fbd[pixelIdx + 0x02] = val & 0xFF;
-						fbd[pixelIdx + 0x03] = 255;
-						val = ((pixelData&0x40) ? 1 : 0.5) * ( (pixelData&0x04) ? 0xFF0000 : 0 | (pixelData&0x10) ? 0x00FF00 : 0 | (pixelData&0x01) ? 0x0000FF : 0);
-						fbd[pixelIdx + 0x04] = val >>> 16;
-						fbd[pixelIdx + 0x05] = (val >>> 8) & 0xFF;
-						fbd[pixelIdx + 0x06] = val & 0xFF;
-						fbd[pixelIdx + 0x07] = 255;
+						pixelData = vidmem[addr++];
+						d0 = pixelData >> 1;
+						intens = 0x7F | ((d0 & 0x40) << 1);
+						r = (0x100 - ((d0 >> 2) & 1)) & intens;
+						g = (0x100 - ((d0 >> 4) & 1)) & intens;
+						b = (0x100 - (d0 & 1)) & intens;
+						//val = ((pixelData&0x80) ? 1 : 0.5) * ( (pixelData&0x08) ? 0xFF0000 : 0 | (pixelData&0x20) ? 0x00FF00 : 0 | (pixelData&0x02) ? 0x0000FF : 0);
+						fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
+						fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
+						fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
+						fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
+						d1 = pixelData;
+						intens = 0x7F | ((d1 & 0x40) << 1);
+						r = (0x100 - ((d1 >> 2) & 1)) & intens;
+						g = (0x100 - ((d1 >> 4) & 1)) & intens;
+						b = (0x100 - (d1 & 1)) & intens;
+						fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
+						fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
+						fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
+						fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
 					}
 				}
 				break;
@@ -504,17 +475,18 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	}
 
 	VID.prototype.setPalette = function(idx, color) {
-		this._palette[idx] = color;
-		if (color & 0x04) {
-			this._palettergb[idx] = ~~(((color&0x04) ? 0xFF0000 : 0) | ((color&0x10) ? 0x00FF00 : 0) | ((color&0x01) ? 0x0000FF : 0));
-		}
-		else {
-			this._palettergb[idx] = ~~(((color&0x04) ? 0x7F0000 : 0) | ((color&0x10) ? 0x007F00 : 0) | ((color&0x01) ? 0x00007F : 0));
-		}
+		this._palette[idx].setColor(color);
+		//this._palette[idx] = color;
+		//if (color & 0x40) {
+		//	this._palettergb[idx] = ~~(((color&0x04) ? 0xFF0000 : 0) | ((color&0x10) ? 0x00FF00 : 0) | ((color&0x01) ? 0x0000FF : 0));
+		//}
+		//else {
+		//	this._palettergb[idx] = ~~(((color&0x04) ? 0x7F0000 : 0) | ((color&0x10) ? 0x007F00 : 0) | ((color&0x01) ? 0x00007F : 0));
+		//}
 	};
 
 	VID.prototype.getPalette = function(idx) {
-		return this._palette[idx];
+		return this._palette[idx].color;
 	};
 
 	VID.prototype.setBorder = function(color) {
@@ -699,8 +671,9 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	////////////////////////////////////////////
 	// TVC
 	////////////////////////////////////////////
-	function TVC(fb) {
+	function TVC(callback) {
 		var TVCthis = this;
+		this._callback = callback;
 		this._clockfreq = 3125000;
 		this._clockperframe = (1/50) / (1/this._clockfreq);
 		console.log(this._clockperframe);
@@ -708,7 +681,7 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		this._breakpoints = undefined;
 		this._pendIt = 0x1F;	// b4: curs/aud, b3-0 cards , 0 active
 		this._mmu = new MMU();
-		this._vid = new VID(this._mmu, fb);
+		this._vid = new VID(this._mmu, callback({id:"fb"}));
 		this._aud = new AUD();
 		this._aud_it = false;
 		this._aud_on = false;
@@ -735,6 +708,11 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	TVC.prototype.focusChange = function(hasFocus) {
 		if (!hasFocus)
 			this._key.reset();
+	}
+
+	TVC.prototype.reset = function() {
+		this._z80.reset();
+		this._mmu.reset();
 	}
 
 	TVC.prototype.loadCas = function(data) {
@@ -804,6 +782,14 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		switch(addr) {
 		case 0x00:
 			this._vid.setBorder(val);
+			val = val >> 1;
+			if (val & 0x40) {
+				val = ~~(((val&0x04) ? 0xFF0000 : 0) | ((val&0x10) ? 0x00FF00 : 0) | ((val&0x01) ? 0x0000FF : 0));
+			}
+			else {
+				val = ~~(((val&0x04) ? 0x7F0000 : 0) | ((val&0x10) ? 0x007F00 : 0) | ((val&0x01) ? 0x00007F : 0));
+			}
+			this._callback({id: "bg", val: val});
 			break;
 
 		case 0x02:

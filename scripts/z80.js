@@ -64,6 +64,10 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 	};
 
 	Z80State.prototype = {
+		get PC() { return this._PC; },
+		set PC(val) {this._PC = val & 0xFFFF;},
+		get SP() { return this._SP; },
+		set SP(val) {this._SP = val & 0xFFFF;},
 		get AF() { return (this.A << 8) | this.F; },
 		set AF(val) {this.A = (val & 0xFF00) >>> 8; this.F = val & 0xFF;},
 		get BC() { return (this.B << 8) | this.C; },
@@ -108,8 +112,8 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		this.IYH = 0xFF;
 		this.IYL = 0xFF;
 
-		this.SP = 0xFFFF;
-		this.PC = 0x0000;
+		this._SP = 0xFFFF;
+		this._PC = 0x0000;
 
 
 		this.Aa = 0xFF;
