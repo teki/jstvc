@@ -223,6 +223,7 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 			return;
 
 		this._timer -= this._clockperframe;
+
 		var vidmem = this._mmu.getVid();
 		this._startAddress = this._reg[12] << 8 | this._reg[13];
 
@@ -744,9 +745,10 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	}
 
 	TVC.prototype.runForAFrame = function() {
+		//var timestart = performance.now();
 		var breakPointHit = false;
 		while (!breakPointHit && this._clock < this._clockperframe) {
-			var tinc = this._z80.step();
+			var tinc = this._z80.step(this._clockperframe);
 			this._vid.step(tinc);
 			this._clock += tinc;
 
@@ -768,11 +770,13 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 			this._z80.interrupt();
 		}
 
+		//console.log("FRAMET: " + (performance.now() - timestart));
+
 		return breakPointHit;
 	};
 
 	TVC.prototype.runOne = function() {
-		var tinc = this._z80.step();
+		var tinc = this._z80.step(0);
 		this._vid.step(tinc);
 		this._clock += tinc;
 	};
