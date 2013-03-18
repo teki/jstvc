@@ -89,7 +89,6 @@ function emuInit() {
 		window.requestAnimationFrame = requestAnimationFrame;
 	})();
 	g.regs = $("#regs")[0];
-	g.lastrefresh = 0;
 	// frame buffer
 	g.canvas = $("#tvcanvas");
 	g.ctx = g.canvas[0].getContext("2d");
@@ -193,14 +192,6 @@ function emuRunFrame() {
 	if (!g.isRunning) {
 		return;
 	}
-	// limit to pal refresh rate
-	var timenow = performance.now();
-	var timediff = timenow - g.lastrefresh;
-	if (timediff < 20) {
-		emuContinue();
-		return;
-	}
-	g.lastrefresh = timenow;
 	// run + update + continue
 	if (g.tvc.runForAFrame()) {
 		g.isRunning = false;

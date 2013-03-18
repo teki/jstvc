@@ -5672,74 +5672,80 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		}
 	};
 
-	Z80.prototype.step = function () {
-		var pc = this._s.PC;
-		var btpc = this._s.PC;
-		var rAdd = 0;
-		var isFDorDD = false;
-		var tAdd = 0;
-		this._op_displ = 0;
-		var opcode,opcodeb2;
-		opcode = this._mmu.r8(pc);
-		if (opcode == 0xDD || opcode == 0xFD) {
-			do {
-				// DD* FD*
-				opcodeb2 = this._mmu.r8(pc + 1);
-				// DDDD, DDFD, FDDD, FDFD handle first byte as NOP
-				if (opcodeb2 == 0xDD || opcodeb2 == 0xFD) {
-					opcode = opcodeb2;
-					tAdd += 4;
-					pc += 1;
-					rAdd += 1;
-				}
-				else {
-					opcode = (opcode << 8) | opcodeb2;
-					// DDCB????, FDCB????
-					if (opcode == 0xFDCB || opcode == 0xDDCB) {
-						rAdd += 2;
-						this._op_displ = this._mmu.r8s(pc + 2);
-						opcode = (opcode << 8) | this._mmu.r8(pc + 3);
+	Z80.prototype.step = function (runFor) {
+		var actRuntime = 0;
+		while (runFor >= 0) {
+			var pc = this._s.PC;
+			var btpc = this._s.PC;
+			var rAdd = 0;
+			var isFDorDD = false;
+			var tAdd = 0;
+			this._op_displ = 0;
+			var opcode,opcodeb2;
+			opcode = this._mmu.r8(pc);
+			if (opcode == 0xDD || opcode == 0xFD) {
+				do {
+					// DD* FD*
+					opcodeb2 = this._mmu.r8(pc + 1);
+					// DDDD, DDFD, FDDD, FDFD handle first byte as NOP
+					if (opcodeb2 == 0xDD || opcodeb2 == 0xFD) {
+						opcode = opcodeb2;
+						tAdd += 4;
+						pc += 1;
+						rAdd += 1;
 					}
-					// DD??, FD??
 					else {
-						rAdd += 2;
-						isFDorDD = true;
+						opcode = (opcode << 8) | opcodeb2;
+						// DDCB????, FDCB????
+						if (opcode == 0xFDCB || opcode == 0xDDCB) {
+							rAdd += 2;
+							this._op_displ = this._mmu.r8s(pc + 2);
+							opcode = (opcode << 8) | this._mmu.r8(pc + 3);
+						}
+						// DD??, FD??
+						else {
+							rAdd += 2;
+							isFDorDD = true;
+						}
 					}
-				}
-			} while (opcode == 0xDD || opcode == 0xFD);
-		}
-		else if (opcode == 0xED || opcode == 0xCB) {
-			opcode = (opcode << 8) | this._mmu.r8(pc + 1);
-			rAdd += 2;
-		}
-		// single byte op
-		else {
-			rAdd += 1;
-		}
-		this._s.R = (this._s.R & 0x80) | ((this._s.R + rAdd) & 0x7F);
-		var f = this._opcodes[opcode];
-		if (!f) {
-			if (isFDorDD) {
-				f = this._opcodes[opcode & 0xFF];
-				pc += 1;
-				this._s.PC = pc;
-				tAdd += 4;
+				} while (opcode == 0xDD || opcode == 0xFD);
 			}
+			else if (opcode == 0xED || opcode == 0xCB) {
+				opcode = (opcode << 8) | this._mmu.r8(pc + 1);
+				rAdd += 2;
+			}
+			// single byte op
+			else {
+				rAdd += 1;
+			}
+			this._s.R = (this._s.R & 0x80) | ((this._s.R + rAdd) & 0x7F);
+			var f = this._opcodes[opcode];
+			if (!f) {
+				if (isFDorDD) {
+					f = this._opcodes[opcode & 0xFF];
+					pc += 1;
+					this._s.PC = pc;
+					tAdd += 4;
+				}
+			}
+			if (!f) {
+				console.log(this._mmu.dasm(pc, 5, "??? ").join("\n"));
+				throw ("not implemented:" + Utils.toHex8(opcode));
+			}
+			//this.logasm();
+			f.call(this);
+			//this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
+			if (this._op_t === 0) {
+				throw ("you forgot something!");
+			}
+			if (this._op_m && !this._s.halted) {
+				this._s.PC = pc + this._op_m;
+			}
+			var instrTime = this._op_t + tAdd;
+			runFor -= instrTime;
+			actRuntime += instrTime;
 		}
-		if (!f) {
-			console.log(this._mmu.dasm(pc, 5, "??? ").join("\n"));
-			throw ("not implemented:" + Utils.toHex8(opcode));
-		}
-		//this.logasm();
-		f.call(this);
-		//this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
-		if (this._op_t === 0) {
-			throw ("you forgot something!");
-		}
-		if (this._op_m && !this._s.halted) {
-			this._s.PC = pc + this._op_m;
-		}
-		return this._op_t + tAdd;
+		return actRuntime;
 	};
 
 	Z80.prototype.interrupt = function() {
