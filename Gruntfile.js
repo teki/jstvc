@@ -13,6 +13,7 @@ module.exports = function(grunt) {
 			if (cl[i].indexOf("cas") != -1)
 				cl2.push(cl[i]);
 		}
+		cl2.sort();
 
 		a = "var datalist = " + JSON.stringify(cl2) + ";\n";
 		fs.writeFileSync("data/datalist.json", a);

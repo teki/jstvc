@@ -4,14 +4,17 @@
 <meta http-equiv="Content-type" content="text/html; charset=utf-8">
 <title>tvc</title>
 <script src="scripts/jquery-1.9.0.min.js"></script>
+<script src="scripts/jquery.pnotify.min.js"></script>
 <script src="scripts/require.js"></script>
 <script src="data/datalist.json"></script>
 <script src="frontend.js"></script>
-<link rel="stylesheet" type="text/css" href="view.css">
+<link rel="stylesheet" type="text/css" href="style/view.css">
+<link rel="stylesheet" type="text/css" href="style/jquery.pnotify.default.css">
+<link rel="stylesheet" type="text/css" href="style/jquery.pnotify.default.icons.css">
 </head>
 <body onload="appStart();">
 	<div id="header" class="center">
-		<img src="vtvc.png" />
+		<img src="vtvc.jpg" />
 		<ul style="padding-top: 1em;">
 			<li><a href="http://tvc.hu/html/inenglish.html">TVC (en)</a></li>
 			<li><a href="http://z80.info">Z80 (en)</a></li>
@@ -24,6 +27,8 @@
 	<div id="toolbar" class="center">
 		<button id="breset">reset</button>
 		<select id="scas"></select>
+		<button id="bload">load</button>
+		<span id="fps">0</span>
 	</div>
 		<canvas id="tvcanvas" width="512" height="240"></canvas>
 	</div>
