@@ -74,7 +74,16 @@ function emuToggleRun() {
 		emuUpdateDbgInfo();
 	}
 }
+function notify(msg, msg2) {
+	$.pnotify({
+		title: msg,
+		text: msg2,
+		animation: "none",
+	});
+}
+
 function emuInit() {
+	notify("loading roms");
 	(function() {
 		var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
 		window.requestAnimationFrame = requestAnimationFrame;
@@ -85,11 +94,22 @@ function emuInit() {
 	g.canvas = $("#tvcanvas");
 	g.ctx = g.canvas[0].getContext("2d");
 	g.fb = {};
+	g.fb.updatetime = performance.now();
+	g.fb.updatecnt = 0;
+	g.fb.fps = $("#fps")[0];
 	g.fb.width = g.canvas[0].width;
 	g.fb.height = g.canvas[0].height;
 	g.fb.data = g.ctx.createImageData(g.fb.width, g.fb.height);
 	g.fb.refresh = function() {
 		g.ctx.putImageData(g.fb.data, 0, 0);
+		g.fb.updatecnt += 1;
+		var timenow = performance.now();
+		if ((timenow - g.fb.updatetime) > 500) {
+			var fps = ~~(g.fb.updatecnt / ((timenow - g.fb.updatetime) / 1000));
+			g.fb.fps.innerHTML = fps.toString(10);
+			g.fb.updatetime = timenow;
+			g.fb.updatecnt = 0;
+		}
 	}
 	g.tvc = new TVCModule.TVC(callback);
 	// gui
@@ -102,21 +122,20 @@ function emuInit() {
 	$("#step").on("click", function() {
 		emuStep();
 	});
-	$("#lcas").on("click", function() {
-		loadCas();
-	});
 	$("#bpoints").change(function (e) {
 		var newbplst = [];
 		var bplst = $("#bpoints")[0].value.split(",");
 		g.tvc.setBreakPoints(bplst);
 		$("#step").focus();
 	});
-	$("#scas").change(function (e) {
-		getData("data/" + $("#scas")[0].value)
+	$("#bload").on("click", function () {
+		var casname = $("#scas")[0].value;
+		getData("data/" + casname)
 			.then(function(data) {
 				g.tvc.reset();
 				g.tvc.loadCas(new Uint8Array(data));
 				$("#monitor").focus();
+				notify("loaded", casname + "\nTip: run + [enter]");
 			});
 	});
 	var casdrop = $("#scas");
@@ -142,14 +161,12 @@ function emuInit() {
 	.then(function(data) {
 		g.tvc.addRom("D7", new Uint8Array(data));
 		// start
+		$.pnotify({
+			title: "start",
+			animation: "none",
+		});
 		emuContinue();
 	});
-}
-function loadCas() {
-	getData("mralex.cas")
-		.then(function(data) {
-			g.tvc.loadCas(new Uint8Array(data));
-		});
 }
 function handleKeyDown(e) {
 	if (g.tvc) {
@@ -177,12 +194,13 @@ function emuRunFrame() {
 		return;
 	}
 	// limit to pal refresh rate
-	var timediff = performance.now() - g.lastrefresh;
-	g.lastrefresh = performance.now();
-	if (timediff < (1/25)) {
+	var timenow = performance.now();
+	var timediff = timenow - g.lastrefresh;
+	if (timediff < 20) {
 		emuContinue();
 		return;
 	}
+	g.lastrefresh = timenow;
 	// run + update + continue
 	if (g.tvc.runForAFrame()) {
 		g.isRunning = false;

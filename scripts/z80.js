@@ -148,16 +148,6 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		return arr.join("");
 	}
 
-	Z80State.prototype.exR = function (regs) {
-		var i, tmp;
-		for (i=0; i<regs.length; i++) {
-			tmp = this[regs[i]];
-			this[regs[i]] = this[regs[i] + "a"];
-			this[regs[i] + "a"] = tmp;
-		}
-	}
-
-
 	////////////////////////////////////////////
 	// Z80
 	////////////////////////////////////////////
@@ -180,11 +170,11 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 	}
 
 	Z80.prototype.push16 = function (val) {
-		var SP = (this._s.SP - 1) & 0xFFFF;
-		this._mmu.w8(SP, (val >>> 8) & 0xFF);
-		SP--;
-		this._mmu.w8(SP, val & 0xFF);
-		this._s.SP = SP;
+		var sp = (this._s.SP - 1) & 0xFFFF;
+		this._mmu.w8(sp, (val >> 8) & 0xFF);
+		sp--;
+		this._mmu.w8(sp, val & 0xFF);
+		this._s.SP = sp;
 	};
 
 	Z80.prototype.pop16 = function () {
@@ -875,7 +865,8 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		0x08:function () { // EX AF,AF'
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.exR("AF");
+			var a = this._s.A; this._s.A = this._s.Aa; this._s.Aa = a;
+			var f = this._s.F; this._s.F = this._s.Fa; this._s.Fa = f;
 		},
 		0x09: add_ss_ss("HL", "BC"), // ADD HL,BC
 		0x0A: ld_r_iss("A", "BC"), // LD A,(BC)
@@ -2456,8 +2447,9 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		0xCD:function () { // CALL nn
 			this._op_t = 17;
 			this._op_m = 0;
-			this._op_nn = this._mmu.r16(this._s.PC+1);
-			this.push16(this._s.PC+3);
+			var pc = this._s.PC;
+			this._op_nn = this._mmu.r16(pc+1);
+			this.push16(pc+3);
 			this._s.PC = this._op_nn;
 		},
 		0xCE:function () { // ADC A,n
@@ -2555,9 +2547,12 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		0xD9:function () { // EXX
 			this._op_t = 4;
 			this._op_m = 1;
-			this._s.exR("BC");
-			this._s.exR("DE");
-			this._s.exR("HL");
+			var b = this._s.B; this._s.B = this._s.Ba; this._s.Ba = b;
+			var c = this._s.C; this._s.C = this._s.Ca; this._s.Ca = c;
+			var d = this._s.D; this._s.D = this._s.Da; this._s.Da = d;
+			var e = this._s.E; this._s.E = this._s.Ea; this._s.Ea = e;
+			var h = this._s.H; this._s.H = this._s.Ha; this._s.Ha = h;
+			var l = this._s.L; this._s.L = this._s.La; this._s.La = l;
 		},
 		0xDA:function () { // JP C,nn
 			this._op_t = 10;
@@ -5737,8 +5732,7 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		}
 		//this.logasm();
 		f.call(this);
-		this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
-		if (this.bt.length > 10) this.bt.shift();
+		//this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
 		if (this._op_t === 0) {
 			throw ("you forgot something!");
 		}
