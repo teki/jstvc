@@ -37,7 +37,7 @@ module.exports = function(grunt) {
 		var done = grunt.task.current.async();
 		var exec = require('child_process').exec;
 		exec("git checkout gh-pages", function(e,i,o) {
-			if (e1) done(false);
+			if (e) done(false);
 		exec("for act in $(find . -maxdepth 1 -not -name '*git*' -not -name build -not -name '.'); do rm -rf $act; done", function(e,i,o) {
 		exec("cp -R build/.gitignore build/* .", function(e,i,o) {
 		exec("git add -A; git commit -m 'release'", function(e,i,o) {
