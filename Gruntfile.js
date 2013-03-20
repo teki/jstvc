@@ -40,7 +40,7 @@ module.exports = function(grunt) {
 			if (e) done(false);
 		exec("for act in $(find . -maxdepth 1 -not -name '*git*' -not -name node_modules -not -name build -not -name '.'); do rm -rf $act; done", function(e,i,o) {
 		exec("cp -R build/.gitignore build/* .", function(e,i,o) {
-		exec("git add -A; git commit -m 'release'", function(e,i,o) {
+		exec("git add -A; git commit -m 'release'; git push; git checkout master", function(e,i,o) {
 			done();
 		});
 		});
