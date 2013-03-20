@@ -5,10 +5,11 @@
     "connect": "~2.7.0",
     "requirejs": "~2.1.0"
   },
-	"devDependencies" : {
-		"grunt": "~0.4.0"
-	},
-	"scripts": {
-		"start": "node web.js"
-	}
+  "devDependencies": {
+    "grunt": "~0.4.0",
+    "grunt-contrib-requirejs": "~0.4.0"
+  },
+  "scripts": {
+    "start": "node web.js"
+  }
 }

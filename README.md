@@ -4,7 +4,27 @@ Javascript VIDEOTON TV Computer emulator.
 
 Demo: http://teki.github.com/jstvc
 
-Ami mukodik:
+# TVC
+
+About the TVC: http://tvc.hu/html/inenglish.html
+
+TVC rajongoi oldal: http://www.tvc.hu/
+
+# Verzio tortenet
+
+v0.0.3
+
+ * verzio szam a weblapon
+ * verzio frissites automatizalas
+ * billentyuzet esemenyek elkapasa
+
+v0.0.2
+
+ * frissites fix (60fps-el fut nekem Chrome-ban, limitalni kell 50-re)
+ * ertesites esemenyekrol (bug: a hatterben jelennek meg)
+ * cas toltes egyszerusitese
+
+v0.0.1
 
 * Z80
 * US billentyuzet
@@ -12,14 +32,16 @@ Ami mukodik:
 * video memoria canvas-ra rajzolasa
 * Chrome-ban gyorsabban fut mint Firefox-ban (mas alatt nem probaltam)
 
-Tennivalok:
+
+# Tennivalok, otletek
 
 * hang
-* 6845
 * magyar billentyuzet
-* debugger
 * fajlkezeles
-* ... (sokminden)
+* bongeszo konzol tamogatas
+* debugger
+* 6845
+
 
 # Egyeb
 
