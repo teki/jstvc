@@ -170,6 +170,7 @@ function emuInit() {
 function handleKeyDown(e) {
 	if (g.tvc) {
 		g.tvc.keyDown(e.which);
+		e.preventDefault();
 	}
 }
 function handleKeyUp(e) {
