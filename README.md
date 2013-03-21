@@ -12,6 +12,11 @@ TVC rajongoi oldal: http://www.tvc.hu/
 
 # Verzio tortenet
 
+v0.0.4
+
+ * Safari fix (mukodik, de lassu)
+ * status sor, ertesitesek helyett
+
 v0.0.3
 
  * verzio szam a weblapon
