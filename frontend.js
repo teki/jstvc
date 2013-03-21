@@ -80,14 +80,17 @@ function notify(msg, msg2) {
 
 function emuInit() {
 	notify("loading roms");
-	var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
-	g.requestAnimationFrame = requestAnimationFrame;
+	/* polyfills */
+	if(window.requestAnimationFrame) g.requestAnimationFrame = function(f) {window.requestAnimationFrame(f);};
+	else if (window.mozRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.mozRequestAnimationFrame(f);};
+	else if (window.webkitRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.webkitRequestAnimationFrame(f);};
+	else if (window.msRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.msRequestAnimationFrame(f);};
 	if (typeof(performance) != "undefined")
 		g.timenow = function() {return performance.now();};
 	else
 		g.timenow = Date.now;
+	/* init */
 	g.regs = $("#regs")[0];
-	// frame buffer
 	g.statusline = $("#statusline")[0];
 	g.canvas = $("#tvcanvas");
 	g.ctx = g.canvas[0].getContext("2d");
@@ -182,7 +185,7 @@ function handleFocusLost(e) {
 		g.tvc.focusChange(false);
 }
 function emuContinue() {
-	window.requestAnimationFrame(emuRunFrame);
+	g.requestAnimationFrame(emuRunFrame);
 };
 function emuRunFrame() {
 	if (!g.isRunning) {

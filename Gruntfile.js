@@ -7,7 +7,6 @@ module.exports = function(grunt) {
 		connect: {
 			server: {
 				options: {
-					hostname: "192.168.10.73",
 					port: 5000,
 					base: require("path").resolve("."),
 					keepalive: true
