@@ -4,32 +4,33 @@
 <meta http-equiv="Content-type" content="text/html; charset=utf-8">
 <title>tvc</title>
 <script src="scripts/jquery-1.9.0.min.js"></script>
-<script src="scripts/jquery.pnotify.min.js"></script>
 <script src="scripts/require.js"></script>
 <script src="data/datalist.json"></script>
 <script src="frontend.js"></script>
 <link rel="stylesheet" type="text/css" href="style/view.css">
-<link rel="stylesheet" type="text/css" href="style/jquery.pnotify.default.css">
-<link rel="stylesheet" type="text/css" href="style/jquery.pnotify.default.icons.css">
 </head>
 <body onload="appStart();">
 	<div id="header" class="center">
 		<img src="vtvc.jpg" />
-		<ul style="padding-top: 1em;">
+		<ul>
 			<li><a href="https://github.com/teki/jstvc">jstvc VVEERR</a></li>
 			<li><a href="http://tvc.hu/html/inenglish.html">TVC (en)</a></li>
 			<li><a href="http://z80.info">Z80 (en)</a></li>
+		</ul>
+		<ul>
 			<li><a href="http://www.tvc.hu">tvc.hu (hu)</a></li>
 			<li><a href="https://github.com/teki/jstvc">project (hu)</a></li>
 		</ul>
 		<br style="clear: both'" />
+	</div>
+	<div id="statusblock" class="center">
+		status: <span id="statusline">ok</span>
 	</div>
 	<div id="monitor" class="center" tabindex="0">
 	<div id="toolbar" class="center">
 		<button id="breset">reset</button>
 		<select id="scas"></select>
 		<button id="bload">load</button>
-		<span id="fps">0</span>
 	</div>
 		<canvas id="tvcanvas" width="512" height="240"></canvas>
 	</div>

@@ -75,11 +75,7 @@ function emuToggleRun() {
 	}
 }
 function notify(msg, msg2) {
-	$.pnotify({
-		title: msg,
-		text: msg2,
-		animation: "none",
-	});
+	$("#statusline")[0].innerHTML = msg;
 }
 
 function emuInit() {
@@ -90,6 +86,7 @@ function emuInit() {
 	})();
 	g.regs = $("#regs")[0];
 	// frame buffer
+	g.statusline = $("#statusline")[0];
 	g.canvas = $("#tvcanvas");
 	g.ctx = g.canvas[0].getContext("2d");
 	g.fb = {};
@@ -105,7 +102,7 @@ function emuInit() {
 		var timenow = performance.now();
 		if ((timenow - g.fb.updatetime) > 500) {
 			var fps = ~~(g.fb.updatecnt / ((timenow - g.fb.updatetime) / 1000));
-			g.fb.fps.innerHTML = fps.toString(10);
+			notify("running " + fps.toString(10) + "fps");
 			g.fb.updatetime = timenow;
 			g.fb.updatecnt = 0;
 		}
@@ -160,10 +157,6 @@ function emuInit() {
 	.then(function(data) {
 		g.tvc.addRom("D7", new Uint8Array(data));
 		// start
-		$.pnotify({
-			title: "start",
-			animation: "none",
-		});
 		emuContinue();
 	});
 }

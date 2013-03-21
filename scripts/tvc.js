@@ -290,7 +290,8 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 					}
 				}
 				break;
-			default: // 2 = 16 colors
+			case 2: // 16 colors
+			case 3:
 				for (j = 0; j < 240; j++) {
 					pixelIdx = fbw * j * 4;
 					for (i = 0; i < 64; i++) {
@@ -316,6 +317,8 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 						fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
 					}
 				}
+				break;
+			default: // 2 = 16 colors
 				break;
 		}
 
