@@ -75,25 +75,27 @@ function emuToggleRun() {
 	}
 }
 function notify(msg, msg2) {
-	$.pnotify({
-		title: msg,
-		text: msg2,
-		animation: "none",
-	});
+	$("#statusline")[0].innerHTML = msg;
 }
 
 function emuInit() {
 	notify("loading roms");
-	(function() {
-		var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
-		window.requestAnimationFrame = requestAnimationFrame;
-	})();
+	/* polyfills */
+	if(window.requestAnimationFrame) g.requestAnimationFrame = function(f) {window.requestAnimationFrame(f);};
+	else if (window.mozRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.mozRequestAnimationFrame(f);};
+	else if (window.webkitRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.webkitRequestAnimationFrame(f);};
+	else if (window.msRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.msRequestAnimationFrame(f);};
+	if (typeof(performance) != "undefined")
+		g.timenow = function() {return performance.now();};
+	else
+		g.timenow = Date.now;
+	/* init */
 	g.regs = $("#regs")[0];
-	// frame buffer
+	g.statusline = $("#statusline")[0];
 	g.canvas = $("#tvcanvas");
 	g.ctx = g.canvas[0].getContext("2d");
 	g.fb = {};
-	g.fb.updatetime = performance.now();
+	g.fb.updatetime = g.timenow();
 	g.fb.updatecnt = 0;
 	g.fb.fps = $("#fps")[0];
 	g.fb.width = g.canvas[0].width;
@@ -102,10 +104,10 @@ function emuInit() {
 	g.fb.refresh = function() {
 		g.ctx.putImageData(g.fb.data, 0, 0);
 		g.fb.updatecnt += 1;
-		var timenow = performance.now();
+		var timenow = g.timenow();
 		if ((timenow - g.fb.updatetime) > 500) {
 			var fps = ~~(g.fb.updatecnt / ((timenow - g.fb.updatetime) / 1000));
-			g.fb.fps.innerHTML = fps.toString(10);
+			notify("running " + fps.toString(10) + "fps");
 			g.fb.updatetime = timenow;
 			g.fb.updatecnt = 0;
 		}
@@ -160,10 +162,6 @@ function emuInit() {
 	.then(function(data) {
 		g.tvc.addRom("D7", new Uint8Array(data));
 		// start
-		$.pnotify({
-			title: "start",
-			animation: "none",
-		});
 		emuContinue();
 	});
 }
@@ -187,7 +185,7 @@ function handleFocusLost(e) {
 		g.tvc.focusChange(false);
 }
 function emuContinue() {
-	window.requestAnimationFrame(emuRunFrame);
+	g.requestAnimationFrame(emuRunFrame);
 };
 function emuRunFrame() {
 	if (!g.isRunning) {
