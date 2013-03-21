@@ -1,8 +1,19 @@
 module.exports = function(grunt) {
 
-  // Project configuration.
+	grunt.loadNpmTasks("grunt-contrib-connect");
+
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
+		connect: {
+			server: {
+				options: {
+					hostname: "192.168.10.73",
+					port: 5000,
+					base: require("path").resolve("."),
+					keepalive: true
+				}
+			}
+		}
   });
 
 	grunt.registerTask('caslist', function() {
