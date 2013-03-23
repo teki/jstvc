@@ -524,19 +524,56 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 	function AUD() {
 		this._clock = 0;
 		this._amp = 0;
+		this._pitch = 0;
 		this._freq = 0;
+		this._vol = 0;
+		this._on = false;
+		this._context = new webkitAudioContext();
+		this._oscillator = undefined;
+		this._gain = undefined;
+	}
+
+	AUD.prototype.freqChanged = function() {
+		console.log("AUD: pitch " + this._pitch + " freq: " + this._freq + " vol: " + this._amp);
+		if (this._oscillator) {
+			var vol = this._on ? this._vol : 0;
+			if (this._gain.gain.value != vol)
+				this._gain.gain.value = vol;
+			if (this._oscillator.frequency.value != this._freq)
+				this._oscillator.frequency.value = this._freq;
+			return;
+		}
+		this._gain = this._context.createGain();
+		this._oscillator = this._context.createOscillator();
+		this._oscillator.connect(this._gain);
+		this._gain.connect(this._context.destination);
+		this._oscillator.frequency.value = this._freq;
+		this._gain.gain.value = this._vol;
+		this._oscillator.start(0);
 	}
 
 	AUD.prototype.setAmp = function(val) {
+		console.log("AUD: setamp " + val);
 		this._amp = val;
+		this._vol = this._amp / 15;
+		this.freqChanged();
 	};
 
 	AUD.prototype.setFreqL = function(val) {
-		this._freq = (this._freq & 0x0F00) | (val & 0xFF);
+		this._pitch = (this._pitch & 0x0F00) | (val & 0xFF);
+		this._freq = 195312.5/(4096-this._pitch);
+		this.freqChanged();
 	};
 
 	AUD.prototype.setFreqH = function(val) {
-		this._freq = (this._freq & 0xFF) | (val << 8);
+		this._pitch = (this._pitch & 0xFF) | (val << 8);
+		this._freq = 195312.5/(4096-this._pitch);
+		this.freqChanged();
+	};
+
+	AUD.prototype.setOn = function(val) {
+		this._on = val;
+		this.freqChanged();
 	};
 
 	////////////////////////////////////////////
@@ -688,7 +725,6 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 		this._vid = new VID(this._mmu, callback({id:"fb"}));
 		this._aud = new AUD();
 		this._aud_it = false;
-		this._aud_on = false;
 		this._key = new KEY();
 		this._z80 = new Z80Module.Z80(this._mmu, function(addr, val) {
 			TVCthis.writePort(addr, val);
@@ -813,14 +849,15 @@ define(["scripts/z80.js","scripts/utils.js"], function(Z80Module, Utils) {
 			break;
 
 		case 0x05:
-			this._aud_on = (val & 0x10) !== 0;
 			this._aud_it = (val & 0x20) !== 0;
 			this._aud.setFreqH(val & 0x0F);
+			this._aud.setOn((val & 0x10) !== 0);
+			console.log("AUD: it: " + this._aud_it);
 			break;
 
 		case 0x06:
 			val1 = val & 0x80; // Printer ack
-			val2 = (val >>> 2) & 0x0F; // Sound amp
+			val2 = (val >> 2) & 0x0F; // Sound amp
 			val3 = val & 0x03; // video mode
 			this._vid.setMode(val3);
 			this._aud.setAmp(val2);
