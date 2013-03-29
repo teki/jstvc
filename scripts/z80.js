@@ -5748,6 +5748,9 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		return actRuntime;
 	};
 
+	Z80.prototype.noInterrupts = function() {
+		return !this._s.IFF1;
+	}
 	Z80.prototype.interrupt = function() {
 		if (this._s.IFF1) {
 			if (this._s.im == 1) {
