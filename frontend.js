@@ -66,11 +66,11 @@ function emuReset() {
 function emuToggleRun() {
 	g.isRunning = !g.isRunning;
 	if (g.isRunning) {
-		$("#run")[0].value = "stop";
+		$("#bstop")[0].innerText = "stop";
 		emuContinue();
 	}
 	else {
-		$("#run")[0].value = "run";
+		$("#bstop")[0].innerText = "run";
 		emuUpdateDbgInfo();
 	}
 }
@@ -92,6 +92,7 @@ function emuInit() {
 	/* init */
 	g.regs = $("#regs")[0];
 	g.statusline = $("#statusline")[0];
+	// frame buffer
 	g.canvas = $("#tvcanvas");
 	g.ctx = g.canvas[0].getContext("2d");
 	g.fb = {};
@@ -117,7 +118,7 @@ function emuInit() {
 	$("#breset").on("click", function() {
 		emuReset();
 	});
-	$("#run").on("click", function() {
+	$("#bstop").on("click", function() {
 		emuToggleRun();
 	});
 	$("#step").on("click", function() {
