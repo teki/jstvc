@@ -86,60 +86,71 @@ define([
 
 	TVC.prototype.runForAFrame = function() {
 		//var timestart = performance.now();
-		this._vid.refreshStart();
 		var maxTime = 2* this._clockperframe;
-		var refrVideo = false; // draw a screen
-		var dCpuTime = 0;
+		var canDraw = this._vid.initLineCopy();
+		var dCpuTime = this._clockdiff; // CPU run this more last time than VID
 		var dVidTime = 0;
-		var cpuAdj = this._clockdiff; // CPU run this more last time than VID
 		var cpuTime = 0; // how long did they run for
 		var vidTime = 0;
-		var itDelay = false;
-
+		var vidRunTime;
+		var drawTiming;
+		var itOffset;
+		var finishedScreen = false;
 		while (maxTime > 0) {
-			var runCpuFor = this._vid.getNextDuration(); // a guess
-			if (runCpuFor >= 0) {
-				if (runCpuFor == 0) // VID is not yet configured
-					runCpuFor = 800;
-				dCpuTime = this._z80.step(runCpuFor - cpuAdj);
-				cpuAdj = 0;
-				if (dCpuTime == 0) throw("CPU: 0 time error");
-
-				cpuTime += dCpuTime;
-				this._clock += dCpuTime;
-			}
-
-			if (this._vid.it) {
-				if (!itDelay) {
-					itDelay = true;
-				}
-				else {
-					itDelay = false;
-					this._vid.it = false;
+			if (canDraw) {
+				drawTiming = this._vid.getLineDuration();
+				// 200
+				vidRunTime = drawTiming[0];
+				// < 128
+				itOffset = drawTiming[1];
+				// handle IT
+				if (itOffset >= 0) {
+					// run till IT point
+					if (itOffset > dCpuTime) {
+						dCpuTime += this._z80.step(itOffset - dCpuTime);
+					}
+					// jump if IT enabled
 					if (!this._z80.noInterrupts()) {
-						cpuTime += 13;
-						this._clock += 13;
+						dCpuTime += 13;
 						this._pendIt &= ~(0x10); // cursor IT
 						this._z80.interrupt();
 					}
 				}
 			}
+			else {
+				vidRunTime = 800;
+				itOffset = -1;
+			}
+			// run CPU
+			if (vidRunTime > dCpuTime) {
+				dCpuTime += this._z80.step(vidRunTime - 2 * dCpuTime);
+			}
+			else {
+				throw("cpu diff is too big");
+			}
+			cpuTime += dCpuTime;
+			this._clock += dCpuTime;
 
-			dVidTime = this._vid.refreshRow();
-			if (dVidTime == 0) {
+			// draw line
+			if (canDraw) {
+				finishedScreen = this._vid.copyLine();
+				dVidTime = vidRunTime;
+			}
+			else {
 				dVidTime = dCpuTime;
 			}
-			else if (dVidTime < 0) {
-				refrVideo = true;
-				break;
-			}
 			vidTime += dVidTime;
+			// upper cap
+			maxTime -= dCpuTime;
+			// carry over overflow
+			dCpuTime = cpuTime - vidTime;
 
-			cpuAdj = cpuTime - vidTime;
+			if (finishedScreen)
+				break;
 		}
-		this._clockdiff = cpuTime - vidTime;
+		this._clockdiff = dCpuTime;
 
-		if (refrVideo) {
+		if (finishedScreen) {
 			this._fb.refresh();
 		}
 

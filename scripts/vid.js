@@ -32,7 +32,6 @@ define([
 		this.b = 0;
 		this.setColor = function(val) {
 			this.color = val;
-			//this.rgb = ~~(((color&0x04) ? 0xFF0000 : 0) | ((color&0x10) ? 0x00FF00 : 0) | ((color&0x01) ? 0x0000FF : 0));
 			var intens = 0x7F | ((val & 0x40) << 1);
 			this.r = (0x100 - ((val >> 2) & 1)) & intens;
 			this.g = (0x100 - ((val >> 4) & 1)) & intens;
@@ -47,7 +46,6 @@ define([
 		this._palette = [new COLOR(),new COLOR(),new COLOR(),new COLOR()];
 		this._border = 0;
 		this._regIdx = 0;
-		//this._reg = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 
 		this._mode = 0; // 00: 2, 01: 4, 1x: 16 color
 		this._cr = [0x00,0x00,0x00,0x00,0x80,0x80,0x80,0x80,0x80,0x00,0x00,0x00,0xFF,0xFF,0xFF,0xFF];
@@ -56,7 +54,7 @@ define([
 
 
 		this._cpufreq = 3125000;
-		this._cclkt = 2; // ticks per character
+		this._clockCh = 2; // ticks per character
 		this._cclk = this._cpufreq / this._cclt; // character freq
 
 		this._ht = 0; // horizontal total CHAR
@@ -71,8 +69,9 @@ define([
 		this._im = 0; // interlace mode, 0 = progressive
 		this._skec = 0; // cursor skew
 		//this._skede = 0; // de skew (display enable)
-		this.__slr = 0; // scan line per character row
+		this._slr = 0; // scan line per character row
 		this._curaddr = 0; // cursor address
+		this._curmemaddr = 0; // cursor address (translated)
 		this._curenabled = 0;
 		this._saddr = 0; // start address
 
@@ -80,10 +79,12 @@ define([
 		this._row = 0; // char row
 		this.it = false;
 
-		this._addr = 0; // copied on start
-
 		//this._reg = [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ];
 		this._reg = [ 0, 0, 0, 0, 0,  0, 0, 0,  0,  0,  0,  0,  0,  0, 0, 0,  0,  0 ];
+
+		this._nextMem = 0;
+		this._nextPixel = 0;
+		this._nextScanLine = 0;
 	}
 
 	VID.prototype.reconfig = function() {
@@ -103,199 +104,143 @@ define([
 		this._curenabled = (this._reg[10] & 0x60) != 0x20;
 		// this._reg[11] cursor end
 		this._saddr = (this._reg[12] << 8) | this._reg[13];
-		this._curaddr = (this._reg[14] << 10)
+		this._curaddr = ((this._reg[14] & 0x3F) << 8) | this._reg[15];
+		this._curmemaddr = (this._reg[14] << 10)
 			| ((this._reg[15] & 0xC0) << 2)
 			| ((this._reg[10] & 0x03) << 6)
 			| (this._reg[15] & 0x3F);
-		console.log("VID reconf curaddr: " + Utils.toHex16(this._curaddr));
+		console.log("VID reconf curaddr: " + Utils.toHex16(this._curmemaddr));
+		console.log("VID it row: " + (this._curaddr >> 6) + " sl: " + (this._reg[10] & 0x03) + " byte: " + (this._curaddr & 63));
 		// this._reg[16] LPen (H)
 		// this._reg[17] LPen (L)
 	}
 
-	VID.prototype.refreshStart = function() {
+	VID.prototype.initLineCopy = function() {
+		// init
 		if (this.it) throw("VID IT ERROR");
-		this._row = 0;
-		this.it = false;
-		this._addr = this._saddr;
+		this._nextMem = this._saddr;
+		this._nextPixel = 0;
+		this._nextScanLine = 0;
+		return this._hd < this._ht;
 	}
 
-	VID.prototype.getNextDuration = function() {
-		var duration = 0;
-		if (!this._ht || !this._slr || !this._hd) {
+	VID.prototype.getLineDuration = function() {
+		var itOffset = -1;
+		var duration;
+		if ((this._nextMem & 0xFFC0) == (this._curmemaddr & 0xFFC0)) {
+			itOffset = (this._curmemaddr & 0x3F) * this._clockCh;
 		}
-		else if (this._row < this._vd) {
-			duration = this._cclkt * this._ht * this._slr;
-		}
-		else if (this._row < this._vt) {
-			duration = this._cclkt * this._ht * this._slr;
-		}
-		else if (this._row == this._vt) {
-			duration = this._cclkt * this._ht * this._adj;
+		if ((this._vd * this._slr) == (this._nextScanLine - 1)) {
+			duration = this._ht * (this._adj + 1) * this._clockCh;
 		}
 		else {
-			duration = -1;
+			duration = this._ht * this._clockCh;
 		}
-		return duration;
+		return [duration, itOffset];
 	}
-	// runs for a full character row
-	VID.prototype.refreshRow = function() {
-		var duration = 0;
-		if (!this._ht || !this._slr || !this._hd) {
-		}
-		else if (this._row < this._vd) {
+
+	VID.prototype.copyLine = function() {
+		var finishedScreen = false;
+		var vidmem = this._mmu.getVid();
+		var fbd = this._fb.data.data;
+
+		var actMem = this._nextMem;
+		var actPixel = this._nextPixel;
+		var actChar = 0;
+
+		while (actChar < this._hd) {
+			pixelData = vidmem[actMem];
 			if (this._mode == 0) {
-					this.copyRow2(this._row);
+					this.writePixel2(fbd, actPixel, pixelData);
 			}
 			else if (this._mode == 1) {
-					this.copyRow4(this._row);
+					this.writePixel4(fbd, actPixel, pixelData);
 			}
 			else {
-					this.copyRow16(this._row);
+					this.writePixel16(fbd, actPixel, pixelData);
 			}
+			actPixel += 32;
+			actChar++;
+			actMem++;
 		}
-		duration = this.getNextDuration();
-
-		if (duration > 0) {
-			this._row += 1;
+		this._nextMem = actMem;
+		this._nextPixel = actPixel;
+		this._nextScanLine += 1;
+		if ((this._vd * this._slr) == this._nextScanLine) {
+			this._nextScanLine = 0;
+			finishedScreen = true;
 		}
-		return duration;
+		return finishedScreen;
 	}
 
-	VID.prototype.copyRow2 = function(row) {
-		var vidmem = this._mmu.getVid();
-		var fbd = this._fb.data.data;
-		var fbw = ~~this._fb.width;
-		var fbh = ~~this._fb.height;
-		var addr = ~~this._addr;
-		var slStart = this._slr * row;
-		var slInRow = this._slr;
-		var visChars = this._hd;
-		var pixelIdx,pixelData;
+	VID.prototype.writePixel2 = function(fbd, actPixel, pixelData) {
 		var p0;
-		for (var sl = 0; sl < slInRow; sl++) {
-			pixelIdx = 4 * fbw * (slStart + sl);
-			for (var visChar = 0; visChar < visChars; visChar++) {
-				pixelData = vidmem[addr++];
-
-				p0 = this._palette[(pixelData >> 7) & 1];
-				fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
-				p0 = this._palette[(pixelData >> 6) & 1];
-				fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
-				p0 = this._palette[(pixelData >> 5) & 1];
-				fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
-				p0 = this._palette[(pixelData >> 4) & 1];
-				fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
-				p0 = this._palette[(pixelData >> 3) & 1];
-				fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
-				p0 = this._palette[(pixelData >> 2) & 1];
-				fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
-				p0 = this._palette[(pixelData >> 1) & 1];
-				fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
-			}
-		}
-		// todo draw border
-		if (this._curenabled
-			&& this._curaddr <= addr
-			&& this._curaddr >= this._addr) {
-			this.it = true;
-		}
-		this._addr = addr;
+		p0 = this._palette[(pixelData >> 7) & 1];
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
+		p0 = this._palette[(pixelData >> 6) & 1];
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
+		p0 = this._palette[(pixelData >> 5) & 1];
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
+		p0 = this._palette[(pixelData >> 4) & 1];
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
+		p0 = this._palette[(pixelData >> 3) & 1];
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
+		p0 = this._palette[(pixelData >> 2) & 1];
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
+		p0 = this._palette[(pixelData >> 1) & 1];
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
+		p0 = this._palette[pixelData & 1];
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
 	}
 
-	VID.prototype.copyRow4 = function(row) {
-		var vidmem = this._mmu.getVid();
-		var fbd = this._fb.data.data;
-		var fbw = ~~this._fb.width;
-		var fbh = ~~this._fb.height;
-		var addr = ~~this._addr;
-		var slStart = this._slr * row;
-		var slInRow = this._slr;
-		var visChars = this._hd;
-		var pixelIdx,pixelData,pixelData2;
-		var p0,p1,p2,p3;
-		var d0,d1,d2,d3;
-		for (var sl = 0; sl < slInRow; sl++) {
-			pixelIdx = 4 * fbw * (slStart + sl);
-			for (var visChar = 0; visChar < visChars; visChar++) {
-				pixelData = vidmem[addr++];
-
-				pixelData2 = pixelData >>> 4;
-				pixelData <<= 1;
-				d3 = (pixelData & 2) | (pixelData2 & 1);
-				pixelData >>= 1;
-				pixelData2 >>= 1;
-				d2 = (pixelData & 2) | (pixelData2 & 1);
-				pixelData >>= 1;
-				pixelData2 >>= 1;
-				d1 = (pixelData & 2) | (pixelData2 & 1);
-				pixelData >>= 1;
-				pixelData2 >>= 1;
-				d0 = (pixelData & 2) | (pixelData2 & 1);
-				p0 = this._palette[d0];
-				fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
-				fbd[pixelIdx++] = p0.r; fbd[pixelIdx++] = p0.g; fbd[pixelIdx++] = p0.b; fbd[pixelIdx++] = 0xFF;
-				p1 = this._palette[d1];
-				fbd[pixelIdx++] = p1.r; fbd[pixelIdx++] = p1.g; fbd[pixelIdx++] = p1.b; fbd[pixelIdx++] = 0xFF;
-				fbd[pixelIdx++] = p1.r; fbd[pixelIdx++] = p1.g; fbd[pixelIdx++] = p1.b; fbd[pixelIdx++] = 0xFF;
-				p2 = this._palette[d2];
-				fbd[pixelIdx++] = p2.r; fbd[pixelIdx++] = p2.g; fbd[pixelIdx++] = p2.b; fbd[pixelIdx++] = 0xFF;
-				fbd[pixelIdx++] = p2.r; fbd[pixelIdx++] = p2.g; fbd[pixelIdx++] = p2.b; fbd[pixelIdx++] = 0xFF;
-				p3 = this._palette[d3];
-				fbd[pixelIdx++] = p3.r; fbd[pixelIdx++] = p3.g; fbd[pixelIdx++] = p3.b; fbd[pixelIdx++] = 0xFF;
-				fbd[pixelIdx++] = p3.r; fbd[pixelIdx++] = p3.g; fbd[pixelIdx++] = p3.b; fbd[pixelIdx++] = 0xFF;
-			}
-		}
-		if (this._curenabled
-			&& this._curaddr <= addr
-			&& this._curaddr >= this._addr) {
-			this.it = true;
-		}
-		this._addr = addr;
+	VID.prototype.writePixel4 = function(fbd, actPixel, pixelData) {
+		var pixelData2, d3, d2, d1, d0, p0, p1, p2, p3;
+		pixelData2 = pixelData >>> 4;
+		pixelData <<= 1;
+		d3 = (pixelData & 2) | (pixelData2 & 1);
+		pixelData >>= 1;
+		pixelData2 >>= 1;
+		d2 = (pixelData & 2) | (pixelData2 & 1);
+		pixelData >>= 1;
+		pixelData2 >>= 1;
+		d1 = (pixelData & 2) | (pixelData2 & 1);
+		pixelData >>= 1;
+		pixelData2 >>= 1;
+		d0 = (pixelData & 2) | (pixelData2 & 1);
+		p0 = this._palette[d0];
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
+		fbd[actPixel++] = p0.r; fbd[actPixel++] = p0.g; fbd[actPixel++] = p0.b; fbd[actPixel++] = 0xFF;
+		p1 = this._palette[d1];
+		fbd[actPixel++] = p1.r; fbd[actPixel++] = p1.g; fbd[actPixel++] = p1.b; fbd[actPixel++] = 0xFF;
+		fbd[actPixel++] = p1.r; fbd[actPixel++] = p1.g; fbd[actPixel++] = p1.b; fbd[actPixel++] = 0xFF;
+		p2 = this._palette[d2];
+		fbd[actPixel++] = p2.r; fbd[actPixel++] = p2.g; fbd[actPixel++] = p2.b; fbd[actPixel++] = 0xFF;
+		fbd[actPixel++] = p2.r; fbd[actPixel++] = p2.g; fbd[actPixel++] = p2.b; fbd[actPixel++] = 0xFF;
+		p3 = this._palette[d3];
+		fbd[actPixel++] = p3.r; fbd[actPixel++] = p3.g; fbd[actPixel++] = p3.b; fbd[actPixel++] = 0xFF;
+		fbd[actPixel++] = p3.r; fbd[actPixel++] = p3.g; fbd[actPixel++] = p3.b; fbd[actPixel++] = 0xFF;
 	}
 
-	VID.prototype.copyRow16 = function(row) {
-		var vidmem = this._mmu.getVid();
-		var fbd = this._fb.data.data;
-		var fbw = ~~this._fb.width;
-		var fbh = ~~this._fb.height;
-		var addr = ~~this._addr;
-		var slStart = this._slr * row;
-		var slInRow = this._slr;
-		var visChars = this._hd;
-		var pixelIdx,pixelData,pixelData2;
-		var d0,d1,r,g,b,intens;
-		for (var sl = 0; sl < slInRow; sl++) {
-			pixelIdx = 4 * fbw * (slStart + sl);
-			for (var visChar = 0; visChar < visChars; visChar++) {
-				pixelData = vidmem[addr++];
-
-				d0 = pixelData >> 1;
-				intens = 0x7F | ((d0 & 0x40) << 1);
-				r = (0x100 - ((d0 >> 2) & 1)) & intens;
-				g = (0x100 - ((d0 >> 4) & 1)) & intens;
-				b = (0x100 - (d0 & 1)) & intens;
-				//val = ((pixelData&0x80) ? 1 : 0.5) * ( (pixelData&0x08) ? 0xFF0000 : 0 | (pixelData&0x20) ? 0x00FF00 : 0 | (pixelData&0x02) ? 0x0000FF : 0);
-				fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
-				fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
-				fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
-				fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
-				d1 = pixelData;
-				intens = 0x7F | ((d1 & 0x40) << 1);
-				r = (0x100 - ((d1 >> 2) & 1)) & intens;
-				g = (0x100 - ((d1 >> 4) & 1)) & intens;
-				b = (0x100 - (d1 & 1)) & intens;
-				fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
-				fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
-				fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
-				fbd[pixelIdx++] = r; fbd[pixelIdx++] = g; fbd[pixelIdx++] = b; fbd[pixelIdx++] = 255;
-			}
-		}
-		if (this._curenabled
-			&& this._curaddr <= addr
-			&& this._curaddr >= this._addr) {
-			this.it = true;
-		}
-		this._addr = addr;
+	VID.prototype.writePixel16 = function(fbd, actPixel, pixelData) {
+		var d0, d1, intens, r, g, b;
+		d0 = pixelData >> 1;
+		intens = 0x7F | ((d0 & 0x40) << 1);
+		r = (0x100 - ((d0 >> 2) & 1)) & intens;
+		g = (0x100 - ((d0 >> 4) & 1)) & intens;
+		b = (0x100 - (d0 & 1)) & intens;
+		fbd[actPixel++] = r; fbd[actPixel++] = g; fbd[actPixel++] = b; fbd[actPixel++] = 255;
+		fbd[actPixel++] = r; fbd[actPixel++] = g; fbd[actPixel++] = b; fbd[actPixel++] = 255;
+		fbd[actPixel++] = r; fbd[actPixel++] = g; fbd[actPixel++] = b; fbd[actPixel++] = 255;
+		fbd[actPixel++] = r; fbd[actPixel++] = g; fbd[actPixel++] = b; fbd[actPixel++] = 255;
+		d1 = pixelData;
+		intens = 0x7F | ((d1 & 0x40) << 1);
+		r = (0x100 - ((d1 >> 2) & 1)) & intens;
+		g = (0x100 - ((d1 >> 4) & 1)) & intens;
+		b = (0x100 - (d1 & 1)) & intens;
+		fbd[actPixel++] = r; fbd[actPixel++] = g; fbd[actPixel++] = b; fbd[actPixel++] = 255;
+		fbd[actPixel++] = r; fbd[actPixel++] = g; fbd[actPixel++] = b; fbd[actPixel++] = 255;
+		fbd[actPixel++] = r; fbd[actPixel++] = g; fbd[actPixel++] = b; fbd[actPixel++] = 255;
+		fbd[actPixel++] = r; fbd[actPixel++] = g; fbd[actPixel++] = b; fbd[actPixel++] = 255;
 	}
 
 	VID.prototype.setPalette = function(idx, color) {
@@ -311,9 +256,9 @@ define([
 	};
 
 	VID.prototype.setReg = function(val) {
+		console.log("VID setReg: " + this._regIdx + " " + Utils.toHex8(val));
 		this._reg[this._regIdx] = val;
 		this.reconfig();
-		console.log("VID setReg: " + this._regIdx + " " + val);
 	};
 
 	VID.prototype.getReg = function() {

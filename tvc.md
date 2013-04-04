@@ -1,4 +1,30 @@
-# MEMORY
+# TVC modellek
+
+Videoton TV Computer
+
+	CPU: Z80A 3.125MHz
+	Video: Motorola 6845
+
+
+
+# Memória
+
+RAM
+
+	- 16kB-os lapok: U0, U1, U2^, U3^
+
+ROM
+
+	- SYS: 16kB, basic, editor
+	- EXT: 8kB, kiegészítő rom
+	
+VID
+
+	VID
+
+^: 64k, 64k+
+
+
     memory mapping: 4*16k pages: 0,1,2,3
     ram pages: U0, U1, U2, U3
     SYS: system (editor + basic)
@@ -17,6 +43,99 @@
     b4-b3: 0: 00 SYS, 01 CART, 10 U0
     b2   : 1: 1 U1
     b1-b0: --
+
+
+# CRTC
+
+Motorola 6845
+
+	Karakter frequencia: 3.125MHz/2 = 1.5625 MHz = 640ns per karakter
+
+Regiszterek:
+
+	Rövidítések: w: írható, r: olvasható, k: karakter, ts: tv sorok, x-1: érték -1-et kell írni bele
+
+	R0 w,k,x-1 karakter ütemek egy tv-soron belül (sor előrefutás+vissza)
+		TVC: 99 => 100 karakterütem == 64us == PAL sorido
+ 
+	R1 w,k sorelőrefutás karaktereinek száma (láthato karakterek), nem lehet kisebb  R0-nál
+		TVC: 64 => 64 byte per sor
+
+	R2 w,k,x-1 	szinkronjel kezdete a sorelőfutás kezdetétől mérve, nem lehet kisebb  R0-nal
+		TVC: 75 => 76
+	
+	R3 w,vvvvhhhh v/h szinkronjelek szélessége; v: tv sorütemben, 0 => 16 sor; h: karakterekben, 0 => tilos
+		TVC: h:2, v:3
+
+	R4 w,-6543210,k,x-1 képelőrefutás + képvisszafutás karaktersorainak összege
+		TVC: 77 => 78 ( (77 + 1) * 4) + 2 = 314 tv sor
+
+	R5 w,---43210,ts kiegészitő regiszter R4-hez; tv sorok száma: (R4 + 1) * R9 + R5
+		TVC: 2
+	
+	R6 w,-6543210,k hasznos kép (sorelőrefutás) karaktersorainak száma, kisebbnek kell lennie mint R4
+		TVC: 60 => 60 * 4 = 240
+            
+	R7 w,-6543210,k,x-1 v-sync kezdete - kép vége a sorelőrefutás kezdetétől
+		TVC: 66 => 67
+		
+	R8 w,uucdtrii uu: frissítés mód, c: kurzor késleltetés, d: display enable késleltetés, t: ram elérési mód, r: ram címzési mód, i: interlace mód
+		TVC: 0, nem váltott soros, nincs késleltetés, megosztott ram elérés, folyamatos címzés
+
+	R9 w,---43210,ts,x-y tv sorok száma per karakter sor; progresszív x-1,  interlace1: x-1, interlace2: x-2
+		TVC: 3 => 4 sor
+
+	R10 w,-BP43210 BP: 00 nem villogó,01 nincs kurzor,10 16 villogás,11 32 villogás; bit 4-0: kurzor tetejének tv-sor pozíciója a karaktersoron belül
+		TVC: 3 => nem villogo, 3. tv sor
+
+	R11 w,---43210,ts kurzor utolsó sora
+		TVC: 3
+
+	R12 rw,--543210 kép kezdete a memóriában H
+		TVC: 0
+
+	R13 rw,76543210 kép kezdete a memóriában L
+		TVC: 0
+
+	R14 rw,--543210 kurzor pozíció H
+		TVC: 14
+
+	R15 rw,76543210 kurzor pozíció L
+		TVC: 255
+
+	R16, R17 r fényceruza
+
+Működés
+
+	- R12,R13-t frissítés kezdetekor olvassa ki.
+	- A 6845 karakteres meghajtásra van optimalizálva.
+	- R3 nem igazán használt
+		- hsync: 25.26us
+		- vsync: R7 a kezdete és MA9 1-be billenése a vége
+	- 3 számláló
+		- oszlop: 0-tól R0-ig számol
+		- sor: 0-tól R4-ig számol
+		- tv sor: 0-tól R9-ig számol
+		- az utolsó karakter sor után még R5 tv sort számol
+	- Címzés: kezdőérték soronként: (sor * R1) , utolsó érték: (sor * R1) + R0 - 1
+	- A 14 bites címregiszter karaktereket címez meg. Ez nem elég a 16kB-os videó memória megcízésére, így a tv sor számlálót használja a TVC kiegészésként: MMMMMMMMRRMMMMMM
+	- Ez magyarázza a 0x0EFF kurzor pizíciót. Akkor magas a kurzor kimenet, amikor a cím megegyezik R14,R15-el és a tv sor számláló R10 és R11 közé esik. R10 és R11 = 3, ezt beillesztve 0xEFF-be, 0x3BFF-et kapunk, ami az utolsó memória pozíció a látható képen.
+	- A kurzor magas jele megszakítást generál a CPU felé, ha a kurzor engedélyezve van.
+	- HSYNC kezdete R7 (67), a vége viszont MA9 
+	- Címzésenként egy bájtot olvas ki, amit egy shift regiszteren keresztül alakít át videó módtól függően:
+		- 2: 0|1|2|3|4|5|6|7
+		- 4: 0L|1L|2L|3L|0H|1H|2H|3H
+		- 16: 0I|1I|0G|1G|0R|1R|0B|1B
+
+	
+# Megszakítások
+
+Kurzor
+
+	A CRTC kurzor jele váltja ki. Alap állapotban másodpercenként 50-szer, amikor a CRTC az utolsó sor utolsó pixeleit rajzolja ki.
+
+Hang
+
 
 # VIDEO
     Resources:
@@ -62,7 +181,7 @@
                 305 visible lines in the first field
                 first visible line ~28, with ~266 visible lines
             impl:
-                312.5 lines => 312.5 * 64us = 20ms = 25fps
+                312.5 lines => 312.5 * 64us = 20ms = 50fps
                 bg color by default
                 64us per line / 320ns per cpu tick = 200 cpu ticks per line
                 drawn line: 640ns*64 = 40.96us = 128 cpu ticks
@@ -141,12 +260,12 @@
             R12: --543210   address high
             R13: 76543210   address low
             (a minuszok nullak olvasaskor)
-            default: 3,0 => 0x300
+            default: 0,0
         R14,R15 rw
             cursor karakter pozicio
             R41: --543210   pozicio high
             R15: 76543210   pozicio low
-            default: 0,14
+            default: 14,255 = 0x0EFF = 59 rastersor utolso karaktere
         R16, R17 r
             fenyceruza
             

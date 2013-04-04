@@ -20,7 +20,7 @@ module.exports = function(grunt) {
 		var cl = fs.readdirSync("data");
 		var cl2 = [];
 		for (var i in cl) {
-			if (cl[i].indexOf("cas") != -1)
+			if (/.*cas$/i.test(cl[i]))
 				cl2.push(cl[i]);
 		}
 		cl2.sort();
