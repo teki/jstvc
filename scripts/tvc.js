@@ -170,14 +170,6 @@ define([
 		switch(addr) {
 		case 0x00:
 			this._vid.setBorder(val);
-			val = val >> 1;
-			if (val & 0x40) {
-				val = ~~(((val&0x04) ? 0xFF0000 : 0) | ((val&0x10) ? 0x00FF00 : 0) | ((val&0x01) ? 0x0000FF : 0));
-			}
-			else {
-				val = ~~(((val&0x04) ? 0x7F0000 : 0) | ((val&0x10) ? 0x007F00 : 0) | ((val&0x01) ? 0x00007F : 0));
-			}
-			this._callback({id: "bg", val: val});
 			break;
 
 		case 0x02:

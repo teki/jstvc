@@ -107,7 +107,7 @@ Regiszterek:
 
 Működés
 
-	- R12,R13-t frissítés kezdetekor olvassa ki.
+	- R12,R13-t címregisztereket a frissítés kezdetekor olvassa ki.
 	- A 6845 karakteres meghajtásra van optimalizálva.
 	- R3 nem igazán használt
 		- hsync: 25.26us
@@ -272,7 +272,7 @@ Hang
 # PORTS
     -: not used
     +: other functions
-    00H     7-5-3-1-    W       Border color
+    00H     7-5-3-1-    W       Border color (IGRB)
     01H     76543210    W       Printer data
     02H     76543---    W       Memory mapping
     03H     ++--3210    W       Keyboard (row)
@@ -340,3 +340,12 @@ Hang
 
 # RESOURCES
 	* how to write emulators: http://atarihq.com/danb/emulation.shtml
+	
+	
+	
+	http://nocash.emubase.de/zxdocs.htm
+	http://www.cpcwiki.eu/imgs/c/c0/Hd6845.hitachi.pdf
+	http://www.retroleum.co.uk/electronics-articles/pal-tv-timing-and-voltages/
+	http://primrosebank.net/computers/mtx/documents/MC6845P.pdf
+	https://github.com/bfirsh/dynamicaudio.js
+	
