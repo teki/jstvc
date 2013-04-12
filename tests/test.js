@@ -4,8 +4,8 @@ requirejs.config({
     nodeRequire: require
 });
 
-requirejs(["scripts/z80.js", "scripts/utils.js"], function(Z80Module, Utils) {
-
+requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js"], function(Z80Module, Utils, VIDModule) {
+/*
 	var F_S = 0x80; // sign
 	var F_Z = 0x40; // zero
 	var F_5 = 0x20; // ???
@@ -14,6 +14,9 @@ requirejs(["scripts/z80.js", "scripts/utils.js"], function(Z80Module, Utils) {
 	var F_PV = 0x04; // parity or overflow
 	var F_N = 0x02; // add/subtract
 	var F_C = 0x01; // carry
+*/
+
+/* FakeMMU ######################################### */
 
 	function FakeMMU(logIntoThis) {
 		this._mem = new Uint8Array(0x10000);
@@ -25,6 +28,10 @@ requirejs(["scripts/z80.js", "scripts/utils.js"], function(Z80Module, Utils) {
 				this._mem[i] = 0;
 			}
 		};
+
+		this.getVid = function() {
+			return this._mem;
+		}
 
 		this.dasm = function (addr, lines, prefix, noLdir) {
 			var offset = 0,
@@ -94,6 +101,8 @@ requirejs(["scripts/z80.js", "scripts/utils.js"], function(Z80Module, Utils) {
 			return val;
 		}
 	};
+
+/* CPU ######################################### */
 
 	function testCpuManual() {
 		console.log("TEST START my manual");
@@ -334,6 +343,33 @@ requirejs(["scripts/z80.js", "scripts/utils.js"], function(Z80Module, Utils) {
 		}
 	};
 
+/* VID ######################################### */
+
+	function testVid() {
+		var mmu = new FakeMMU(false),
+			fb = {buf32: [], width: 608, height: 288},
+			vid = new VIDModule.VID(mmu, fb),
+			regs = [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ],
+			l=0,
+			i;
+
+		for (i = regs.length - 1; i >= 0; i--) {
+			vid.setRegIdx(i);
+			vid.setReg(regs[i]);
+			var timing = vid.streamLine();
+			console.log(l++,timing,vid._streamt,vid._streamh);
+		}
+
+		for (i = 0; i < 3*320; i++) {
+			var timing = vid.streamLine();
+			console.log(l++,timing,vid._streamt,vid._streamh);
+			var haveAFrame = vid.renderStream();
+			if (haveAFrame) console.log("haveAFrame");
+		}
+	}
+
+/* exec ######################################### */
+
 	var tests = {
 	"cpu_doc": function() {
 		if (process.argv.length < 5) throw("ERROR: cpu do_disasm skip_cnt");
@@ -348,6 +384,9 @@ requirejs(["scripts/z80.js", "scripts/utils.js"], function(Z80Module, Utils) {
 		},
 	"cpu_fuse": function() {
 		testCpuFuse();
+		},
+	"vid": function() {
+		testVid();
 		},
 	};
 

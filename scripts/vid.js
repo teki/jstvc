@@ -7,24 +7,6 @@ define([
 	////////////////////////////////////////////
 	// VID
 	////////////////////////////////////////////
-	function testVid() {
-		var mmu = new MMU.MMU(),
-			vid = new VID(mmu, undefined),
-			regs = [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ],
-			screentime = 4 * (1/50) / (1/3125000),
-			i;
-
-		for (i = 0; i < regs.length; i++) {
-			vid.setRegIdx(i);
-			vid.setReg(regs[i]);
-		}
-
-		while (screentime > 0) {
-			vid.step(4); // nop
-			screentime -= 4;
-		}
-	}
-
 	// xIxGxRxB
 	function toRGBA(val) {
 		var intens = 0x7F | ((val & 0x40) << 1);
@@ -84,136 +66,79 @@ define([
 
 		// counters
 		this._row = 0; // char row
-		this.it = false;
 
 		//this._reg = [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ];
 		this._reg = [ 0, 0, 0, 0, 0,  0, 0, 0,  0,  0,  0,  0,  0,  0, 0, 0,  0,  0 ];
 
-		this._nextMem = 0;
-		this._nextPixel = 0;
-		this._nextScanLine = 0;
+		this._memStart = 0;
+		this._nextRasterLine = 0; // line in a row
+		this._vsyncLineCnt = -1;
+		this._nextRow = -1;
+		this._stream = new Int16Array(608*288*2*2);
+		this._streamh = 0; // head
+		this._streamt = 0; // tail
+
+		this._renderPhase = 0;
+		this._renderPhaseNext = 0;
+		this._renderHCnt = 0;
+		this._renderVCnt = 0;
+		this._renderY = 0;
+		this._renderA = 0;
+	}
+
+	// ma: memory address, rl: raster line
+	// address: MMMMMMMMRRMMMMMM
+	function genAddress(ma, rl) {
+		return ((rl & 0x03) << 6)
+			| (ma & 0x3F)
+			| ((ma & 0x3FC0) << 2);
 	}
 
 	VID.prototype.reconfig = function() {
-		this._ht = this._reg[0] + 1;
+		this._ht = this._reg[0];
 		this._hd = this._reg[1];
 		this._hsp = this._reg[2];
 		this._hsw = this._reg[3] & 0x0F;
 		this._vsw = (this._reg[3] >>> 4) & 0x0F;
-		this._vt = (this._reg[4] & 0x7F) + 1;
+		this._vt = (this._reg[4] & 0x7F);
 		this._adj = this._reg[5] & 0x1F;
 		this._vd = this._reg[6] & 0x7F;
 		this._vsp = this._reg[7] & 0x7F;
 		this._im = this._reg[8] & 0x03;
 		this._skede = (this._reg[8] >> 4) & 0x03;
 		this._skec = (this._reg[8] >> 6) & 0x03; 
-		this._slr = (this._reg[9] & 0x1F) + 1;
+		this._slr = (this._reg[9] & 0x1F);
 		this._curenabled = (this._reg[10] & 0x60) != 0x20;
-		// this._reg[11] cursor end
+		this._curstart = this._reg[10] & 0x1F;
+		this._curend = this._reg[11] & 0x1F;
 		this._saddr = (this._reg[12] << 8) | this._reg[13];
 		this._curaddr = ((this._reg[14] & 0x3F) << 8) | this._reg[15];
-		this._curmemaddr = (this._reg[14] << 10)
-			| ((this._reg[15] & 0xC0) << 2)
-			| ((this._reg[10] & 0x03) << 6)
-			| (this._reg[15] & 0x3F);
-		console.log("VID reconf curaddr: " + Utils.toHex16(this._curmemaddr));
+		this._curmemaddr = genAddress(this._curaddr, this._curstart);
+		console.log("VID reconf curaddr: m/a " + Utils.toHex16(this._curaddr) + " " + Utils.toHex16(this._curmemaddr));
 		console.log("VID it row: " + (this._curaddr >> 6) + " sl: " + (this._reg[10] & 0x03) + " byte: " + (this._curaddr & 63));
 		// this._reg[16] LPen (H)
 		// this._reg[17] LPen (L)
 	}
 
-	VID.prototype.initLineCopy = function() {
-		// init
-		if (this.it) throw("VID IT ERROR");
-		this._nextMem = this._saddr;
-		this._nextPixel = 0;
-		this._nextScanLine = 0;
-		return this._hd < this._ht;
-	}
-
-	VID.prototype.getLineDuration = function() {
-		var itOffset = -1;
-		var duration;
-		if ((this._nextMem & 0xFFC0) == (this._curmemaddr & 0xFFC0)) {
-			itOffset = (this._curmemaddr & 0x3F) * this._clockCh;
-		}
-		if ((this._vd * this._slr) == (this._nextScanLine - 1)) {
-			duration = this._ht * (this._adj + 1) * this._clockCh;
-		}
-		else {
-			duration = this._ht * this._clockCh;
-		}
-		return [duration, itOffset];
-	}
-
-	VID.prototype.copyLine = function() {
-		var finishedScreen = false;
-		var vidmem = this._mmu.getVid();
-		var fbd = this._fb.buf32;
-
-		var actMem = this._nextMem;
-		var actPixel = this._nextPixel;
-		var actScanLine = this._nextScanLine;
-		var actChar = 0;
-		var i,j;
-
-		if (actScanLine == 0) {
-			for(i = 0; i < (6*this._slr); i++) {
-				for(j = 0; j < this._hd + 12; j++) {
-					this.writePixel16(fbd, actPixel, this._border2);
-					actPixel += 8;
-				}
-			}
-		}
-
-		for(i = 0; i < 6; i++) {
-			this.writePixel16(fbd, actPixel, this._border2);
-			actPixel += 8;
-		}
-		while (actChar < this._hd) {
-			pixelData = vidmem[actMem];
-			this.writePixel(fbd, actPixel, pixelData);
-			actPixel += 8;
-			actChar++;
-			actMem++;
-		}
-		for(i = 0; i < 6; i++) {
-			this.writePixel16(fbd, actPixel, this._border2);
-			actPixel += 8;
-		}
-		actScanLine += 1;
-
-		this._nextMem = actMem;
-		this._nextPixel = actPixel;
-		this._nextScanLine = actScanLine;
-		if ((this._vd * this._slr) == this._nextScanLine) {
-
-			for(i = 0; i < (6*this._slr); i++) {
-				for(j = 0; j < this._hd + 12; j++) {
-					this.writePixel16(fbd, actPixel, this._border2);
-					actPixel += 8;
-				}
-			}
-
-			this._nextScanLine = 0;
-			finishedScreen = true;
-		}
-		return finishedScreen;
-	}
-
 	VID.prototype.writePixel = function(fbd, actPixel, pixelData) {
-			if (this._mode == 0) {
-					this.writePixel2(fbd, actPixel, pixelData);
-			}
-			else if (this._mode == 1) {
-					this.writePixel4(fbd, actPixel, pixelData);
-			}
-			else {
-					this.writePixel16(fbd, actPixel, pixelData);
-			}
+		switch((pixelData >> 8) & 3) {
+			case 0:
+				this.writePixel2(fbd, actPixel, pixelData & 0xFF);
+				break;
+			case 1:
+				this.writePixel4(fbd, actPixel, pixelData & 0xFF);
+				break;
+			default:
+				this.writePixel16(fbd, actPixel, pixelData & 0xFF);
+				break;
+		}
 	}
 
+	var prevAddr = -1;
 	VID.prototype.writePixel2 = function(fbd, actPixel, pixelData) {
+		if (isNaN(actPixel)) throw("err");
+		//console.log("addr diff: ", actPixel - prevAddr);
+		prevAddr = actPixel;
 		var p0;
 		p0 = this._palette[(pixelData >> 7) & 1];
 		fbd[actPixel++] = p0.rgba;
@@ -275,6 +200,228 @@ define([
 		fbd[actPixel++] = rgba;
 	}
 
+/* ------------- streaming version ------------ */
+	var HSYNC = 0x0400;
+	var VSYNC = 0x0800;
+
+	// returns duration or -1 of frame completion
+	VID.prototype.streamLine = function() {
+		// init
+		if (this._nextRow == -1) {
+			if (this._hd >= this._ht)
+				return [false, -1, -1];
+			this._memStart = this._saddr;
+			this._nextRow = 0;
+			this._nextRasterLine = 0;
+			this._vsyncLineCnt = -1;
+		}
+
+		var vidmem = this._mmu.getVid();
+		var actRow = this._nextRow;
+		var actRasterLine = this._nextRasterLine;
+		var actMem = this._memStart + actRow * this._hd;
+		var actAddr = genAddress(actMem, actRasterLine);
+		var actChar = 0;
+		var hsync = 0;
+		var vsync = 0;
+		var skipRasterLineCheck = false;
+		var endScreen = false;
+		var itOffset = -1;
+		var pixelData;
+		var mode = this._mode << 8;
+		var mode16 = 2 << 8;
+		var checkIt = (actRasterLine == this._curstart);
+
+		// active row
+		if (actRow < this._vd) {
+			// draw paper
+			while (actChar < this._hd) {
+				if (checkIt && (actMem == this._curaddr)) {
+					itOffset = (actMem - (this._memStart + actRow * this._hd)) * this._clockCh;
+				}
+				pixelData = vidmem[actAddr];
+				this.streamData(mode|pixelData);
+				actChar++;
+				actAddr++;
+				actMem++;
+			}
+			// draw border
+			while (actChar <= this._ht) {
+				hsync = ((actChar > this._hsp) && (actChar < (this._hsp + this._hsw))) ? HSYNC : 0;
+				this.streamData(hsync|mode16|this._border2);
+				actChar++;
+			}
+		}
+		// bottom broder / vsync / top border 
+		else if (actRow <= this._vt) {
+			// vsync
+			if (this._vsyncLineCnt > 0) {
+				if (this._vsyncLineCnt < this._vsw) {
+					vsync = VSYNC;
+					this._vsyncLineCnt++;
+				}
+			}
+			else if (actRow > this._vsp) {
+				vsync = VSYNC;
+				this._vsyncLineCnt = 1;
+			}
+			// draw border
+			while (actChar <= this._ht) {
+				hsync = ((actChar > this._hsp) && (actChar < (this._hsp + this._hsw))) ? HSYNC : 0;
+				this.streamData(vsync|hsync|mode16|this._border2);
+				actChar++;
+			}
+		}
+		// adj lines
+		else if ((this._adj > 0) && (this._adj > actRasterLine)) {
+			skipRasterLineCheck = true;
+			// draw border
+			while (actChar <= this._ht) {
+				hsync = ((actChar > this._hsp) && (actChar < (this._hsp + this._hsw))) ? HSYNC : 0;
+				this.streamData(vsync|hsync|mode16|this._border2);
+				actChar++;
+			}
+		}
+		// end of screen
+		else {
+			endScreen = true;
+			this._nextRow = -1
+		}
+
+		if (!endScreen) {
+			// next line
+			actRasterLine++;
+			if (!skipRasterLineCheck && (actRasterLine > this._slr)) {
+				actRasterLine = 0;
+				actRow++;
+			}
+
+			// write back
+			this._nextRow = actRow;
+			this._nextRasterLine = actRasterLine;
+		}
+
+		return [true,  (this._ht + 1) * this._clockCh, itOffset];
+	}
+
+	VID.prototype.streamData = function(data) {
+		this._stream[this._streamh] = data;
+		this._streamh++;
+		if (this._streamh == this._streamt)
+			throw("streamData overflow");
+		if (this._streamh == this._stream.length)
+			this._streamh = 0;
+	}
+
+	VID.prototype.readData = function() {
+		var res;
+		if (this._streamh == this._streamt) {
+			res = -1;
+		}
+		else {
+			res = this._stream[this._streamt];
+			this._streamt++;
+			if (this._streamt == this._stream.length)
+				this._streamt = 0;
+		}
+		return res;
+	}
+
+	// renders a stream into a video frame
+	// render starts 26 scanlines after vsync on, lasts for 288 scanlines
+	// line is rendered 16 chars after hsync and renders 76 chars (or hsync)
+	VID.prototype.renderStream = function() {
+		var haveAFrame = false;
+		var fbd = this._fb.buf32;
+		var data;
+		while (!haveAFrame && ((data = this.readData()) != -1)) {
+			switch(this._renderPhase) {
+			// tools
+				case 100: // wait for end of hsync
+					if (data & HSYNC) {
+						this._renderHCnt++;
+					}
+					else {
+						this._renderPhase = this._renderPhaseNext;
+						//console.log("100 => ",this._renderPhaseNext);
+					}
+					break;
+			// wait for vsync
+				case 0:
+					if (data & VSYNC) {
+						// transition
+						this._renderPhase = 1;
+						this._renderVCnt = 0;
+						//console.log("0 => 1");
+					}
+					break;
+			// skip 26 lines
+				case 1: // count lines
+					if (data & HSYNC) {
+						this._renderVCnt++;
+						//console.log("renderVCnt",this._renderVCnt);
+						if (this._renderVCnt == 26) {
+							// transition
+							this._renderPhase = 100;
+							this._renderPhaseNext = 2;
+							this._renderHCnt = 1; // we have the first one already
+							this._renderY = 0;
+							this._renderA = 0;
+							//console.log("1 => 100");
+						}
+						else {
+							this._renderPhase = 100;
+							this._renderPhaseNext = 1;
+							//console.log("1 => 100");
+						}
+					}
+					break;
+
+			// draw 288 lines
+				case 2: // h skip
+					this._renderHCnt++;
+					//console.log("renderHCnt",this._renderHCnt);
+					if (this._renderHCnt == 16) {
+						this._renderPhase = 3;
+						this._renderHCnt = 0;
+						//console.log("2 => 3");
+					}
+					break;
+				case 3: // draw 76
+					this._renderHCnt++;
+					//console.log("renderHCnt",this._renderHCnt," wp");
+					this.writePixel(fbd, this._renderA, data);
+					this._renderA += 8;
+					if (this._renderHCnt == 76) {
+						this._renderY++;
+						//console.log("renderY",this._renderY);
+						this._renderA = this._fb.width * this._renderY;
+						if (this._renderY == 288) {
+							// finished, next frame
+							this._renderPhase = 0;
+							haveAFrame = true;
+							//console.log("3 => 0");
+						}
+						else {
+							this._renderPhase = 4;
+						}
+					}
+					break;
+				case 4: // wiat for hsync
+					if (data & HSYNC) {
+							this._renderPhase = 100;
+							this._renderPhaseNext = 2;
+							this._renderHCnt = 1; // we have the first one already
+							//console.log("4 => 100");
+					}
+					break;
+			}
+		}
+		return haveAFrame;
+	}
+
+/* ------------- streaming version ------------ */
+
 	VID.prototype.setPalette = function(idx, color) {
 		this._palette[idx].setColor(color);
 	};
@@ -312,6 +459,5 @@ define([
 	};
 
 	exports.VID = VID;
-	exports.testVid = testVid;
 	return exports;
 });
