@@ -85,149 +85,25 @@ define([
 	}
 
 	TVC.prototype.runForAFrame = function() {
-		//var timestart = performance.now();
-		var maxTime = 2* this._clockperframe;
-		var dCpuTime = this._clockdiff; // CPU run this more last time than VID
-		var dVidTime = 0;
-		var cpuTime = 0; // how long did they run for
-		var vidTime = 0;
-		var finishedScreen = false;
-		var vidRunTime;
-		var drawTiming;
-		var itOffset;
-		var canDraw;
+		var maxTime = 2 * this._clockperframe;
+		var cpuTime = 0;
+		var drawInfo = [false,false];
 		while (maxTime > 0) {
-			drawTiming = this._vid.streamLine();
-			canDraw = drawTiming[0];
-			if (canDraw) {
-				// 200
-				vidRunTime = drawTiming[1];
-				// < 128
-				itOffset = drawTiming[2];
-				// handle IT
-				if (itOffset >= 0) {
-					// run till IT point
-					if (itOffset > dCpuTime) {
-						dCpuTime += this._z80.step(itOffset - dCpuTime);
-					}
-					// jump if IT enabled
-					if (!this._z80.noInterrupts()) {
-						dCpuTime += 13;
-						this._pendIt &= ~(0x10); // cursor IT
-						this._z80.interrupt();
-					}
+			cpuTime = this._z80.step(0);
+			this._clock += cpuTime;
+			maxTime -= cpuTime;
+			drawInfo = this._vid.streamSome(cpuTime);
+			if (drawInfo[0]) { // crtc is not yet initialized
+				if (drawInfo[1] && this._z80.irqEnabled()) { // it
+					var irqDuration = this._z80.irq();
+					this._pendIt &= ~(0x10); // cursor IT
+					this._vid.streamSome(irqDuration);
+				}
+				if (this._vid.renderStream()) {
+					this._fb.refresh();
+					break;
 				}
 			}
-			else {
-				vidRunTime = 800;
-				itOffset = -1;
-			}
-			// run CPU
-			if (vidRunTime > dCpuTime) {
-				dCpuTime += this._z80.step(vidRunTime - 2 * dCpuTime);
-			}
-			else {
-				throw("cpu diff is too big");
-			}
-			cpuTime += dCpuTime;
-			this._clock += dCpuTime;
-
-			// draw line
-			if (canDraw) {
-				finishedScreen = this._vid.renderStream();
-				dVidTime = vidRunTime;
-			}
-			else {
-				dVidTime = dCpuTime;
-			}
-			vidTime += dVidTime;
-			// upper cap
-			maxTime -= dCpuTime;
-			// carry over overflow
-			dCpuTime = cpuTime - vidTime;
-
-			if (finishedScreen)
-				break;
-		}
-		this._clockdiff = dCpuTime;
-
-		if (finishedScreen) {
-			this._fb.refresh();
-		}
-
-		//console.log("FRAMET: " + (performance.now() - timestart));
-
-		return false;
-	};
-
-	TVC.prototype.runForAFrame2 = function() {
-		//var timestart = performance.now();
-		var maxTime = 2* this._clockperframe;
-		var canDraw = this._vid.initLineCopy();
-		var dCpuTime = this._clockdiff; // CPU run this more last time than VID
-		var dVidTime = 0;
-		var cpuTime = 0; // how long did they run for
-		var vidTime = 0;
-		var vidRunTime;
-		var drawTiming;
-		var itOffset;
-		var finishedScreen = false;
-		while (maxTime > 0) {
-			if (canDraw) {
-				drawTiming = this._vid.getLineDuration();
-				// 200
-				vidRunTime = drawTiming[0];
-				// < 128
-				itOffset = drawTiming[1];
-				// handle IT
-				if (itOffset >= 0) {
-					// run till IT point
-					if (itOffset > dCpuTime) {
-						dCpuTime += this._z80.step(itOffset - dCpuTime);
-					}
-					// jump if IT enabled
-					if (!this._z80.noInterrupts()) {
-						dCpuTime += 13;
-						this._pendIt &= ~(0x10); // cursor IT
-						this._z80.interrupt();
-					}
-				}
-			}
-			else {
-				vidRunTime = 800;
-				itOffset = -1;
-			}
-			// run CPU
-			if (vidRunTime > dCpuTime) {
-				dCpuTime += this._z80.step(vidRunTime - 2 * dCpuTime);
-			}
-			else {
-				throw("cpu diff is too big");
-			}
-			cpuTime += dCpuTime;
-			this._clock += dCpuTime;
-
-			// draw line
-			if (canDraw) {
-				finishedScreen = this._vid.copyLine();
-				dVidTime = vidRunTime;
-			}
-			else {
-				dVidTime = dCpuTime;
-			}
-			vidTime += dVidTime;
-			// upper cap
-			maxTime -= dCpuTime;
-			// carry over overflow
-			dCpuTime = cpuTime - vidTime;
-
-			if (finishedScreen)
-				break;
-		}
-		this._clockdiff = dCpuTime;
-
-		if (finishedScreen) {
-			this._fb.refresh();
 		}
 
 		//console.log("FRAMET: " + (performance.now() - timestart));

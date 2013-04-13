@@ -1,54 +1,59 @@
 # jstvc
 
-Javascript VIDEOTON TV Computer emulator.
+Javascript VIDEOTON TV Computer emulátor.
 
 Demo: http://teki.github.com/jstvc
+
+(Google Chrome ajánlott)
 
 # TVC
 
 About the TVC: http://tvc.hu/html/inenglish.html
 
-TVC rajongoi oldal: http://www.tvc.hu/
+TVC rajongói oldal: http://www.tvc.hu
 
-# Verzio tortenet
+# Verzió történet
+
+v0.0.5
+
+ * új CRTC implementáció, még nem 100%-os, de közelít
+ * stop gomb, emuláció szüneteltetéséhez
 
 v0.0.4
 
- * Safari fix (mukodik, de lassu)
- * status sor, ertesitesek helyett
+ * Safari fix (működik, de lassú)
+ * status sor, értesítések helyett
 
 v0.0.3
 
- * verzio szam a weblapon
- * verzio frissites automatizalas
- * billentyuzet esemenyek elkapasa
+ * verzió szám a weblapon
+ * verzió frissítés automatizálás
+ * billentyűzet események elkapása
 
 v0.0.2
 
- * frissites fix (60fps-el fut nekem Chrome-ban, limitalni kell 50-re)
- * ertesites esemenyekrol (bug: a hatterben jelennek meg)
+ * frissítés fix (60fps-el fut nekem Chrome-ban, limitálni kell 50-re)
+ * értesítés eseményekről (bug: a háttérben jelennek meg)
  * cas toltes egyszerusitese
 
 v0.0.1
 
 * Z80
-* US billentyuzet
-* megszakitas
-* video memoria canvas-ra rajzolasa
-* Chrome-ban gyorsabban fut mint Firefox-ban (mas alatt nem probaltam)
+* US billentyűzet
+* megszakítás
+* video memória canvas-ra rajzolása
+* Chrome-ban gyorsabban fut mint Firefox-ban (más alatt nem próbáltam)
 
 
 # Tennivalok, otletek
 
 * hang
-* magyar billentyuzet
-* fajlkezeles
-* bongeszo konzol tamogatas
+* magyar billentyűzet
+* fájlkezelés
+* böngésző konzol támogatás
 * debugger
-* 6845
 
-
-# Egyeb
+# Egyéb
 
 Ez egy javascript tanulo / TVC rajongo project.
 

@@ -107,21 +107,25 @@ Regiszterek:
 
 Működés
 
+	Jó kis leírás: http://www.6502.org/users/andre/hwinfo/crtc/crtc.html
+	A datasheet-et nem nehéz google-el meglelni. (a Hitachi 46505 verzió egy kicsit jobban sikerült szerintem)
+
+TVC specifikus + jó tudni programozáshoz
+
+
 	- R12,R13-t címregisztereket a frissítés kezdetekor olvassa ki.
-	- A 6845 karakteres meghajtásra van optimalizálva.
 	- R3 nem igazán használt
 		- hsync: 25.26us
 		- vsync: R7 a kezdete és MA9 1-be billenése a vége
-	- 3 számláló
+	- számlálók
 		- oszlop: 0-tól R0-ig számol
 		- sor: 0-tól R4-ig számol
 		- tv sor: 0-tól R9-ig számol
 		- az utolsó karakter sor után még R5 tv sort számol
 	- Címzés: kezdőérték soronként: (sor * R1) , utolsó érték: (sor * R1) + R0 - 1
-	- A 14 bites címregiszter karaktereket címez meg. Ez nem elég a 16kB-os videó memória megcízésére, így a tv sor számlálót használja a TVC kiegészésként: MMMMMMMMRRMMMMMM
-	- Ez magyarázza a 0x0EFF kurzor pizíciót. Akkor magas a kurzor kimenet, amikor a cím megegyezik R14,R15-el és a tv sor számláló R10 és R11 közé esik. R10 és R11 = 3, ezt beillesztve 0xEFF-be, 0x3BFF-et kapunk, ami az utolsó memória pozíció a látható képen.
+	- Memória cím képzés: 12 bitet használ a 6845 címértékéből, s betoldja a raszter sor számláló alsó két bitjét a hatodik bit után: MMMMMMRRMMMMMM
+	- Ez magyarázza a 0x0EFF kurzor pizíciót. Akkor magas a kurzor kimenet, amikor a cím megegyezik R14,R15-el és a tv sor számláló R10 és R11 közé esik. R10 és R11 = 3, ezt beillesztve 0xEFF-be, 0x3BFF-et kapunk, ami az utolsó memória pozíció : a látható képen.
 	- A kurzor magas jele megszakítást generál a CPU felé, ha a kurzor engedélyezve van.
-	- HSYNC kezdete R7 (67), a vége viszont MA9 
 	- Címzésenként egy bájtot olvas ki, amit egy shift regiszteren keresztül alakít át videó módtól függően:
 		- 2: 0|1|2|3|4|5|6|7
 		- 4: 0L|1L|2L|3L|0H|1H|2H|3H

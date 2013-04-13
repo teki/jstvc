@@ -59,16 +59,16 @@ function emuReset() {
 function emuToggleRun() {
 	g.isRunning = !g.isRunning;
 	if (g.isRunning) {
-		$("#bstop")[0].innerText = "stop";
+		$("#bstop").text("stop");
 		emuContinue();
 	}
 	else {
-		$("#bstop")[0].innerText = "run";
+		$("#bstop").text("run");
 		emuUpdateDbgInfo();
 	}
 }
 function notify(msg, msg2) {
-	$("#statusline")[0].innerHTML = msg;
+	$("#statusline").text(msg);
 }
 
 function emuInit() {
