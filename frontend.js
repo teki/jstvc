@@ -13,13 +13,6 @@ var callback = function(e) {
 		case "fb":
 			res = g.fb;
 			break;
-		case "bg":
-			if (g.bgcolor != e.val) {
-				valstr = e.val.toString(16);
-				$("#monitor").css("background-color","#000000".slice(0,-valstr.length)+valstr); 
-				g.bgcolor = e.val;
-			}
-			break;
 	}
 	return res;
 }
@@ -66,16 +59,16 @@ function emuReset() {
 function emuToggleRun() {
 	g.isRunning = !g.isRunning;
 	if (g.isRunning) {
-		$("#run")[0].value = "stop";
+		$("#bstop").text("stop");
 		emuContinue();
 	}
 	else {
-		$("#run")[0].value = "run";
+		$("#bstop").text("run");
 		emuUpdateDbgInfo();
 	}
 }
 function notify(msg, msg2) {
-	$("#statusline")[0].innerHTML = msg;
+	$("#statusline").text(msg);
 }
 
 function emuInit() {
@@ -92,6 +85,7 @@ function emuInit() {
 	/* init */
 	g.regs = $("#regs")[0];
 	g.statusline = $("#statusline")[0];
+	// frame buffer
 	g.canvas = $("#tvcanvas");
 	g.ctx = g.canvas[0].getContext("2d");
 	g.fb = {};
@@ -100,9 +94,13 @@ function emuInit() {
 	g.fb.fps = $("#fps")[0];
 	g.fb.width = g.canvas[0].width;
 	g.fb.height = g.canvas[0].height;
-	g.fb.data = g.ctx.createImageData(g.fb.width, g.fb.height);
+	g.fb.imageData = g.ctx.createImageData(g.fb.width, g.fb.height);
+	g.fb.buf = new ArrayBuffer(g.fb.imageData.data.length);
+	g.fb.buf8 = new Uint8ClampedArray(g.fb.buf);
+	g.fb.buf32 = new Uint32Array(g.fb.buf);
 	g.fb.refresh = function() {
-		g.ctx.putImageData(g.fb.data, 0, 0);
+		g.fb.imageData.data.set(g.fb.buf8);
+		g.ctx.putImageData(g.fb.imageData, 0, 0);
 		g.fb.updatecnt += 1;
 		var timenow = g.timenow();
 		if ((timenow - g.fb.updatetime) > 500) {
@@ -117,7 +115,7 @@ function emuInit() {
 	$("#breset").on("click", function() {
 		emuReset();
 	});
-	$("#run").on("click", function() {
+	$("#bstop").on("click", function() {
 		emuToggleRun();
 	});
 	$("#step").on("click", function() {
@@ -148,7 +146,7 @@ function emuInit() {
 	$(document).keyup(handleKeyUp);
 	$(window).focus(handleFocus);
 	$(window).blur(handleFocusLost);
-
+	g.canvas.on("selectstart", function(e) { e.preventDefault(); return false; });
 	// load roms
 	getData("TVC12_D3.64K")
 		.then(function(data) {

@@ -10,6 +10,10 @@ html, body, ul, ol, li, form, fieldset, legend
 {
 	margin: 0;
 	padding: 0;
+	border: 0;
+	font-size: 100%;
+	font: inherit;
+	vertical-align: baseline;
 }
 
 h1, h2, h3, h4, h5, h6, p { margin-top: 0; }
@@ -25,28 +29,27 @@ body {
 	width: 612px;
 	margin: 0px auto;
 }
+#monitor {
+	width: 608px;
+	height: 100%;
+}
 
 #tvcanvas {
-	position: relative;
-	top: 30px;
-	left: 50px;
 	transform-origin: left top 0;
 	transform: scaleY(1.6);
 	-webkit-transform-origin: left top 0;
 	-webkit-transform: scaleY(1.6);
 }
-#monitor {
-	height: 480px;
-	background-color: black;
-}
+
 #toolbar {
-	height: 20px;
+	height: 30px;
 }
 #header {
 	vertical-align: top;
-	height: 60px;
+	height: 5em;
 	margin-top: 5px;
 	padding-left: 20px;
+	overflow: auto;
 }
 #header img {
 	display: block;
@@ -92,4 +95,6 @@ body {
 #bpoints {
 	width: 400px;
 }
-
+#bstop {
+	width: 40px;
+}

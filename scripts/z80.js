@@ -5748,18 +5748,24 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		return actRuntime;
 	};
 
-	Z80.prototype.interrupt = function() {
+	Z80.prototype.irqEnabled = function() {
+		return this._s.IFF1;
+	}
+	Z80.prototype.irq = function() {
+		var res = 0;
 		if (this._s.IFF1) {
 			if (this._s.im == 1) {
 				this._s.IFF1 = 0;
 				this._s.IFF2 = 0;
 				this.push16(this._s.PC);
 				this._s.PC = 0x0038;
+				res = 11 + 2; // rst 38 + 2 wait states
 			}
 			else {
 				throw("not implemented im mode:", this._s.im);
 			}
 		}
+		return res;
 	}
 
 	Z80.prototype.reset = function () {
