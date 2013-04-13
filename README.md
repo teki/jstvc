@@ -2,9 +2,12 @@
 
 Javascript VIDEOTON TV Computer emulátor.
 
-Demo: http://teki.github.com/jstvc
+Demo: http://teki.github.io/jstvc
 
-(Google Chrome ajánlott)
+Tesztelve:
+- Google Chrome (ajánlott)
+- Safari 6+
+- Firefox műküdik, de nem elég gyors
 
 # TVC
 
@@ -18,6 +21,7 @@ v0.0.5
 
  * új CRTC implementáció, még nem 100%-os, de közelít
  * stop gomb, emuláció szüneteltetéséhez
+ * Firefox jól teljesített a sor alapú megjelenítéssel, de amint váltottam nagyobb pontosságra feladta.
 
 v0.0.4
 
@@ -47,6 +51,7 @@ v0.0.1
 
 # Tennivalok, otletek
 
+* opcinálisan gyorsabb CRTC
 * hang
 * magyar billentyűzet
 * fájlkezelés
