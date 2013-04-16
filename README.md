@@ -7,7 +7,7 @@ Demo: http://teki.github.io/jstvc
 Tesztelve:
 - Google Chrome (ajánlott)
 - Safari 6+
-- Firefox műküdik, de nem elég gyors
+- Firefox műküdik, de lassú
 
 # TVC
 
@@ -15,7 +15,39 @@ About the TVC: http://tvc.hu/html/inenglish.html
 
 TVC rajongói oldal: http://www.tvc.hu
 
+# Működik (működget)
+
+* Z80
+	* a FUSE és ZXDOC tesztek lefutnak hiba nélkül
+	* utasítás hosszabbítás nincs
+* CRTC
+	* Motorla 6845 emuláció
+	* megjelenítés szimuláció (a 6845 kiementét rendereli bitmap-re)
+	* kurzor megszakítás
+* US billentyűzet
+
+# Tennivalók, ötletek
+
+* CRTC/CPU időzítés nem 100%-osan pontos
+* pontosabb hang
+* magyar billentyűzet
+* fájlkezelés
+* böngésző konzol támogatás
+* debugger
+
+# Nem általam írt kódok
+
+* hang: https://github.com/jussi-kalliokoski/sink.js/
+* web: http://jquery.com/
+* modulok: http://requirejs.org/
+
 # Verzió történet
+
+v0.1.0
+
+ * kezdetleges hang implementáció
+ 	* nincs korrekt időzítés (azért felismerhetőek a dallamok)
+ 	* Web Audio és Mozilla Audio implementációkat támogat, így Safar,Chrome és Firefox-on kívül nem nagyon fog működni
 
 v0.0.5
 
@@ -47,16 +79,6 @@ v0.0.1
 * megszakítás
 * video memória canvas-ra rajzolása
 * Chrome-ban gyorsabban fut mint Firefox-ban (más alatt nem próbáltam)
-
-
-# Tennivalok, otletek
-
-* opcinálisan gyorsabb CRTC
-* hang
-* magyar billentyűzet
-* fájlkezelés
-* böngésző konzol támogatás
-* debugger
 
 # Egyéb
 
