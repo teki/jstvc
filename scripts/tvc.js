@@ -11,7 +11,7 @@ define([
 	////////////////////////////////////////////
 	// TVC
 	////////////////////////////////////////////
-	function TVC(callback) {
+	function TVC(type,callback) {
 		var TVCthis = this;
 		this._callback = callback;
 		this._clock = 0;
@@ -21,7 +21,7 @@ define([
 		this._clockperframe = this._clockfreq / 50; // 62500, for interrupt
 		this._breakpoints = undefined;
 		this._pendIt = 0x1F;	// b4: curs/aud, b3-0 cards , 0 active
-		this._mmu = new MMU.MMU();
+		this._mmu = new MMU.MMU(type);
 		this._fb = callback({id:"fb"});
 		this._vid = new VID.VID(this._mmu, this._fb);
 		this._aud = new AUD.AUD();
@@ -155,6 +155,13 @@ define([
 		case 0x07:
 			// cursor/audio irq ack
 			this._pendIt |= 0x10;
+			break;
+
+		case 0x0C:
+		case 0x0D:
+		case 0x0E:
+		case 0x0F:
+			this._mmu.setVidMap(val);
 			break;
 
 		case 0x58:

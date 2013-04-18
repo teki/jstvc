@@ -70,7 +70,6 @@ define([
 		//this._reg = [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ];
 		this._reg = [ 0, 0, 0, 0, 0,  0, 0, 0,  0,  0,  0,  0,  0,  0, 0, 0,  0,  0 ];
 
-		this._vidmem = this._mmu.getVid();
 
 		this._memStart = 0; // initialized on frame start
 		this._mem = 0; // act crtc addr
@@ -221,6 +220,7 @@ define([
 		if (this._hd >= this._ht)
 			return [false,false];
 
+		var vidmem = this._mmu.crtmem;
 		var mode = this._mode << 8;
 		var mode16 = 2 << 8;
 		var hsync = 0;
@@ -241,7 +241,7 @@ define([
 					if (this._curenabled) {
 						cursorIt = (this._mem == this._curaddr) && (this._line == this._curstart);
 					}
-					this.streamData(mode|this._vidmem[this._addr]);
+					this.streamData(mode|vidmem[this._addr]);
 					this._char++;
 					this._addr++;
 					this._mem++;

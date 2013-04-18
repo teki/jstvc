@@ -56,6 +56,33 @@ function emuUpdateDbgInfo() {
 function emuReset() {
 	g.tvc.reset();
 }
+function emuCreate(type) {
+	g.isRunning = false;
+	g.tvc = new TVCModule.TVC(type,callback);
+	var roms;
+	if (/2\.2/.test(type)) {
+		roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
+	}
+	else {
+		roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
+	}
+	// load roms
+	getData("roms/"+roms[0])
+	.then(function(data) {
+		g.tvc.addRom(roms[0], new Uint8Array(data));
+		return getData("roms/"+roms[1]);
+	})
+	.then(function(data) {
+		g.tvc.addRom(roms[1], new Uint8Array(data));
+		return getData("roms/"+roms[2]);
+	})
+	.then(function(data) {
+		g.tvc.addRom(roms[2], new Uint8Array(data));
+		// start
+		g.isRunning = true;
+		emuContinue();
+	});
+}
 function emuToggleRun() {
 	g.isRunning = !g.isRunning;
 	if (g.isRunning) {
@@ -110,7 +137,7 @@ function emuInit() {
 			g.fb.updatecnt = 0;
 		}
 	}
-	g.tvc = new TVCModule.TVC(callback);
+	emuCreate("64k 1.2");
 	// gui
 	$("#breset").on("click", function() {
 		emuReset();
@@ -127,8 +154,10 @@ function emuInit() {
 		g.tvc.setBreakPoints(bplst);
 		$("#step").focus();
 	});
+	// cas loading + selection
+	var casdrop = $("#scas");
 	$("#bload").on("click", function () {
-		var casname = $("#scas")[0].value;
+		var casname = casdrop[0].value;
 		getData("data/" + casname)
 			.then(function(data) {
 				g.tvc.reset();
@@ -137,32 +166,30 @@ function emuInit() {
 				notify("loaded", casname + "\nTip: run + [enter]");
 			});
 	});
-	var casdrop = $("#scas");
 	for( var i = 0; i < datalist.length; i++ )
 	{
 			$("<option>").text(datalist[i]).val(datalist[i]).appendTo(casdrop);
 	}
+	// machine type
+	var machdrop = $("#smach");
+	$("<option>").text("64k  1.2").val("64k 1.2").appendTo(machdrop);
+	$("<option>").text("64k+ 1.2").val("64k+ 1.2").appendTo(machdrop);
+	$("<option>").text("64k+ 2.2").val("64k+ 2.2").appendTo(machdrop);
+	machdrop.on("change", function(e) {
+		var machType = machdrop[0].value;
+		emuCreate(machType);
+	});
+	// keyboard
 	$(document).keydown(handleKeyDown);
 	$(document).keyup(handleKeyUp);
+	// focus on canvas
 	$(window).focus(handleFocus);
 	$(window).blur(handleFocusLost);
+	// disable selection
 	g.canvas.on("selectstart", function(e) { e.preventDefault(); return false; });
-	// load roms
-	getData("TVC12_D3.64K")
-		.then(function(data) {
-			g.tvc.addRom("D3", new Uint8Array(data));
-			return getData("TVC12_D4.64K");
-		})
-	.then(function(data) {
-		g.tvc.addRom("D4", new Uint8Array(data));
-		return getData("TVC12_D7.64K");
-	})
-	.then(function(data) {
-		g.tvc.addRom("D7", new Uint8Array(data));
-		// start
-		emuContinue();
-	});
 }
+
+// event handlers
 function handleKeyDown(e) {
 	if (g.tvc) {
 		g.tvc.keyDown(e.which);
@@ -182,6 +209,8 @@ function handleFocusLost(e) {
 	if (g.tvc)
 		g.tvc.focusChange(false);
 }
+
+// emulator functions
 function emuContinue() {
 	g.requestAnimationFrame(emuRunFrame);
 };
@@ -206,3 +235,4 @@ function emuStep() {
 		emuUpdateDbgInfo();
 	}
 };
+
