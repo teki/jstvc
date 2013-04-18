@@ -11,39 +11,50 @@ Videoton TV Computer
 
 RAM
 
-	- 16kB-os lapok: U0, U1, U2^, U3^
+	-16kB-os lapok: U0, U1, U2^, U3^
 
 ROM
 
 	- SYS: 16kB, basic, editor
-	- EXT: 8kB, kiegészítő rom
+		- TVC12_D4.64K (0000), TVC12_D3.64K (0x2000)
+		- TVC22_D6.64K (0000), TVC22_D4.64K (0x2000)
+	- EXT: 8kB, kiegészítő rom, boot
+		- TVC12_D7.64K
+		- TVC22_D7.64K
 	
 VID
 
-	VID
+	- 16kB a 32k és a 64k esetében
+	- 16kB * 4 a 64k+ esetében
 
-^: 64k, 64k+
+CART
 
+	- cartridge
 
-    memory mapping: 4*16k pages: 0,1,2,3
-    ram pages: U0, U1, U2, U3
+Lapozás
+
+    RAM: U0, U1, U2, U3
     SYS: system (editor + basic)
     EXT: extension (boot)
     VID: video
-    CART: cartridge
-    possible values:
-    0: U0, SYS
-    1: U1
-    2: U2, VID
-    3: U3, EXT, SYS
+ 
+	^: 64k, 64k+
+	#: 64k+
+	%: 64k+ és 32K
     
-    mapping: writing to port 2
-    b7-b6: 3: 00 CART, 01 SYS, 10 U3, 11 EXT
-    b5   : 2: 0 VID, 1 U2
-    b4-b3: 0: 00 SYS, 01 CART, 10 U0
-    b2   : 1: 1 U1
-    b1-b0: --
+	Memória lapozás, 2-es port:
+		lap 0: SYS (00), CART (08), U0 (10), U3% (18) /maszk: 18/
+		lap 1: U1 (00), VID# (04) /maszk: 04/
+		lap 2: VID (00), U2 (20) /maszk: 20/
+		lap 3: CART (00), SYS (40), U3 (80), EXT (C0) /maszk: C0/
 
+	Bővítők lapozása, 3-as port:
+		CST0 (00), CST1 (40), CST2 (80), CST3 (C0) /maszk: C0/
+
+	Videó lapozó regiszter #, 15-ös port:
+		CRT: VID0 (00), VID1 (10), VID2 (20), VID3 (30)
+		LAP2: VID0 (00), VID1 (04), VID2 (08), VID3 (0C)
+		LAP1: VID0 (00), VID1 (01), VID2 (02), VID3 (03)
 
 # CRTC
 
@@ -152,126 +163,6 @@ Hang
             * [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ]
             * [ 63, 40, 4B, 32, 4D, 02, 60, 3C, 00, 03, 03, 03, 00, 00, 0E, FF , 00, 00 ]
             
-        240 lines
-        width: 64 bytes (512, 256, 128 pixels)
-        240*64 = 15360 bytes
-        IRGB colors
-        3 modes: 2 colors (mapped to IRGB),4 (mapped to IRGB), 16 (IRGB)
-        3 clocks: 12.5MHz, 6.25MHz, 3.125MHz
-        plaetta register: 4 * 4bits (for 2 and 4 clolor modes)
-        border register: 4 bit
-        A byte is read in every 640ns.
-        
-        prev border end, line, border beg, line back
-        
-        line back: 25.26us
-        line: 640ns * 64 = 40.96us
-        
-        
-        pic end: line 268
-        
-        
-        PAL standard: http://martin.hinner.info/vga/pal.html
-            50 VSYNC / sec
-            625 HSYNC / sec
-            line period:  64us
-            line 6 is the first visible and 310 is the last visible
-            
-        Video imp:
-            tvc: 240 lines
-            screen:
-                64us line period
-                312.5*2 lines (2 fields)  20ms/64us = 312.5
-                305 visible lines in the first field
-                first visible line ~28, with ~266 visible lines
-            impl:
-                312.5 lines => 312.5 * 64us = 20ms = 50fps
-                bg color by default
-                64us per line / 320ns per cpu tick = 200 cpu ticks per line
-                drawn line: 640ns*64 = 40.96us = 128 cpu ticks
-                12us is not visible from the line, 52us remains, center it: start at 18us
-                
-                line timing in cpu ticks:
-                    38 nothing
-                    18 border
-                    128 image
-                    16 border
-                pic timing (lines):
-                    1-5 nothing
-                    6-35 border
-                    36 - 275 image
-                    276-310 border
-                    311-312.5 nothing
-       
-    Registers:
-        R0 w karakterutem
-            x-1
-            karakter utemek egy tv-soron belul (sor elorefutes+vissza)
-            default: 99 => 100 karakterutem == 64us == PAL sorido
-        R1 w karakterutem
-            sorelorefutas karaktereinek szama = lathato karakterek
-            nem lehet kisebb  R0-nal
-            default: 64 => 64 byte per sor
-        R2 w karakterutem
-            x-1
-            szinkronjel kezdete a sorelofutas kezdetetol merve
-            nem lehet kisebb  R0-nal
-            default: 75 => 76
-        R3 w vvvvhhhh
-            v/h szinkronjelek szelessege
-            v: tv-sorutemben, 0 => 16 sor
-            h: karakterekben, 0 => tilos
-            default: h:2 karakter semmi, v:3 sor semmi
-        R4 w -6543210 karaktersorutem
-            x-1
-            kepelorefutas + kepvisszafutas karaktersorainak osszege
-            default: 77 => 78 => 78 * 4 = 312 ami majdnem 312.5
-        R5 w ---43210 tv-sorutem
-            kiegeszito regiszter R4-hez
-            tv-sorok szama: (R4 + 1) * tv-sorok szama egy karaktersorban + R5
-        R6 w -6543210 karaktersorutem
-            hasznos kep (sorelorefutas) karaktersorainak szama
-            kisebbnek kell lennie mint R4
-            default: 60 => 60 * 4 = 240
-        R7 w -6543210 karaktersorutem
-            x-1
-            H-sync kezdete - kep vege a sorelorefutas kezdetetol
-            default: 66
-        R8 w megjelenites modja, idozites
-            default: 0
-            nem valtott soros, nincs kesleltetes, throw ha vmi mas jon
-            modok: progressive, interlace1, interlace2
-        R9 w ---43210 tv-sorutem
-            progressive: x-1
-            interlace1: x-1 / ciklus (duplaja lesz a megjelenes, mert 2 felkep van)
-            interlace2: x-2
-            default: 3 => 4 sor
-        R10 w -BP43210
-            cursor villogo + kezdopozicio regiszter
-            bit 5,6: type
-                00 nem villogo
-                01 nincs cursor
-                10 16 felfrissites
-                11 32 felfrissites
-            bit 4-0: cursor tetejenek tv-sor pozicija a karaktersoron belul
-            default: 3 => nem villogo, 3. tv sor
-        R11 w ---43210 tv-sorutem
-            cursor utolso soranak regisztere
-            karaktersoron belul a cursor utolso tv-sora
-            default: 3
-        R12,R13 rw
-            kep kezdete a memoriaban
-            R12: --543210   address high
-            R13: 76543210   address low
-            (a minuszok nullak olvasaskor)
-            default: 0,0
-        R14,R15 rw
-            cursor karakter pozicio
-            R41: --543210   pozicio high
-            R15: 76543210   pozicio low
-            default: 14,255 = 0x0EFF = 59 rastersor utolso karaktere
-        R16, R17 r
-            fenyceruza
             
 # PORTS
     -: not used
@@ -292,18 +183,21 @@ Hang
     08H-0BH unused
     0CH                 W       Video mapping (64k+)
     0DH-0FH same as 0CH
-    10H-4FH extension card addresses
-    50H     --------    R/W     Tape data out
+    10H-1FH extension card 0 addresses
+    20H-2FH extension card 1 addresses
+    30H-3FH extension card 2 addresses
+    40H-4FH extension card 3 addresses
+    50H     --------    R/W Tape data out
     51H-57H same as 50H
-    58H     76543210    R       Keyboard state (column read)
-    58H     7-------    W       Extension card 0 IT clear
-    59H     +++43210    R       Pending IT requests
-    59H     765+++++    R       7: printer ack, 6: black/white, 5: tape data in
-    59H     7-------    W       Extension card 1 IT clear
-    5AH     76543210    R       Extension card identifier
-    5AH     7-------    W       Extension card 2 IT clear
-    5BH     --------    R       Sound oscillator reset
-    5BH     7-------    W       Extension card 3 IT clear
+    58H     76543210    R   Keyboard state (column read)
+    58H     7-------    W   Extension card 0 IT clear
+    59H     +++43210    R   Pending IT requests (CU/HANG, CSTL3, CSTL2, CSTL1, CSTL0)
+    59H     765+++++    R   7: printer ack, 6: black/white, 5: tape data in
+    59H     7-------    W   Extension card 1 IT clear
+    5AH     76543210    R   Extension card identifier 33221100: 00 RS232, 01 nem használt, 10: floppy, 11: üres vagy nem specifikált
+    5AH     7-------    W   Extension card 2 IT clear
+    5BH     --------    R   Sound oscillator reset
+    5BH     7-------    W   Extension card 3 IT clear
     5CH-5FH same as 58H-5BH
     60H-63H -6-4-2-0    W       Palette registers
     64H-6FH same as 60H-63H
