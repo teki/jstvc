@@ -43,6 +43,12 @@ TVC rajongói oldal: http://www.tvc.hu
 
 # Verzió történet
 
+v0.1.1
+
+ * géptipusválasztás
+ * 64k+ emulálása
+ * 2.2 BASIC romok
+
 v0.1.0
 
  * kezdetleges hang implementáció
