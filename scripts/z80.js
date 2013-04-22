@@ -4962,7 +4962,7 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		0xFD46:function () { // LD B,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			this._op_displ = this._mmu.r8(this._s.PC+2);
+			this._op_displ = this._mmu.r8s(this._s.PC+2);
 			this._s.B = this._mmu.r8(this._s.IY+this._op_displ);
 		},
 		0xFD4C:function () { // LD C,IYH*
@@ -4978,7 +4978,7 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		0xFD4E:function () { // LD C,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			this._op_displ = this._mmu.r8(this._s.PC+2);
+			this._op_displ = this._mmu.r8s(this._s.PC+2);
 			this._s.C = this._mmu.r8(this._s.IY+this._op_displ);
 		},
 		0xFD54:function () { // LD D,IYH*
@@ -5729,12 +5729,13 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 				}
 			}
 			if (!f) {
-				console.log(this._mmu.dasm(pc, 5, "??? ").join("\n"));
+				//console.log(this._mmu.dasm(pc, 5, "??? ").join("\n"));
 				throw ("not implemented:" + Utils.toHex8(opcode));
 			}
 			//this.logasm();
 			f.call(this);
-			//this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
+			this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
+			if (this.bt.length > 10) this.bt.shift();
 			if (this._op_t === 0) {
 				throw ("you forgot something!");
 			}
@@ -5779,12 +5780,12 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		var i;
 		for(i=0; i<this.bt.length; i++) {
 			var o = this.bt[i];
-			arr.push(Utils.toHex16(o[0]) + " " + Dasm.Dasm(o));
+			arr.push(Utils.toHex16(o[0]) + " " + Dasm.Dasm(o)[0]);
 		}
 		var r = function(addr) {
 			return self._mmu.r8(addr);
 		}
-		arr.push(Utils.toHex16(this._s.PC) + " " + Dasm.Dasm([r, this._s.PC]));
+		arr.push(Utils.toHex16(this._s.PC) + " " + Dasm.Dasm([r, this._s.PC])[0]);
 		return arr;
 	};
 
