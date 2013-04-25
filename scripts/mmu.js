@@ -20,12 +20,14 @@ define(["scripts/utils.js"], function(Utils) {
 		}
 		this._sys = new MemBlock("SYS", false, 16384);
 		this._cart = new MemBlock("CART", false, 16384);
-		this._ext = new MemBlock("EXT", false, 16384);
+		this._exth = new MemBlock("EXT", false, 8192);
 		this._map = [];
 		this._mapVal = -1;
 		this._mapValVid = -1;
 		this._log = false;
+		this.breakAddr = null;
 		this.crtmem = this._vid0.m;
+		this.extmmu = null;
 
 		this.init();
 	}
@@ -37,7 +39,7 @@ define(["scripts/utils.js"], function(Utils) {
 		for (i = 0; i < this._u2.m.length; i++) this._u2.m[i] = 0;
 		for (i = 0; i < this._u3.m.length; i++) this._u3.m[i] = 0;
 		// for(i=0; i<this._cart.m.length; i++) this._cart.m[i] = 0;
-		for (i = 0; i < this._ext.m.length; i++) this._ext.m[i] = 0;
+		for (i = 0; i < this._exth.m.length; i++) this._exth.m[i] = 0;
 		for (i = 0; i < this._vid0.m.length; i++) this._vid0.m[i] = 0;
 		if (this._isPlus) {
 			for (i = 0; i < this._vid1.m.length; i++) this._vid1.m[i] = 0;
@@ -54,7 +56,7 @@ define(["scripts/utils.js"], function(Utils) {
 		switch(name) {
 			case "TVC12_D7.64K":
 				if (Utils.crc32(data) != 0x1cbbeac6) throw ("invalid rom ("+name+")!");
-				for (i = 0; i < data.length; i++) this._ext.m[0x2000 + i] = data[i];
+				for (i = 0; i < data.length; i++) this._exth.m[i] = data[i];
 				break;
 
 			case "TVC12_D4.64K":
@@ -69,7 +71,7 @@ define(["scripts/utils.js"], function(Utils) {
 
 			case "TVC22_D7.64K":
 				if (Utils.crc32(data) != 0x05e1c3a8) throw ("invalid rom ("+name+")!");
-				for (i = 0; i < data.length; i++) this._ext.m[0x2000 + i] = data[i];
+				for (i = 0; i < data.length; i++) this._exth.m[i] = data[i];
 				break;
 
 			case "TVC22_D6.64K":
@@ -136,7 +138,7 @@ define(["scripts/utils.js"], function(Utils) {
 		case 0x00: this._map[3] = this._cart; break;
 		case 0x40: this._map[3] = this._sys; break;
 		case 0x80: this._map[3] = this._u3; break;
-		case 0xC0: this._map[3] = this._ext; break;
+		case 0xC0: this._map[3] = null; break;
 		}
 
 	};
@@ -176,11 +178,31 @@ define(["scripts/utils.js"], function(Utils) {
 		return this._mapVal;
 	};
 
-	MMU.prototype.w8 = function(addr, val) {
-		var mapIdx = (addr & 0xC000) >>> 14;
+	MMU.prototype.toString = function() {
+		var result = "";
+		result += this._map[0].name;
+		result += "," + this._map[1].name;
+		result += "," + this._map[2].name;
+		if (this._map[3]) result += "," + this._map[3].name;
+		else result += ",EXT+" + this.extmmu.name + "(" + this.extmmu.toString(true) + ")";
+		return result;
+	};
+
+	MMU.prototype.w8 = function(addrP, val) {
+		var mapIdx = (addrP & 0xC000) >>> 14;
+		var addr = addrP & 0x3FFF;
 		var block = this._map[mapIdx];
-		if (block.isRam) {
-			block.m[addr & 0x3FFF] = val & 0xFF;
+		if (this.breakAddr && this.breakAddr[addrP]) {
+			console.warn("MEM WRITE:", Utils.toHex16(addrP),"<=",Utils.toHex8(val), "(",Utils.toHex16(g.tvc._z80._s.PC),")");
+			//debugger;
+		}
+		if ((mapIdx == 3) && !block) { // ext
+			if ((addr < 0x2000) && this.extmmu) {
+				this.extmmu.w8(addr, val);
+			}
+		}
+		else if (block.isRam) {
+			block.m[addr] = val & 0xFF;
 		}
 	};
 	MMU.prototype.w16 = function(addr, val) {
@@ -191,11 +213,28 @@ define(["scripts/utils.js"], function(Utils) {
 		this.w8(addr + 1, val >>> 8);
 		this.w8(addr, val);
 	};
-	MMU.prototype.r8 = function(addr) {
-		return this._map[(addr & 0xC000) >>> 14].m[addr & 0x3FFF];
+	MMU.prototype.r8 = function(addrP) {
+		var mapIdx = (addrP & 0xC000) >>> 14;
+		var block = this._map[mapIdx];
+		var result = 0;
+		var addr = addrP & 0x3FFF;
+		if ((mapIdx == 3) && !block) { // ext
+			if (addr < 0x2000) {
+				if (this.extmmu) {
+					result = this.extmmu.r8(addr);
+				}
+			}
+			else {
+				result = this._exth.m[addr - 0x2000];
+			}
+		}
+		else {
+			result = block.m[addr];
+		}
+		return result;
 	};
 	MMU.prototype.r8s = function(addr) {
-		var val = this._map[(addr & 0xC000) >>> 14].m[addr & 0x3FFF];
+		var val = this.r8(addr);
 		if (val & 0x80) val = -((~val + 1) & 0xFF);
 		return val;
 	};
@@ -203,33 +242,6 @@ define(["scripts/utils.js"], function(Utils) {
 		return this.r8(addr) | (this.r8(addr + 1) << 8);
 	};
 	MMU.prototype.r16nolog = MMU.prototype.r16;
-	MMU.prototype.dasm = function(addr, lines, prefix, noLdir) {
-		var offset = 0,
-			res = [],
-			d, i, str, oplen, line;
-		do {
-			d = Z80Module.decodeZ80(this, addr + offset);
-			oplen = d[1];
-
-			str = Utils.toHex16(addr + offset) + " ";
-			for (i = 0; i < 4; i++) {
-				if (i < oplen) {
-					str += Utils.toHex8(this.r8(addr + offset + i)) + " ";
-				}
-				else {
-					str += "   ";
-				}
-			}
-			line = prefix + str + d[0];
-			if (!noLdir || -1 == line.indexOf("LDIR")) {
-				res.push(line);
-			}
-			offset += oplen;
-			lines--;
-		} while (lines);
-		return res;
-	};
-
 
 	exports.MMU = MMU;
 	return exports;

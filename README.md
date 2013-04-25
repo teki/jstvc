@@ -32,16 +32,34 @@ TVC rajongói oldal: http://www.tvc.hu
 * pontosabb hang
 * magyar billentyűzet
 * fájlkezelés
-* böngésző konzol támogatás
-* debugger
+* snapshot
 
 # Nem általam írt kódok
 
 * hang: https://github.com/jussi-kalliokoski/sink.js/
 * web: http://jquery.com/
 * modulok: http://requirejs.org/
+* z80 tesztek:
+	* http://sourceforge.net/p/fuse-emulator/code/HEAD/tree/trunk/fuse/z80/tests/
+	* http://mdfs.net/Software/Z80/Exerciser/
+* wd1793 implementáció: http://fms.komkon.org/EMUL8/
+
+# Debugger
+
+A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel kezdődő utasítások használhatók debuggolásra:
+
+	* g.tvc.db("0010,3000") - új breakpoint(ok), paraméter nélkül: breakpoint-ok litázása
+	* g.tvc.dd("0010") - breakpoint törlése ("all" törli az összeset)
+	* g.tvc.dreg() - regiszterek tartalma
+	* g.tvc.dstep() - egy utasítás végrehajtása
+	* g.tvc.dmem(cím, [sorok száma], [bájt per sor]) - memóriatartalom listázása
+	* g.tvc.dasm(cím, [utasítások száma]) - disassembly memória
 
 # Verzió történet
+
+ * debugger g.tvc.[step,b,bd,dumpMem,dasm]
+ * z80 LD r,(IY+d) fix
+ * wd1793 emuláció
 
 v0.1.1
 

@@ -15,12 +15,12 @@ module.exports = function(grunt) {
 		}
   });
 
-	grunt.registerTask('caslist', function() {
+	grunt.registerTask('imglist', function() {
 		var fs = require("fs");
 		var cl = fs.readdirSync("data");
 		var cl2 = [];
 		for (var i in cl) {
-			if (/.*cas$/i.test(cl[i]))
+			if (/.*cas$/i.test(cl[i]) || /.*dsk$/i.test(cl[i]))
 				cl2.push(cl[i]);
 		}
 		cl2.sort();
@@ -59,6 +59,6 @@ module.exports = function(grunt) {
 	});
 
   // Default task(s).
-  grunt.registerTask('default', ['caslist']);
+  grunt.registerTask('default', ['imglist']);
 
 };

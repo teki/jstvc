@@ -1,0 +1,15 @@
+#extension cards
+
+ - init address read from c00b (tvc-rom page 396)
+ - call init with: C: type, B: 04, IX: 0040
+ - start with "MOPS", then device name (prefixed with length, like 04DISK)
+
+
+
+#vt-dos
+
+ - init address: c21c
+ - reads from 0b21 (WARM-FLAG)
+ - there is something from dff2
+ - rst 38 redirected to (db99)
+ 

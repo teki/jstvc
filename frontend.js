@@ -13,9 +13,12 @@ var callback = function(e) {
 		case "fb":
 			res = g.fb;
 			break;
+		case "notify":
+			notify(e.str);
+			break;
 	}
 	return res;
-}
+};
 
 function appStart() {
 	requirejs(["scripts/tvc.js"], function(tvc) {
@@ -37,26 +40,18 @@ function getData(url) {
 		else {
 			defer.reject(this);
 		}
-	}
+	};
 	oReq.send(null);
 	return defer;
 }
 function emuBreak() {
 	g.isRunning = false;
-	emuUpdateDbgInfo();
-}
-function emuUpdateDbgInfo() {
-	return;
-	var arr = [];
-	arr.push(g.tvc._z80.toString());
-	arr = arr.concat(g.tvc._z80.btToString());
-	arr[arr.length-1] = '<span class="greenline">' + arr[arr.length-1] + "</span>";
-	g.regs.innerHTML = arr.join("\n");
 }
 function emuReset() {
 	g.tvc.reset();
 }
 function emuCreate(type) {
+	notify("loading roms");
 	g.isRunning = false;
 	g.tvc = new TVCModule.TVC(type,callback);
 	var roms;
@@ -64,7 +59,7 @@ function emuCreate(type) {
 		roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
 	}
 	else {
-		roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
+		roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K", "D_TVCDOS.128"];
 	}
 	// load roms
 	getData("roms/"+roms[0])
@@ -78,6 +73,13 @@ function emuCreate(type) {
 	})
 	.then(function(data) {
 		g.tvc.addRom(roms[2], new Uint8Array(data));
+		return getData("roms/"+roms[3]);
+		//// start
+		//g.isRunning = true;
+		//emuContinue();
+	})
+	.then(function(data) {
+		g.tvc.addRom(roms[3], new Uint8Array(data));
 		// start
 		g.isRunning = true;
 		emuContinue();
@@ -90,8 +92,8 @@ function emuToggleRun() {
 		emuContinue();
 	}
 	else {
-		$("#bstop").text("run");
-		emuUpdateDbgInfo();
+		$("#bstop").text("continue");
+		notify("stopped");
 	}
 }
 function notify(msg, msg2) {
@@ -99,7 +101,7 @@ function notify(msg, msg2) {
 }
 
 function emuInit() {
-	notify("loading roms");
+	notify("init page");
 	/* polyfills */
 	if(window.requestAnimationFrame) g.requestAnimationFrame = function(f) {window.requestAnimationFrame(f);};
 	else if (window.mozRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.mozRequestAnimationFrame(f);};
@@ -136,7 +138,7 @@ function emuInit() {
 			g.fb.updatetime = timenow;
 			g.fb.updatecnt = 0;
 		}
-	}
+	};
 	emuCreate("64k 1.2");
 	// gui
 	$("#breset").on("click", function() {
@@ -145,30 +147,27 @@ function emuInit() {
 	$("#bstop").on("click", function() {
 		emuToggleRun();
 	});
-	$("#step").on("click", function() {
-		emuStep();
-	});
 	$("#bpoints").change(function (e) {
 		var newbplst = [];
 		var bplst = $("#bpoints")[0].value.split(",");
 		g.tvc.setBreakPoints(bplst);
 		$("#step").focus();
 	});
-	// cas loading + selection
-	var casdrop = $("#scas");
+	// img loading + selection
+	var imgdrop = $("#scas");
 	$("#bload").on("click", function () {
-		var casname = casdrop[0].value;
-		getData("data/" + casname)
+		var imgname = imgdrop[0].value;
+		getData("data/" + imgname)
 			.then(function(data) {
 				g.tvc.reset();
-				g.tvc.loadCas(new Uint8Array(data));
+				g.tvc.loadImg(imgname, new Uint8Array(data));
 				$("#monitor").focus();
-				notify("loaded", casname + "\nTip: run + [enter]");
+				notify("loaded", imgname + "\nTip: run + [enter]");
 			});
 	});
 	for( var i = 0; i < datalist.length; i++ )
 	{
-			$("<option>").text(datalist[i]).val(datalist[i]).appendTo(casdrop);
+			$("<option>").text(datalist[i]).val(datalist[i]).appendTo(imgdrop);
 	}
 	// machine type
 	var machdrop = $("#smach");
@@ -213,7 +212,7 @@ function handleFocusLost(e) {
 // emulator functions
 function emuContinue() {
 	g.requestAnimationFrame(emuRunFrame);
-};
+}
 function emuRunFrame() {
 	if (!g.isRunning) {
 		return;
@@ -221,18 +220,11 @@ function emuRunFrame() {
 	// run + update + continue
 	if (g.tvc.runForAFrame()) {
 		g.isRunning = false;
-		emuUpdateDbgInfo();
+		$("#bstop").text("continue");
 	}
 	else {
 		//g.regs.innerHTML = g.tvc._z80.toString();
 		emuContinue();
 	}
-};
-function emuStep() {
-	var arr = [];
-	if (!g.isRunning) {
-		g.tvc.runOne();
-		emuUpdateDbgInfo();
-	}
-};
+}
 
