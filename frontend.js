@@ -27,7 +27,7 @@ function appStart() {
 	});
 }
 
-function getData(url) {
+function getData(name, url) {
 	var defer = $.Deferred();
 	var oReq = new XMLHttpRequest();
 	oReq.open("GET", url, true);
@@ -35,14 +35,14 @@ function getData(url) {
 	oReq.onload = function (oEvent) {
 		var arrayBuffer = oReq.response;
 		if (arrayBuffer) {
-			defer.resolve(arrayBuffer);
+			defer.resolve(name, arrayBuffer);
 		}
 		else {
 			defer.reject(this);
 		}
 	};
 	oReq.send(null);
-	return defer;
+	return defer.promise();
 }
 function emuBreak() {
 	g.isRunning = false;
@@ -55,31 +55,29 @@ function emuCreate(type) {
 	g.isRunning = false;
 	g.tvc = new TVCModule.TVC(type,callback);
 	var roms;
-	if (/2\.2/.test(type)) {
-		roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
-	}
-	else {
-		roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K", "D_TVCDOS.128"];
-	}
+	if (/2\.2/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
+	else if (/DOS/.test(type)) roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K", "D_TVCDOS.128"];
+	else roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
 	// load roms
-	getData("roms/"+roms[0])
-	.then(function(data) {
-		g.tvc.addRom(roms[0], new Uint8Array(data));
-		return getData("roms/"+roms[1]);
+	getData(roms[0], "roms/"+roms[0])
+	.then(function(dataname, data) {
+		g.tvc.addRom(dataname, new Uint8Array(data));
+		return getData(roms[1], "roms/"+roms[1]);
 	})
-	.then(function(data) {
-		g.tvc.addRom(roms[1], new Uint8Array(data));
-		return getData("roms/"+roms[2]);
+	.then(function(dataname, data) {
+		g.tvc.addRom(dataname, new Uint8Array(data));
+		return getData(roms[2], "roms/"+roms[2]);
 	})
-	.then(function(data) {
-		g.tvc.addRom(roms[2], new Uint8Array(data));
-		return getData("roms/"+roms[3]);
-		//// start
-		//g.isRunning = true;
-		//emuContinue();
+	.then(function(dataname, data) {
+		g.tvc.addRom(dataname, new Uint8Array(data));
+		if (roms.length > 3) {
+			return getData(roms[3], "roms/"+roms[3]);
+		}
 	})
-	.then(function(data) {
-		g.tvc.addRom(roms[3], new Uint8Array(data));
+	.then(function(dataname, data) {
+		if (dataname) {
+			g.tvc.addRom(dataname, new Uint8Array(data));
+		}
 		// start
 		g.isRunning = true;
 		emuContinue();
@@ -174,6 +172,7 @@ function emuInit() {
 	$("<option>").text("64k  1.2").val("64k 1.2").appendTo(machdrop);
 	$("<option>").text("64k+ 1.2").val("64k+ 1.2").appendTo(machdrop);
 	$("<option>").text("64k+ 2.2").val("64k+ 2.2").appendTo(machdrop);
+	$("<option>").text("64k 1.2, VT-DOS").val("64k 1.2, VT-DOS").appendTo(machdrop);
 	machdrop.on("change", function(e) {
 		var machType = machdrop[0].value;
 		emuCreate(machType);

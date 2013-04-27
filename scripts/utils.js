@@ -63,9 +63,22 @@ define(function() {
 	Utils.loadLocal = function(key, defaultval) {
 		if (this.isBrowser()) {
 			var value = window.localStorage.getItem(key);
-			return value && JSON.parse(value);
+			if (value) return JSON.parse(value);
+			return defaultval;
 		}
 		return defaultval;
+	};
+
+	Utils.setConfig = function(name, value) {
+		var conf = Utils.loadLocal("tvc~config",{});
+		conf[name] = value;
+		Utils.saveLocal("tvc~config", conf);
+	};
+
+	Utils.getConfig = function(name, defaultval) {
+		var conf = Utils.loadLocal("tvc~config",{});
+		var value = conf[name];
+		return value || defaultval;
 	};
 
 	return Utils;

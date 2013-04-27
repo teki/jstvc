@@ -12,4 +12,5 @@
  - reads from 0b21 (WARM-FLAG)
  - there is something from dff2
  - rst 38 redirected to (db99)
+ - d02b ??
  

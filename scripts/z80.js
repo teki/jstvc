@@ -164,6 +164,7 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		this._op_e = 0;
 		this._op_alures = [0,0];
 		this.bt = [];
+		this._btmaxlen = Utils.getConfig("btmaxlen", 10);
 	}
 	Z80.prototype.toString = function() {
 		return this._s.toString();
@@ -5735,7 +5736,7 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 			//this.logasm();
 			f.call(this);
 			this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
-			if (this.bt.length > 10) this.bt.shift();
+			if (this.bt.length > this._btmaxlen) this.bt.shift();
 			if (this._op_t === 0) {
 				throw ("you forgot something!");
 			}

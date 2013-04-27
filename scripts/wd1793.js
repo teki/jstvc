@@ -59,7 +59,7 @@ define(["scripts/utils.js"], function(Utils) {
 		this.Sectors = 0;    /* Sectors per track int  */
 		this.SecSize = 0;    /* Bytes per sector int  */
 
-		this.Data = undefined;      /* Disk data byte */
+		this.Data = null;      /* Disk data byte */
 		this.DataSize = 0;   /* Disk data size int  */
 
 		this.Header = new Uint8Array(6);  /* Current header, result of SeekFDI() byte */
@@ -142,7 +142,7 @@ define(["scripts/utils.js"], function(Utils) {
 	/*************************************************************/
 	FDIDisk.prototype.EjectFDI = function(D)
 	{
-		if (D.Data) D.Data = undefined;
+		if (D.Data) D.Data = null;
 		this.InitFDI(D);
 	};
 
@@ -542,7 +542,7 @@ define(["scripts/utils.js"], function(Utils) {
 	var S_DENSITY  = 0x20;
 
 	function WD1793() {
-		this.Disk = [undefined,undefined,undefined,undefined]; // Disk images FDIDisk*[4] 
+		this.Disk = [null,null,null,null]; // Disk images FDIDisk*[4] 
 		this.R = [0,0,0,0,0];        // Registers byte[5]
 		this.Drive = 0;       // Current disk # byte 
 		this.Side = 0;        // Current side # byte 
@@ -552,7 +552,7 @@ define(["scripts/utils.js"], function(Utils) {
 		this.Wait = 0;        // Expiration counter byte 
 		this.WRLength = 0;    // Data left to write int  
 		this.RDLength = 0;    // Data left to read int  
-		this.Ptr = undefined;        // Pointer to data byte*
+		this.Ptr = null;        // Pointer to data byte*
 		this.Verbose = 0;     // 1: Print debugging messages byte 
 
 	}
@@ -582,7 +582,7 @@ define(["scripts/utils.js"], function(Utils) {
 		for(J=0; J<4; J++)
 		{
 			/* Reset drive-dependent state */
-			D.Disk[J]  = Disks ? Disks[J] : undefined;
+			D.Disk[J]  = Disks ? Disks[J] : null;
 			D.Track[J] = 0;
 			/* Initialize disk structure, if requested */
 			if((Eject == WD1793_INIT) && D.Disk[J])

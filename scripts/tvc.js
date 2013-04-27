@@ -227,33 +227,21 @@ define([
 			break;
 
 		default:
-			if (addr >= 0x10 && addr <= 0x1F) {
-				if (this._ext0) {
+			if (addr >= 0x10 && addr <= 0x1F && this._ext0) {
 					this._ext0.writePort(addr & 0x0F, val);
-				}
-				else {
-					debugger;
-					throw ("unhandled device0 port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
-				}
 			}
-			else if (addr >= 0x20 && addr <= 0x2F) {
-				if (this._ext1) {
+			else if (addr >= 0x20 && addr <= 0x2F && this._ext1) {
 					this._ext1.writePort(addr & 0x0F, val);
-				}
-				else {
-					debugger;
-					throw ("unhandled device1 port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
-				}
 			}
 			else {
-				debugger;
-				throw ("unhandled port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
+				//debugger;
+				console.warn("Unhandled port write: " + Utils.toHex8(addr) + " " + Utils.toHex8(val)," (PC:",Utils.toHex16(this._z80._s.PC),")");
 			}
 		}
 	};
 
 	TVC.prototype.readPort = function(addr) {
-		var result = 0;
+		var result;
 		switch (addr) {
 		case 0x58:
 			result = this._key.readRow();
@@ -270,16 +258,15 @@ define([
 			break;
 
 		default:
-			if (addr >= 0x10 && addr <= 0x1F) {
-				if (this._ext0) resutl = this._ext0.readPort(addr & 0x0F);
-				else throw ("unhandled device0 port read " + Utils.toHex8(addr));
+			if (addr >= 0x10 && addr <= 0x1F && this._ext0) {
+				result = this._ext0.readPort(addr & 0x0F);
 			}
-			else if (addr >= 0x20 && addr <= 0x2F) {
-				if (this._ext1) result = this._ext1.readPort(addr & 0x0F);
-				else throw ("unhandled device1 port read " + Utils.toHex8(addr));
+			else if (addr >= 0x20 && addr <= 0x2F && tihs._ext1) {
+				result = this._ext1.readPort(addr & 0x0F);
 			}
 			else {
-				throw ("unhandled port read " + Utils.toHex8(addr));
+				console.warn("Unhandled port read: ", Utils.toHex8(addr)," (PC:",Utils.toHex16(this._z80._s.PC),")");
+				result = 0;
 			}
 		}
 		return result;
@@ -300,6 +287,7 @@ define([
 		else throw("invalid extension port!");
 		this._extTypes &= ~(3 << (port * 2));
 		this._extTypes |= (ext.getType() << (port * 2));
+		console.log("Added extension: ",port," ",ext.type," extTypes:",this._extTypes.toString(2));
 	};
 
 	// /////////////////////////////

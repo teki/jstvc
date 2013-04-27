@@ -11,6 +11,7 @@ define([
 	}
 
 	function HBF(rom) {
+		this.type = "HBF";
 		this.mmu = this;
 		this._rom0 = new MemBlock("ROM0", false, 4096);
 		this._rom1 = new MemBlock("ROM1", false, 4096);
@@ -44,7 +45,6 @@ define([
 	};
 
 	HBF.prototype.writePort = function(addr, val) {
-		console.log("HBF: writePort:",addr,Utils.toHex8(val));
 		var result;
 		switch(addr) {
 			case 0x00:
@@ -81,12 +81,13 @@ define([
 				}
 				break;
 			default:
+				debugger;
 				throw ("unhandled HBF port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
 		}
+		console.log("HBF: writePort: ",Utils.toHex8(addr)," ",Utils.toHex8(val));
 	};
 
 	HBF.prototype.readPort = function(addr) {
-		console.log("HBF: readPort:",addr);
 		var result;
 		switch (addr) {
 			case 0x00:
@@ -112,8 +113,10 @@ define([
 				result |= (this._fdc.IRQ & 0x40) ? 1 : 0;
 				break;
 			default:
+				debugger;
 				throw ("unhandled HBF port read " + Utils.toHex8(addr));
 		}
+		console.log("HBF: readPort: ",Utils.toHex8(addr)," ",Utils.toHex8(result));
 		return result;
 	};
 
