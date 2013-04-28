@@ -118,7 +118,10 @@ function emuInit() {
 	g.fb = {};
 	g.fb.updatetime = g.timenow();
 	g.fb.updatecnt = 0;
+	g.fb.updates = [];
+	g.fb.skipcnt = 0;
 	g.fb.fps = $("#fps")[0];
+	g.fb.fpsv = 0;
 	g.fb.width = g.canvas[0].width;
 	g.fb.height = g.canvas[0].height;
 	g.fb.imageData = g.ctx.createImageData(g.fb.width, g.fb.height);
@@ -128,13 +131,18 @@ function emuInit() {
 	g.fb.refresh = function() {
 		g.fb.imageData.data.set(g.fb.buf8);
 		g.ctx.putImageData(g.fb.imageData, 0, 0);
-		g.fb.updatecnt += 1;
+		g.fb.updatecnt++;
 		var timenow = g.timenow();
-		if ((timenow - g.fb.updatetime) > 500) {
-			var fps = ~~(g.fb.updatecnt / ((timenow - g.fb.updatetime) / 1000));
-			notify("running " + fps.toString(10) + "fps");
+		if ((timenow - g.fb.updatetime) > 1000) {
+			g.fb.updates.push([g.fb.updatecnt, timenow]);
+			if (g.fb.updates.length > 5) g.fb.updates.shift();
 			g.fb.updatetime = timenow;
-			g.fb.updatecnt = 0;
+
+			var cntdiff = g.fb.updates[g.fb.updates.length -1][0] - g.fb.updates[0][0];
+			var timediff = g.fb.updates[g.fb.updates.length -1][1] - g.fb.updates[0][1];
+
+			g.fb.fpsv = ~~(cntdiff / (timediff / 1000));
+			notify("running " + g.fb.fpsv.toString(10) + "fps");
 		}
 	};
 	emuCreate("64k 1.2");
@@ -216,13 +224,15 @@ function emuRunFrame() {
 	if (!g.isRunning) {
 		return;
 	}
-	// run + update + continue
-	if (g.tvc.runForAFrame()) {
+	g.fb.skipcnt++;
+	var skip = (g.fb.fpsv >= 45) && (g.fb.skipcnt == 8);
+	if (g.fb.skipcnt >= 8) g.fb.skipcnt = 0;
+
+	if (!skip && g.tvc.runForAFrame()) {
 		g.isRunning = false;
 		$("#bstop").text("continue");
 	}
 	else {
-		//g.regs.innerHTML = g.tvc._z80.toString();
 		emuContinue();
 	}
 }
