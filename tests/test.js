@@ -4,7 +4,7 @@ requirejs.config({
     nodeRequire: require
 });
 
-requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js"], function(Z80Module, Utils, VIDModule) {
+requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm.js"], function(Z80Module, Utils, VIDModule, DASM) {
 /*
 	var F_S = 0x80; // sign
 	var F_Z = 0x40; // zero
@@ -33,32 +33,6 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js"], function(Z80
 			return this._mem;
 		}
 
-		this.dasm = function (addr, lines, prefix, noLdir) {
-			var offset = 0,
-				res = [],
-				d, i, str, oplen, line;
-			do {
-				d = Z80Module.decodeZ80(this, addr + offset);
-				oplen = d[1];
-
-				str = Utils.toHex16(addr + offset) + " ";
-				for (i = 0; i < 4; i++) {
-					if (i < oplen) {
-						str += Utils.toHex8(this.r8(addr + offset + i)) + " ";
-					}
-					else {
-						str += "   ";
-					}
-				}
-				line = prefix + str + d[0];
-				if (!noLdir || -1 == line.indexOf("LDIR")) {
-					res.push(line);
-				}
-				offset += oplen;
-				lines--;
-			} while (lines);
-			return res;
-		};
 		this.r8 = function (addr) {
 			addr &= 0xFFFF;
 			var val = this._mem[addr];
@@ -110,9 +84,10 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js"], function(Z80
 		var z80 = new Z80Module.Z80(fakeMmu,
 			function(port, addr) {fakeMmu.out8(port,addr);},
 			null);
+		z80._btmaxlen = 0;
 
 		while (true) {
-			z80.step();
+			z80.step(0);
 		}
 	};
 
@@ -133,17 +108,20 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js"], function(Z80
 		// first test address
 		fakemmu.w8(0x120, 0x3A + 2 * skipCnt);
 
-		console.log(Z80Module);
 		var z80 = new Z80Module.Z80(fakemmu,
 			function(port, addr) {fakemmu.out8(port,addr);},
 			null);
+		z80._btmaxlen = 0;
 		z80._s.PC = 0x100;
 
 		while (true) {
-			z80.step();
+			z80.step(0);
 			var pc = z80._s.PC;
 			if (pc == 0x1D42 && doDasm) {
-				console.log(fakemmu.dasm(z80._s.PC, 1, "%% ", false).join("\n"));
+				var r = function(addr) {
+					return fakemmu.r8(addr);
+				}
+				console.log("%%",Utils.toHex16(pc)," ",DASM.Dasm([r, pc])[0]);
 			}
 			// 0 = soft reset
 			else if (pc == 0) {
@@ -250,6 +228,7 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js"], function(Z80
 			function(port, val, expectedval) {fakemmu.out8(port,val, expectedval);},
 			function(port, expectedval) {return fakemmu.in8(port,expectedval);}
 			);
+		z80._btmaxlen = 0;
 
 		lr = 0;
 		for (l in testData) {
@@ -301,7 +280,7 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js"], function(Z80
 			log.length = 0;
 			var totalRunTime = 0;
 			while (runTime > 0) {
-				var stepTime = z80.step();
+				var stepTime = z80.step(0);
 				runTime -= stepTime;
 				totalRunTime += stepTime;
 			}
