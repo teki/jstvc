@@ -1,5 +1,6 @@
 #extension cards
 
+ - init in rom: f102
  - init address read from c00b (tvc-rom page 396)
  - call init with: C: type, B: 04, IX: 0040
  - start with "MOPS", then device name (prefixed with length, like 04DISK)

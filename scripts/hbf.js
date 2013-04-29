@@ -81,8 +81,8 @@ define([
 				}
 				break;
 			default:
-				debugger;
-				throw ("unhandled HBF port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
+				//debugger;
+				console.warn("unhandled HBF port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
 		}
 		console.log("HBF: writePort: ",Utils.toHex8(addr)," ",Utils.toHex8(val));
 	};
@@ -113,10 +113,10 @@ define([
 				result |= (this._fdc.IRQ & 0x40) ? 1 : 0;
 				break;
 			default:
-				debugger;
-				throw ("unhandled HBF port read " + Utils.toHex8(addr));
+				//debugger;
+				console.warn("unhandled HBF port read " + Utils.toHex8(addr));
 		}
-		console.log("HBF: readPort: ",Utils.toHex8(addr)," ",Utils.toHex8(result));
+		console.log("HBF: readPort: ",Utils.toHex8(addr));
 		return result;
 	};
 

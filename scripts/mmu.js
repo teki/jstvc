@@ -54,7 +54,6 @@ define(["scripts/utils.js"], function(Utils) {
 	MMU.prototype.addRom = function(name, data) {
 		var i;
 		var dataCrc = Utils.crc32(data);
-		console.log("ADD ROM: %s crc: 0x%s", name, dataCrc.toString(16));
 		switch(name) {
 			case "TVC12_D7.64K":
 				if (dataCrc != 0x1cbbeac6) throw ("invalid rom ("+name+")!");

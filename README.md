@@ -18,7 +18,7 @@ TVC rajongói oldal: http://www.tvc.hu
 # Működik (működget)
 
 * Z80
-	* a FUSE és ZXDOC tesztek lefutnak hiba nélkül
+	* a FUSE és ZXDOC/ALL tesztek lefutnak hiba nélkül
 	* utasítás hosszabbítás nincs
 * CRTC
 	* Motorla 6845 emuláció
