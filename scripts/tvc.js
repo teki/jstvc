@@ -42,6 +42,7 @@ define([
 		}, function(addr) {
 			return TVCthis.readPort(addr);
 		});
+		this._z80._logdasm = true;
 
 		this._mmu.breakAddr = Utils.loadLocal("tvc~memory-breakpoints", null);
 	}
@@ -52,6 +53,7 @@ define([
 	};
 
 	TVC.prototype.addRom = function(name, data) {
+		console.log("ADD ROM: ", name);
 		if (name == "D_TVCDOS.128") {
 			this.extensionAttach(0, new HBF.HBF(data));
 		}
@@ -234,7 +236,7 @@ define([
 					this._ext1.writePort(addr & 0x0F, val);
 			}
 			else {
-				//debugger;
+				debugger;
 				console.warn("Unhandled port write: " + Utils.toHex8(addr) + " " + Utils.toHex8(val)," (PC:",Utils.toHex16(this._z80._s.PC),")");
 			}
 		}
