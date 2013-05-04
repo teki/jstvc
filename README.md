@@ -43,13 +43,15 @@ TVC rajongói oldal: http://www.tvc.hu
 	* http://sourceforge.net/p/fuse-emulator/code/HEAD/tree/trunk/fuse/z80/tests/
 	* http://mdfs.net/Software/Z80/Exerciser/
 * wd1793 implementáció: http://fms.komkon.org/EMUL8/
+* zip: http://stuk.github.io/jszip/
+* vasm: http://sun.hasenbraten.de/vasm/
 
 # Debugger
 
 A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel kezdődő utasítások használhatók debuggolásra:
 
 	* g.tvc.db("0010,3000") - új breakpoint(ok), paraméter nélkül: breakpoint-ok litázása
-	* g.tvc.dd("0010") - breakpoint törlése ("all" törli az összeset)
+	* g.tvc.dd("0010") - breakpoint törlése ("all" törli az összeset), lehet regisztereket is használni
 	* g.tvc.dreg() - regiszterek tartalma
 	* g.tvc.dstep() - egy utasítás végrehajtása
 	* g.tvc.dmem(cím, [sorok száma], [bájt per sor]) - memóriatartalom listázása
@@ -57,9 +59,13 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 
 # Verzió történet
 
+v0.2
  * debugger g.tvc.[step,b,bd,dumpMem,dasm]
  * z80 LD r,(IY+d) fix
- * wd1793 emuláció
+ * cpu tesztek javítva, használat: node tests/test.js   (meg fogja mondani milyen tesztek vannak)
+ * minden beépített teszt lefut hiba nélkül!
+ * wd1793 emuláció (nem működik)
+ * assembler kezdetek (http://teki.github.io/jstvc/asm.html), még csak épp működik, nincs integrálva az emulátorral. Egy mintát azért bele tettem, azt lefordítva egy működő cas fájl lesz az eredmény, ami a save linkkel letölthető (sajna a letöltésnek nem lesz szép fájlneve, át kell nevezni zip-re)
 
 v0.1.1
 
