@@ -33,7 +33,7 @@ module.exports = function(grunt) {
 		var done = grunt.task.current.async();
 		var exec = require('child_process').exec;
 		exec("rm -rf build; mkdir build", function(e,i,o) {
-		exec("cp -R .gitignore data frontend.js index.html scripts 3rdparty style roms *jpg build", function(e,i,o) {
+		exec("cp -R .gitignore data frontend.js index.html asm.html scripts 3rdparty style roms *jpg build", function(e,i,o) {
 		exec("grep --colour=none -m 1 -E '^v' README.md", function(e,i,o) {
 		exec("sed -i 's/VVEERR/"+i.trim()+"/g' build/index.html", function(e,i,o) {
 			done();
