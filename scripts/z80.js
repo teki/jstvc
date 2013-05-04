@@ -5786,11 +5786,15 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		this.bt = [];
 	};
 
-	Z80.prototype.btToString = function() {
+	Z80.prototype.btToString = function(limit) {
 		var self = this;
 		var arr = [];
-		var i;
-		for(i=0; i<this.bt.length; i++) {
+		var i = 0;
+		if (limit) {
+			i = this.bt.length - limit;
+			if (i < 0) i = 0;
+		}
+		for(; i<this.bt.length; i++) {
 			var o = this.bt[i];
 			arr.push(Utils.toHex16(o[0]) + " " + Dasm.Dasm(o)[0]);
 		}
