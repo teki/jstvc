@@ -42,7 +42,7 @@ define([
 		}, function(addr) {
 			return TVCthis.readPort(addr);
 		});
-		this._z80._logdasm = true;
+		//this._z80._logdasm = true;
 
 		this._mmu.breakAddr = Utils.loadLocal("tvc~memory-breakpoints", null);
 	}
@@ -54,7 +54,7 @@ define([
 
 	TVC.prototype.addRom = function(name, data) {
 		console.log("ADD ROM: ", name);
-		if (name == "D_TVCDOS.128") {
+		if (/DOS/.test(name)) {
 			this.extensionAttach(0, new HBF.HBF(data));
 		}
 		else {
@@ -151,6 +151,7 @@ define([
 
 		case 0x02:
 			this._mmu.setMap(val);
+			//console.log(this._mmu.toString());
 			break;
 
 		case 0x03:
@@ -158,10 +159,10 @@ define([
 			this._extCartMapping = val >>> 6;
 			switch(this._extCartMapping) {
 				case 0:
-					if (this._ext0) this._mmu.extmmu = this._ext0.mmu;
+					//if (this._ext0) this._mmu.extmmu = this._ext0.mmu;
 					break;
 				case 1:
-					if (this._ext1) this._mmu.extmmu = this._ext1.mmu;
+					//if (this._ext1) this._mmu.extmmu = this._ext1.mmu;
 					break;
 				default:
 					this._mmu.extmmu = null;
@@ -231,12 +232,14 @@ define([
 		default:
 			if (addr >= 0x10 && addr <= 0x1F && this._ext0) {
 					this._ext0.writePort(addr & 0x0F, val);
+					if (addr == 0x18)
+						console.log(this._mmu.toString());
 			}
 			else if (addr >= 0x20 && addr <= 0x2F && this._ext1) {
 					this._ext1.writePort(addr & 0x0F, val);
 			}
 			else {
-				debugger;
+				//debugger;
 				console.warn("Unhandled port write: " + Utils.toHex8(addr) + " " + Utils.toHex8(val)," (PC:",Utils.toHex16(this._z80._s.PC),")");
 			}
 		}
@@ -257,6 +260,7 @@ define([
 
 		case 0x5A:
 			result = this._extTypes;
+			result = 0xff;
 			break;
 
 		default:
@@ -268,7 +272,7 @@ define([
 			}
 			else {
 				console.warn("Unhandled port read: ", Utils.toHex8(addr)," (PC:",Utils.toHex16(this._z80._s.PC),")");
-				result = 0;
+				result = 0xff;
 			}
 		}
 		return result;
@@ -281,6 +285,7 @@ define([
 		if (port == 0) {
 			this._ext0 = ext;
 			this._ext0.mmu.name = "CART0";
+			//this._mmu.extmmu = this._ext0.mmu;
 		}
 		else if (port == 1) {
 			this._ext1 = ext;
@@ -348,6 +353,9 @@ define([
 	};
 
 	TVC.prototype.db = function(bps) {
+		if (typeof(bps) == "number") {
+			bps = bps.toString(16);
+		}
 		if (!bps) {
 			if (this._breakpoints) {
 				var arr = [];
@@ -376,6 +384,10 @@ define([
 	};
 
 	TVC.prototype.dd = function(bp) {
+		if (typeof(bp) == "number") {
+			if (bp == -1) bp = "all";
+			else bp = bp.toString(16);
+		}
 		if (bp == "all") {
 			this._breakpoints = null;
 		}
@@ -391,13 +403,26 @@ define([
 	};
 
 	TVC.prototype.dreg = function() {
+		var l = 3;
 		var arr = [];
-		arr.push(this._z80.toString());
-		arr.push(this._mmu.toString());
-		//arr = arr.concat(this._z80.btToString());
-		//arr[arr.length-1] = '<span class="greenline">' + arr[arr.length-1] + "</span>";
-		console.log(arr.join("\n"));
-		this.dasm("PC");
+		var addr = this._z80._s.PC;
+		var line;
+		var arr = [];
+		var self = this;
+		var r = function(addrr) {
+			return self._mmu.r8(addrr);
+		};
+		console.log(this._z80.toString());
+		console.log(this._mmu.toString());
+		console.log(this._z80.btToString(5).slice(0,-1).join("\n"));
+		line = DASM.Dasm([r, addr]);
+		console.log("%c%s", "color: green; font-weight: bold;", Utils.toHex16(addr) + " " + line[0]);
+		addr += line[1];
+		while (l--) {
+			line = DASM.Dasm([r, addr]);
+			console.log(Utils.toHex16(addr) + " " + line[0]);
+			addr += line[1];
+		}
 	};
 
 	TVC.prototype.dbt = function() {
@@ -405,21 +430,32 @@ define([
 		console.log(arr.join("\n"));
 	};
 
-	TVC.prototype.dstep = function() {
+	TVC.prototype.dstep = function(breakOnNext) {
 		var cpuTime = 0;
 		var drawInfo = [false,false];
-		cpuTime = this._z80.step(0);
-		this._clock += cpuTime;
-		drawInfo = this._vid.streamSome(cpuTime);
-		if (drawInfo[0]) { // crtc is not yet initialized
-			if (drawInfo[1] && this._z80.irqEnabled()) { // it
-				var irqDuration = this._z80.irq();
-				this._pendIt &= ~(0x10); // cursor IT
-				this._vid.streamSome(irqDuration);
+		var self = this;
+		var r = function(addrr) {
+			return self._mmu.r8(addrr);
+		};
+		var line;
+		line = DASM.Dasm([r, this._z80._s.PC]);
+		var dstPC = this._z80._s.PC + line[1];
+		while (true) {
+			cpuTime = this._z80.step(0);
+			this._clock += cpuTime;
+			drawInfo = this._vid.streamSome(cpuTime);
+			if (drawInfo[0]) { // crtc initialized
+				if (drawInfo[1] && this._z80.irqEnabled()) { // it
+					var irqDuration = this._z80.irq();
+					this._pendIt &= ~(0x10); // cursor IT
+					this._vid.streamSome(irqDuration);
+				}
+				if (this._vid.renderStream()) {
+					this._fb.refresh();
+				}
 			}
-			if (this._vid.renderStream()) {
-				this._fb.refresh();
-			}
+			if (!breakOnNext || (this._z80._s.PC == dstPC))
+				break;
 		}
 		this.dreg();
 	};

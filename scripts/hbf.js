@@ -4,33 +4,28 @@ define([
 	], function(Utils, WD1793) {
 	var exports = {};
 
-	function MemBlock(name, isRam, size) {
+	function MemBlock(name, isRam, buffer, offset, size) {
 		this.name = name;
 		this.isRam = isRam;
-		this.m = new Uint8Array(size);
+		if (isRam) this.m = new Uint8Array(size);
+		else this.m = new Uint8Array(buffer, offset, size);
 	}
 
 	function HBF(rom) {
 		this.type = "HBF";
 		this.mmu = this;
-		this._rom0 = new MemBlock("ROM0", false, 4096);
-		this._rom1 = new MemBlock("ROM1", false, 4096);
-		this._rom2 = new MemBlock("ROM2", false, 4096);
-		this._rom3 = new MemBlock("ROM3", false, 4096);
+		this._rom0 = new MemBlock("ROM0", false, rom.buffer, 0x0000, 0x1000);
+		this._rom1 = new MemBlock("ROM1", false, rom.buffer, 0x1000, 0x1000);
+		this._rom2 = new MemBlock("ROM2", false, rom.buffer, 0x2000, 0x1000);
+		this._rom3 = new MemBlock("ROM3", false, rom.buffer, 0x3000, 0x1000);
 
 		this._rom = this._rom0;
-		this._ram = new MemBlock("RAM", true, 4096);
+		this._ram = new MemBlock("RAM", true, null, 0, 4096);
 
 		this._disks = [undefined, undefined, undefined, undefined];
 		this._fdc = new WD1793.WD1793();
 
 		this._fdc.Reset1793(this._fdc, this._disks, 0);
-
-		var i;
-		for(i=0x0000; i < 0x1000; i++) this._rom0.m[i] = rom[i];
-		for(i=0x1000; i < 0x2000; i++) this._rom1.m[i-0x1000] = rom[i];
-		for(i=0x2000; i < 0x3000; i++) this._rom2.m[i-0x2000] = rom[i];
-		for(i=0x3000; i < 0x4000; i++) this._rom3.m[i-0x3000] = rom[i];
 	}
 
 	HBF.prototype.toString = function(mmu) {
@@ -92,29 +87,37 @@ define([
 		switch (addr) {
 			case 0x00:
 				// FDC state
-				result = this._fdc.Read1793(this._fdc, addr); 
+				//result = this._fdc.Read1793(this._fdc, addr); 
+				retult = 0;
 				break;
 			case 0x01:
 				// FDC track
-				result = this._fdc.Read1793(this._fdc, addr); 
+				//result = this._fdc.Read1793(this._fdc, addr); 
+				retult = 0;
 				break;
 			case 0x02:
 				// FDC sector
-				result = this._fdc.Read1793(this._fdc, addr); 
+				//result = this._fdc.Read1793(this._fdc, addr); 
+				retult = 0;
 				break;
 			case 0x03:
 				// FDC data
-				result = this._fdc.Read1793(this._fdc, addr); 
+				//result = this._fdc.Read1793(this._fdc, addr); 
+				retult = 0;
 				break;
 			case 0x04:
 				// INTRQ,0,0,0,0,0,0,DRQ
 				// faster to use than FDC
+				retult = 0;
+				/*
 				result = this._fdc.IRQ & 0x80;
 				result |= (this._fdc.IRQ & 0x40) ? 1 : 0;
+				*/
 				break;
 			default:
 				//debugger;
 				console.warn("unhandled HBF port read " + Utils.toHex8(addr));
+				result = 0xff;
 		}
 		console.log("HBF: readPort: ",Utils.toHex8(addr));
 		return result;

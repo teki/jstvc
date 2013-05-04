@@ -58,8 +58,9 @@ function emuCreate(type) {
 	g.isRunning = false;
 	g.tvc = new TVCModule.TVC(type,callback);
 	var roms;
-	if (/DOS/.test(type)) roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K", "D_TVCDOS.128"];
+	//if (/DOS/.test(type)) roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K", "D_TVCUPM.128"];
 	//if (/DOS/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K", "D_TVCDOS.128"];
+	if (/DOS/.test(type)) roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K", "D_TVCDOS.128"];
 	else if (/2\.2/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
 	else roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
 	// load roms
@@ -154,10 +155,11 @@ function emuInit() {
 		}
 	};
 	var emuDefs = [
-		"64k+ 2.2, VT-DOS",
 		"64k  1.2",
 		"64k+ 1.2",
-		"64k+ 2.2" ];
+		"64k+ 2.2",
+		"64k+ 2.2, VT-DOS (not working)"
+			];
 	emuCreate(emuDefs[0]);
 	// gui
 	$("#breset").on("click", function() {
@@ -173,6 +175,7 @@ function emuInit() {
 		$("#step").focus();
 	});
 	// img loading + selection
+	var i;
 	var imgdrop = $("#scas");
 	$("#bload").on("click", function () {
 		var imgname = imgdrop[0].value;
@@ -184,13 +187,13 @@ function emuInit() {
 				notify("loaded", dataname + "\nTip: run + [enter]");
 			});
 	});
-	for( var i = 0; i < datalist.length; i++ )
+	for(i = 0; i < datalist.length; i++ )
 	{
 			$("<option>").text(datalist[i]).val(datalist[i]).appendTo(imgdrop);
 	}
 	// machine type
 	var machdrop = $("#smach");
-	for ( var i = 0; i < emuDefs.length; i++ ) {
+	for (i = 0; i < emuDefs.length; i++ ) {
 		$("<option>").text(emuDefs[i]).val(emuDefs[i]).appendTo(machdrop);
 	}
 	machdrop.on("change", function(e) {
@@ -236,8 +239,8 @@ function emuRunFrame() {
 		//console.timeEnd("arf");
 		//console.time("arf");
 	if (!g.isRunning) return;
-	var skip = false;
 /*
+	var skip = false;
 	g.fb.skipcnt++;
 	if (g.fb.skipcnt > 1) {
 		//if (g.fb.fpsv >= 50) {
@@ -245,13 +248,13 @@ function emuRunFrame() {
 		//}
 		g.fb.skipcnt = 0;
 	}
-*/
 	if (!skip) {
 		//console.time("RunForAFrame");
+*/
 		var breakPointHit = g.tvc.runForAFrame();
 		//console.timeEnd("RunForAFrame");
 		if (breakPointHit) emuBreak();
-	}
+//	}
 
 	if (g.isRunning) emuContinue();
 }

@@ -2,9 +2,9 @@ define(["scripts/utils.js"], function(Utils) {
 	var exports = {};
 
 	function MemBlock(name, isRam, size) {
-	  this.name = name;
-	  this.isRam = isRam;
-	  this.m = new Uint8Array(size);
+		this.name = name;
+		this.isRam = isRam;
+		this.m = new Uint8Array(size);
 	}
 	function MMU(type) {
 		this._isPlus = /\+/.test(type);
@@ -85,7 +85,7 @@ define(["scripts/utils.js"], function(Utils) {
 				for (i = 0; i < data.length; i++) this._sys.m[0x2000+i] = data[i];
 				break;
 		}
-	}
+	};
 
 	MMU.prototype.reset = function() {
 		this.setVidMap(0);
@@ -173,7 +173,7 @@ define(["scripts/utils.js"], function(Utils) {
 			case 0x20: this.crtmem = this._vid2.m; break;
 			case 0x30: this.crtmem = this._vid3.m; break;
 		}
-	}
+	};
 
 	MMU.prototype.getMap = function() {
 		return this._mapVal;
@@ -185,7 +185,8 @@ define(["scripts/utils.js"], function(Utils) {
 		result += "," + this._map[1].name;
 		result += "," + this._map[2].name;
 		if (this._map[3]) result += "," + this._map[3].name;
-		else result += ",EXT+" + this.extmmu.name + "(" + this.extmmu.toString(true) + ")";
+		else if (this.extmmu) result += ",EXT+" + this.extmmu.name + "(" + this.extmmu.toString(true) + ")";
+		else result += ",EXT";
 		return result;
 	};
 
