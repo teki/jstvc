@@ -163,6 +163,9 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		this._op_nn = 0;
 		this._op_e = 0;
 		this._op_alures = [0,0];
+		this._btmaxlen = Utils.getConfig("btmaxlen", 10);
+		this._logdasm = false;
+		this._dasmtxt = "";
 		this.bt = [];
 	}
 	Z80.prototype.toString = function() {
@@ -347,8 +350,8 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 			this._op_t = 20;
 			this._op_m = 4;
 			var addr = (this._s[reg] + this._op_displ) & 0xFFFF;
-			var memval = this._mmu.r8(addr);
-			var val = memval & mask;
+			var srcval = this._mmu.r8(addr);
+			var val = srcval & mask;
 			this._s.F =
 				(val & F_S) |
 				((val) ? (0) : (F_Z|F_PV)) |
@@ -363,12 +366,13 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		return function() {
 			this._op_t = 12;
 			this._op_m = 2;
-			var memval = this._mmu.r8(this._s.HL);
-			var val = memval & mask;
+			var addr = this._s.HL;
+			var srcval = this._mmu.r8(addr);
+			var val = srcval & mask;
 			this._s.F =
 				(val & F_S) |
 				((val) ? (0) : (F_Z|F_PV)) |
-				(memval & (F_3|F_5)) |
+				((addr >>> 8) & (F_3|F_5)) |
 				F_H |
 				(this._s.F & F_C);
 		}
@@ -379,11 +383,12 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		return function() {
 			this._op_t = 8;
 			this._op_m = 2;
-			var val = this._s[reg] & mask;
+			var srcval = this._s[reg];
+			var val = srcval & mask;
 			this._s.F =
 				(val & F_S) |
 				((val) ? (0) : (F_Z|F_PV)) |
-				(this._s[reg] & (F_3|F_5)) |
+				(srcval & (F_3|F_5)) |
 				F_H |
 				(this._s.F & F_C);
 		}
@@ -4962,7 +4967,7 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		0xFD46:function () { // LD B,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			this._op_displ = this._mmu.r8(this._s.PC+2);
+			this._op_displ = this._mmu.r8s(this._s.PC+2);
 			this._s.B = this._mmu.r8(this._s.IY+this._op_displ);
 		},
 		0xFD4C:function () { // LD C,IYH*
@@ -4978,7 +4983,7 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		0xFD4E:function () { // LD C,(IY+d)
 			this._op_t = 19;
 			this._op_m = 3;
-			this._op_displ = this._mmu.r8(this._s.PC+2);
+			this._op_displ = this._mmu.r8s(this._s.PC+2);
 			this._s.C = this._mmu.r8(this._s.IY+this._op_displ);
 		},
 		0xFD54:function () { // LD D,IYH*
@@ -5729,12 +5734,20 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 				}
 			}
 			if (!f) {
-				console.log(this._mmu.dasm(pc, 5, "??? ").join("\n"));
+				//console.log(this._mmu.dasm(pc, 5, "??? ").join("\n"));
 				throw ("not implemented:" + Utils.toHex8(opcode));
 			}
 			//this.logasm();
 			f.call(this);
-			//this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
+			if (this._btmaxlen) {
+				this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
+				if (this.bt.length > this._btmaxlen) this.bt.shift();
+			}
+			if (this._logdasm) {
+				var o = [btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ];
+				var strinn = Utils.toHex16(o[0]) + " " + Dasm.Dasm(o)[0] + "\n";
+				this._dasmtxt += strinn;
+			}
 			if (this._op_t === 0) {
 				throw ("you forgot something!");
 			}
@@ -5773,18 +5786,22 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 		this.bt = [];
 	};
 
-	Z80.prototype.btToString = function() {
+	Z80.prototype.btToString = function(limit) {
 		var self = this;
 		var arr = [];
-		var i;
-		for(i=0; i<this.bt.length; i++) {
+		var i = 0;
+		if (limit) {
+			i = this.bt.length - limit;
+			if (i < 0) i = 0;
+		}
+		for(; i<this.bt.length; i++) {
 			var o = this.bt[i];
-			arr.push(Utils.toHex16(o[0]) + " " + Dasm.Dasm(o));
+			arr.push(Utils.toHex16(o[0]) + " " + Dasm.Dasm(o)[0]);
 		}
 		var r = function(addr) {
 			return self._mmu.r8(addr);
 		}
-		arr.push(Utils.toHex16(this._s.PC) + " " + Dasm.Dasm([r, this._s.PC]));
+		arr.push(Utils.toHex16(this._s.PC) + " " + Dasm.Dasm([r, this._s.PC])[0]);
 		return arr;
 	};
 

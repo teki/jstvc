@@ -1,0 +1,124 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=utf-8">
+<title>tvc asm</title>
+<script>
+	var textA;
+	var editor;
+	var Utils;
+</script>
+<script src="3rdparty/jquery-1.9.0.min.js"></script>
+<script src="3rdparty/require.js"></script>
+<script src="3rdparty/behave.js"></script>
+<script src="3rdparty/vasmz80_oldstyle.js"></script>
+<script src="3rdparty/jszip.js"></script>
+<script>
+	var testScript = "LIST\n\
+\n\
+startaddr = 6639-128-16\n\
+datalen = $3000 - startaddr + 1\n\
+applen = datalen - 128 - 16\n\
+blockcnt = datalen / 128\n\
+blockbyt = (datalen % 128) & 255\n\
+\n\
+; cas header (ez jobb lenne kulon progiba, majd kesobb)\n\
+		org startaddr\n\
+		byte $11, $00\n\
+		byte blockcnt % 256, blockcnt / 256\n\
+		byte blockbyt\n\
+		blk 128-5\n\
+		byte $00, $01\n\
+		byte applen & 255, applen / 256\n\
+		blk 16-4\n\
+\n\
+\n\
+; 10 print usr(6912)\n\
+		org 6639\n\
+		byte $0f,$0a,$00,$dd,$20,$55,$53,$52\n\
+		byte $96,$36,$39,$31,$32,$95,$ff\n\
+\n\
+; ide jon a kod\n\
+		org $1b00\n\
+\n\
+		ld hl,11\n\
+		ret\n\
+\n\
+; egy extra szegmens, hogy a fajlmeret fix legyen (bizti van vmi megoldas hogy ne kelljen)\n\
+		org $3000\n\
+		byte $76\n\
+\n\
+		end\n\
+";
+	function appStart() {
+		textA = $("#myeditor");
+		editor = new Behave({
+			textarea: textA[0],
+			replaceTab: true,
+			softTabs: false,
+			tabSize: 4,
+			autoOpen: true,
+			overwrite: true,
+			autoStrip: true,
+			autoIndent: true,
+			fence: false
+		});
+		requirejs(["scripts/utils.js"], function(UTILS) {
+			Utils = UTILS;
+			var editText = Utils.loadLocal("tvc~asm1",testScript);
+			textA.val(editText);
+			textA.on("keydown", function(e) {
+				Utils.saveLocal("tvc~asm1", textA.val());
+			});
+			$("#comp").on("click", function(e) {compileBuffer();}) ;
+		});
+	}
+	function compileBuffer() {
+		Utils.saveLocal("tvc~asm1", textA.val());
+		var code = Utils.loadLocal("tvc~asm1","");
+		var res = {'out': "", 'err': ""};
+		ASM(code, res);
+		if (!res.ret) {
+			$("#buildres").val(res.err);
+		}
+		else {
+			var j = 0;
+			var strline = "";
+			var resstr = "";
+			for(var i = 0; i < res.data.length; i++) {
+				strline += res.data[i].toString(10);
+				if (j++ == 7) {
+					resstr += strline + "\n";
+					strline = "";
+					j = 0;
+				}
+				else if (i != res.data.length -1) {
+					strline += ",";
+				}
+			}
+			if (strline.length) {
+				resstr += strline + "\n";
+			}
+			$("#buildres").val(resstr);
+			var zip = new JSZip();
+			zip.file("prog.cas", res.data);
+			var zipcontent = zip.generate();
+			$("#saveme").attr("href", "data:application/zip;base64,"+zipcontent);
+		}
+	}
+</script>
+</head>
+<body onload="appStart();">
+
+<div>
+	<button id="comp">compile</button>
+	<a id="saveme" href="">save</a>
+</div>
+<div>
+	<textarea style="float: left;" id="myeditor" rows="30" cols="50"></textarea>
+	<textarea id="buildres" rows="30" cols="40"></textarea>
+</div>
+
+</body>
+
+</html>

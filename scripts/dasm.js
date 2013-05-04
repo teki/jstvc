@@ -1336,7 +1336,7 @@ define(function() {
 						n = reader(pc++);
 					}
 					else {
-						nn = (n << 8) | reader(pc++);
+						nn = (reader(pc++) << 8) | n;
 					}
 					break;
 				}
@@ -1357,7 +1357,7 @@ define(function() {
 			if (d & 0x80) d = -((~d + 1) & 0xFF);
 			restxt = restxt.replace("d", d);
 			if (d < 0) {
-				restxt = testxt.replace("+","");
+				restxt = restxt.replace("+","");
 			}
 		}
 		if (rescode.indexOf("e") != -1) {
@@ -1370,8 +1370,8 @@ define(function() {
 			}
 		}
 		if (rescode.indexOf("n n") != -1) {
+			rescode = rescode.replace("n", toHex8((nn & 0xFF) >> 0));
 			rescode = rescode.replace("n", toHex8((nn & 0xFF00) >> 8));
-			rescode = rescode.replace("n", toHex8(nn & 0xFF));
 			restxt = restxt.replace("n", toHex8((nn & 0xFF00) >> 8));
 			restxt = restxt.replace("n", toHex8(nn & 0xFF));
 		}
@@ -1379,7 +1379,7 @@ define(function() {
 			rescode = rescode.replace("n", toHex8(n));
 			restxt = restxt.replace("n", toHex8(n));
 		}
-		return rescode + "        ".substr(0,10-rescode.length) + restxt;
+		return [rescode + "          ".substr(0,12-rescode.length) + restxt, op[2] ];
 	}
 
 	var Z80Dasm = {};
