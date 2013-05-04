@@ -1,0 +1,10 @@
+--- vasm/output_bin.c	2009-01-11 06:19:36.000000000 +1100
++++ output_bin.c	2013-05-03 23:09:55.661144340 +1000
+@@ -46,6 +46,7 @@
+   for (s=sec; s; s=s->next) {
+     if (s!=sec && s->org>pc) {
+       /* fill gap between sections with zeros */
++		if (pc == 0) pc=s->org;
+       for (; pc<s->org; pc++)
+         fw8(f,0);
+     }
