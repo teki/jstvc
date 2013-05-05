@@ -79,7 +79,7 @@ define([
 				//debugger;
 				console.warn("unhandled HBF port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
 		}
-		console.log("HBF: writePort: ",Utils.toHex8(addr)," ",Utils.toHex8(val));
+		//console.log("HBF: writePort: ",Utils.toHex8(addr)," ",Utils.toHex8(val));
 	};
 
 	HBF.prototype.readPort = function(addr) {
@@ -87,39 +87,32 @@ define([
 		switch (addr) {
 			case 0x00:
 				// FDC state
-				//result = this._fdc.Read1793(this._fdc, addr); 
-				retult = 0;
+				result = this._fdc.Read1793(this._fdc, addr); 
 				break;
 			case 0x01:
 				// FDC track
-				//result = this._fdc.Read1793(this._fdc, addr); 
-				retult = 0;
+				result = this._fdc.Read1793(this._fdc, addr); 
 				break;
 			case 0x02:
 				// FDC sector
-				//result = this._fdc.Read1793(this._fdc, addr); 
-				retult = 0;
+				result = this._fdc.Read1793(this._fdc, addr); 
 				break;
 			case 0x03:
 				// FDC data
-				//result = this._fdc.Read1793(this._fdc, addr); 
-				retult = 0;
+				result = this._fdc.Read1793(this._fdc, addr); 
 				break;
 			case 0x04:
 				// INTRQ,0,0,0,0,0,0,DRQ
 				// faster to use than FDC
-				retult = 0;
-				/*
 				result = this._fdc.IRQ & 0x80;
 				result |= (this._fdc.IRQ & 0x40) ? 1 : 0;
-				*/
 				break;
 			default:
 				//debugger;
 				console.warn("unhandled HBF port read " + Utils.toHex8(addr));
 				result = 0xff;
 		}
-		console.log("HBF: readPort: ",Utils.toHex8(addr));
+		//console.log("HBF: readPort: ",Utils.toHex8(addr));
 		return result;
 	};
 

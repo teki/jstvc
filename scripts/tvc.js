@@ -151,18 +151,18 @@ define([
 
 		case 0x02:
 			this._mmu.setMap(val);
-			//console.log(this._mmu.toString());
 			break;
 
 		case 0x03:
 			this._key.selectRow(val & 0xF);
 			this._extCartMapping = val >>> 6;
+			this._mmu.extmmu = null;
 			switch(this._extCartMapping) {
 				case 0:
-					//if (this._ext0) this._mmu.extmmu = this._ext0.mmu;
+					if (this._ext0) this._mmu.extmmu = this._ext0.mmu;
 					break;
 				case 1:
-					//if (this._ext1) this._mmu.extmmu = this._ext1.mmu;
+					if (this._ext1) this._mmu.extmmu = this._ext1.mmu;
 					break;
 				default:
 					this._mmu.extmmu = null;
@@ -232,8 +232,6 @@ define([
 		default:
 			if (addr >= 0x10 && addr <= 0x1F && this._ext0) {
 					this._ext0.writePort(addr & 0x0F, val);
-					if (addr == 0x18)
-						console.log(this._mmu.toString());
 			}
 			else if (addr >= 0x20 && addr <= 0x2F && this._ext1) {
 					this._ext1.writePort(addr & 0x0F, val);
@@ -282,10 +280,10 @@ define([
 	// extensions
 	// /////////////////////////////
 	TVC.prototype.extensionAttach = function(port,ext) {
-		if (port == 0) {
+		if (port === 0) {
 			this._ext0 = ext;
 			this._ext0.mmu.name = "CART0";
-			//this._mmu.extmmu = this._ext0.mmu;
+			this._mmu.extmmu = this._ext0.mmu;
 		}
 		else if (port == 1) {
 			this._ext1 = ext;
