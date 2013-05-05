@@ -58,11 +58,9 @@ function emuCreate(type) {
 	g.isRunning = false;
 	g.tvc = new TVCModule.TVC(type,callback);
 	var roms;
-	//if (/DOS/.test(type)) roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K", "D_TVCUPM.128"];
-	//if (/DOS/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K", "D_TVCDOS.128"];
-	if (/DOS/.test(type)) roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K", "D_TVCDOS.128"];
-	else if (/2\.2/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
+	if (/2\.2/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
 	else roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
+	if (/DOS/.test(type)) roms.push("D_TVCDOS.128");
 	// load roms
 	getData(roms[0], "roms/"+roms[0])
 	.then(function(dataname, data) {
@@ -158,7 +156,8 @@ function emuInit() {
 		"64k  1.2",
 		"64k+ 1.2",
 		"64k+ 2.2",
-		"64k+ 2.2, VT-DOS (not working)"
+		"64k+ 1.2, VT-DOS",
+		"64k+ 2.2, VT-DOS"
 			];
 	emuCreate(emuDefs[0]);
 	// gui
@@ -235,27 +234,14 @@ function handleFocusLost(e) {
 function emuContinue() {
 	g.requestAnimationFrame(emuRunFrame);
 }
-function emuRunFrame() {
-		//console.timeEnd("arf");
-		//console.time("arf");
-	if (!g.isRunning) return;
-/*
-	var skip = false;
-	g.fb.skipcnt++;
-	if (g.fb.skipcnt > 1) {
-		//if (g.fb.fpsv >= 50) {
-			skip = false;
-		//}
-		g.fb.skipcnt = 0;
-	}
-	if (!skip) {
-		//console.time("RunForAFrame");
-*/
-		var breakPointHit = g.tvc.runForAFrame();
-		//console.timeEnd("RunForAFrame");
-		if (breakPointHit) emuBreak();
-//	}
 
-	if (g.isRunning) emuContinue();
+function emuRunFrame() {
+	if (!g.isRunning)
+		return;
+	var breakPointHit = g.tvc.runForAFrame();
+	if (breakPointHit)
+		emuBreak();
+	if (g.isRunning)
+		emuContinue();
 }
 

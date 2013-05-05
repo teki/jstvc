@@ -759,7 +759,7 @@ define(["scripts/utils.js"], function(Utils) {
 						if (D.Verbose)
 							console.log("WD1793: READ-SECTOR",(V&0x10? "S":"")," ",String.fromCharCode(65+D.Drive),":",D.Side,":",D.R[1],":",D.R[2]," (",Utils.toHex8(V),")");
 						// Seek to the requested sector
-						D.Ptr = SeekFDI(
+						D.Ptr = D.Disk[D.Drive].SeekFDI(
 							D.Disk[D.Drive], D.Side, D.Track[D.Drive],
 							(V&C_SIDECOMP) ? (!!(V&C_SIDE)) : (D.Side,D.R[1],D.R[2])
 						);
@@ -783,7 +783,7 @@ define(["scripts/utils.js"], function(Utils) {
 						if (D.Verbose)
 							console.log("WD1793: WRITE-SECTOR",(V&0x10? "S":"")," ",String.fromCharCode(65+D.Drive),":",D.Side,":",D.R[1],":",D.R[2]," (",Utils.toHex8(V),")");
 						// Seek to the requested sector
-						D.Ptr = SeekFDI(
+						D.Ptr = D.Disk[D.Drive].SeekFDI(
 							D.Disk[D.Drive], D.Side, D.Track[D.Drive],
 							(V & C_SIDECOMP) ? (!!(V&C_SIDE)) : D.Side,D.R[1], D.R[2]
 						);
@@ -814,7 +814,7 @@ define(["scripts/utils.js"], function(Utils) {
 						else {
 							for (J = 0;J < 256; J++)
 							{
-								D.Ptr = SeekFDI(
+								D.Ptr = D.Disk[D.Drive].SeekFDI(
 									D.Disk[D.Drive],
 									D.Side, D.Track[D.Drive],
 									D.Side, D.Track[D.Drive], J
