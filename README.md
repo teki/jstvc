@@ -59,6 +59,11 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 
 # Verzió történet
 
+v0.2.1
+ * kiegészítők memóriájának kilapozása nem működött, javítva, így elindul a lemezkezelés
+ * basic 1.2 és 2.2 DOS-al a menüben
+ * a floppy nem működik még
+
 v0.2
  * debugger g.tvc.[step,b,bd,dumpMem,dasm]
  * z80 LD r,(IY+d) fix
