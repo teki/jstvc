@@ -22,7 +22,7 @@ TVC rajongói oldal: http://www.tvc.hu
 	* utasítás hosszabbítás nincs
 * CRTC
 	* Motorla 6845 emuláció
-	* megjelenítés szimuláció (a 6845 kiementét rendereli bitmap-re)
+	* megjelenítés szimuláció
 	* kurzor megszakítás
 * US billentyűzet
 
@@ -42,7 +42,6 @@ TVC rajongói oldal: http://www.tvc.hu
 * z80 tesztek:
 	* http://sourceforge.net/p/fuse-emulator/code/HEAD/tree/trunk/fuse/z80/tests/
 	* http://mdfs.net/Software/Z80/Exerciser/
-* wd1793 implementáció: http://fms.komkon.org/EMUL8/
 * zip: http://stuk.github.io/jszip/
 * vasm: http://sun.hasenbraten.de/vasm/
 
@@ -58,6 +57,11 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 	* g.tvc.dasm(cím, [utasítások száma]) - disassembly memória
 
 # Verzió történet
+
+v0.3.0
+ * c-ből portolt wd1793 helyett írtam sajátot, már tud olvasni a lemezről
+ * nem kapcsoltam ki a loggolást egyenlőre a lemezkezelésben, így csak egy kis progit tettem fel teszteléshez
+ * megjegyzi az oldal a választott géptipust
 
 v0.2.1
  * kiegészítők memóriájának kilapozása nem működött, javítva, így elindul a lemezkezelés

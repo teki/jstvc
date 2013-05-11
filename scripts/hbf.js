@@ -1,7 +1,7 @@
 define([
 	"scripts/utils.js",
-	"scripts/wd1793.js"
-	], function(Utils, WD1793) {
+	"scripts/fd1793.js"
+	], function(Utils, FD1793) {
 	var exports = {};
 
 	function MemBlock(name, isRam, buffer, offset, size) {
@@ -22,10 +22,7 @@ define([
 		this._rom = this._rom0;
 		this._ram = new MemBlock("RAM", true, null, 0, 4096);
 
-		this._disks = [undefined, undefined, undefined, undefined];
-		this._fdc = new WD1793.WD1793();
-
-		this._fdc.Reset1793(this._fdc, this._disks, 0);
+		this._fdc = new FD1793.FD1793();
 	}
 
 	HBF.prototype.toString = function(mmu) {
@@ -40,79 +37,32 @@ define([
 	};
 
 	HBF.prototype.writePort = function(addr, val) {
-		var result;
-		switch(addr) {
-			case 0x00:
-				// FDC command
-				result = this._fdc.Write1793(this._fdc, addr, val); 
-				break;
-			case 0x01:
-				// FDC track
-				result = this._fdc.Write1793(this._fdc, addr, val); 
-				break;
-			case 0x02:
-				// FDC sector
-				result = this._fdc.Write1793(this._fdc, addr, val); 
-				break;
-			case 0x03:
-				// FDC data
-				result = this._fdc.Write1793(this._fdc, addr, val); 
-				break;
-			case 0x04:
-				// SS,MON,DDEN,HLD,DS3,DS2,DS1,DS0
-				// side select: 0: side 0, 1: side 1
-				// motor on: 1: motor on
-				// double density: 1: on
-				// hold: 1: head on disk (it is or-ed with motor on)
-				// drive select: 1: drive active
-				result = this._fdc.Write1793(this._fdc, addr, val); 
-				break;
-			case 0x08:
-				switch(val & 0x30) {
-					case 0x00: this._rom = this._rom0; break;
-					case 0x10: this._rom = this._rom1; break;
-					case 0x20: this._rom = this._rom2; break;
-					case 0x30: this._rom = this._rom3; break;
-				}
-				break;
-			default:
-				//debugger;
-				console.warn("unhandled HBF port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
+		if (addr >= 0 && addr <= 4) {
+			this._fdc.write(addr, val); 
 		}
-		//console.log("HBF: writePort: ",Utils.toHex8(addr)," ",Utils.toHex8(val));
+		else if (addr == 8) {
+			switch(val & 0x30) {
+				case 0x00: this._rom = this._rom0; break;
+				case 0x10: this._rom = this._rom1; break;
+				case 0x20: this._rom = this._rom2; break;
+				case 0x30: this._rom = this._rom3; break;
+			}
+		}
+		else {
+			debugger;
+			console.warn("unhandled HBF port write " + Utils.toHex8(addr) + " " + Utils.toHex8(val));
+		}
 	};
 
 	HBF.prototype.readPort = function(addr) {
-		var result;
-		switch (addr) {
-			case 0x00:
-				// FDC state
-				result = this._fdc.Read1793(this._fdc, addr); 
-				break;
-			case 0x01:
-				// FDC track
-				result = this._fdc.Read1793(this._fdc, addr); 
-				break;
-			case 0x02:
-				// FDC sector
-				result = this._fdc.Read1793(this._fdc, addr); 
-				break;
-			case 0x03:
-				// FDC data
-				result = this._fdc.Read1793(this._fdc, addr); 
-				break;
-			case 0x04:
-				// INTRQ,0,0,0,0,0,0,DRQ
-				// faster to use than FDC
-				result = this._fdc.IRQ & 0x80;
-				result |= (this._fdc.IRQ & 0x40) ? 1 : 0;
-				break;
-			default:
-				//debugger;
-				console.warn("unhandled HBF port read " + Utils.toHex8(addr));
-				result = 0xff;
+		var result = 0;
+		if (addr >= 0 && addr <= 4) {
+			result = this._fdc.read(addr); 
 		}
-		//console.log("HBF: readPort: ",Utils.toHex8(addr));
+		else {
+			debugger;
+			console.warn("unhandled HBF port read " + Utils.toHex8(addr));
+		}
 		return result;
 	};
 
@@ -138,9 +88,7 @@ define([
 	};
 
 	HBF.prototype.loadDisk = function(name, data) {
-		this._disks[0] = new WD1793.FDIDisk();
-		this._disks[0].LoadFDI(this._disks[0], name, 0, data);
-		this._fdc.Reset1793(this._fdc, this._disks, 0);
+		this._fdc.loadDsk(0, name, data);
 	};
 
 	exports.HBF = HBF;
