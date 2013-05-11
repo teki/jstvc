@@ -159,7 +159,8 @@ function emuInit() {
 		"64k+ 1.2, VT-DOS",
 		"64k+ 2.2, VT-DOS"
 			];
-	emuCreate(emuDefs[0]);
+	var defaultType = Utils.loadLocal("tvc~defmachtype", emuDefs[0]);
+	emuCreate(defaultType);
 	// gui
 	$("#breset").on("click", function() {
 		emuReset();
@@ -180,7 +181,6 @@ function emuInit() {
 		var imgname = imgdrop[0].value;
 		getData(imgname, "data/" + imgname)
 			.then(function(dataname, data) {
-				g.tvc.reset();
 				g.tvc.loadImg(dataname, new Uint8Array(data));
 				$("#monitor").focus();
 				notify("loaded", dataname + "\nTip: run + [enter]");
@@ -197,8 +197,10 @@ function emuInit() {
 	}
 	machdrop.on("change", function(e) {
 		var machType = machdrop[0].value;
+		Utils.saveLocal("tvc~defmachtype", machType);
 		emuCreate(machType);
 	});
+	machdrop.val(defaultType);
 	// keyboard
 	$(document).keydown(handleKeyDown);
 	$(document).keyup(handleKeyUp);
