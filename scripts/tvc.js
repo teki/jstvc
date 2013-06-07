@@ -98,6 +98,11 @@ define([
 				this._ext0.loadDisk(name, data);
 			}
 		}
+		else if (extension == ".zip") {
+			var z = new JSZip(data, {base64:false});
+			var f = z.file(/.*/)[0];
+			this.loadImg(f.name, f.data);
+		}
 	};
 
 	// /////////////////////////////

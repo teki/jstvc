@@ -9,20 +9,27 @@ define(["scripts/utils.js"], function(Utils) {
 	var bufferAlloc = function(size, data) {
 		var buf = new Uint8Array(size);
 		if (data) {
-			for (var i = 0; i < size; i++) {
-				buf[i] = data[i];
+			if (typeof(data) == "string") {
+				for (var i = 0; i < size; i++) {
+					buf[i] = data.charCodeAt(i);
+				}
+			}
+			else {
+				for (var i = 0; i < size; i++) {
+					buf[i] = data[i];
+				}
 			}
 		}
 		return buf;
 	};
 
 	var bufferSeek = function (buffer, offset, absolute) {
-        var buf = buffer.buffer;
-        var bufOffset = (absolute ? 0 : buffer.byteOffset) + offset;
-				if (bufOffset >= buf.length || bufOffset < 0)
-					throw("BUFFER: out of range");
-        return new Uint8Array(buf, bufOffset);
-    };
+		var buf = buffer.buffer;
+		var bufOffset = (absolute ? 0 : buffer.byteOffset) + offset;
+		if (bufOffset >= buf.length || bufOffset < 0)
+			throw("BUFFER: out of range");
+		return new Uint8Array(buf, bufOffset);
+	};
 
 	var bufferCopyStr = function (buffer, offset, str) {
         for (var i = 0; i < str.length; i++) {
@@ -62,12 +69,13 @@ define(["scripts/utils.js"], function(Utils) {
 
 	// disk
 	function FDisk() {
-		this.log = true;
+		this.log = false;
 		this.dsk = null;
 		this.sectorsPerTrack = 9;
 		this.sectorSize = 512;
 		this.totSec = 720;
 		this.numHeads = 1;
+        this.tracksPerSide = (this.totSec / this.sectorsPerTrack / this.numHeads) | 0;
 		this.data = 0;
 		this.track = 0;
 		this.side = 0;
@@ -96,13 +104,8 @@ define(["scripts/utils.js"], function(Utils) {
 
 	FDisk.prototype.seek = function(track, sector, side) {
 		if (this.dsk !== null) {
-			if (side == 1) {
-				if (this.numHeads != 2) throw("invalid side!");
-				var tracksPerSide = this.totSec / this.sectorsPerTrack / 2;
-				track += tracksPerSide;
-			}
 			var offsetSector = (sector !== 0) ? (sector - 1) : 0;
-			this.position = (track * this.sectorsPerTrack + offsetSector) * this.sectorSize;
+			this.position = (track * (this.sectorsPerTrack * this.numHeads) + (this.sectorsPerTrack * side) + offsetSector) * this.sectorSize;
 			this.track = track;
 			this.side = side;
 			if (this.log)
@@ -151,7 +154,7 @@ define(["scripts/utils.js"], function(Utils) {
 	};
 
 	FDisk.prototype.parse = function() {
-		console.log("FD1793: disk dump begin");
+		//console.log("FD1793: disk dump begin");
 		if (!this.isReady()) {
 			console.warn("FD1793: no disk");
 			return;
@@ -164,29 +167,29 @@ define(["scripts/utils.js"], function(Utils) {
 			console.warn("FD1793: non msdos disk!");
 			return;
 		}
-		console.log("FD1793: creator:", bufferGetStr(this.dsk, 3, 7));
+		//console.log("FD1793: creator:", bufferGetStr(this.dsk, 3, 7));
 		var sectorSize = this.dsk[11] + this.dsk[12] * 256;
-		console.log("FD1793: sector size:", sectorSize);
+		//console.log("FD1793: sector size:", sectorSize);
 		var sectorsPerCluster = this.dsk[13];
-		console.log("FD1793: sectors per cluster:", sectorSize);
+		//console.log("FD1793: sectors per cluster:", sectorSize);
 		var rsvdSecCnt = this.dsk[14] + this.dsk[15] * 256;
-		console.log("FD1793: reserved sectors (1):", rsvdSecCnt);
+		//console.log("FD1793: reserved sectors (1):", rsvdSecCnt);
 		var numFat = this.dsk[16];
-		console.log("FD1793: count of FAT data sctructures (2):", numFat);
+		//console.log("FD1793: count of FAT data sctructures (2):", numFat);
 		var rootEntCnt = this.dsk[17] + this.dsk[18] * 256;
-		console.log("FD1793: count of 32b dir entries in root:", rootEntCnt);
+		//console.log("FD1793: count of 32b dir entries in root:", rootEntCnt);
 		var totSec = this.dsk[19] + this.dsk[20] * 256;
-		console.log("FD1793: total sector count:", totSec);
-		console.log("FD1793: media:",bufferHexdump(this.dsk,21,1));
+		//console.log("FD1793: total sector count:", totSec);
+		//console.log("FD1793: media:",bufferHexdump(this.dsk,21,1));
 		var fatSize = this.dsk[22] + this.dsk[23] * 256;
-		console.log("FD1793: fat entry size (sectors):", fatSize);
+		//console.log("FD1793: fat entry size (sectors):", fatSize);
 		var secPerTrk = this.dsk[24] + this.dsk[25] * 256;
-		console.log("FD1793: sectors per track:", secPerTrk);
+		//console.log("FD1793: sectors per track:", secPerTrk);
 		var numHeads = this.dsk[26] + this.dsk[27] * 256;
-		console.log("FD1793: number of heads:", numHeads);
-		console.log("FD1793: hidden sec:", bufferHexdump(this.dsk, 28,4));
-		console.log("FD1793: total sector count 32:", bufferHexdump(this.dsk, 32,4));
-		console.log("FD1793: drive number:", bufferHexdump(this.dsk, 36,1));
+		//console.log("FD1793: number of heads:", numHeads);
+		//console.log("FD1793: hidden sec:", bufferHexdump(this.dsk, 28,4));
+		//console.log("FD1793: total sector count 32:", bufferHexdump(this.dsk, 32,4));
+		//console.log("FD1793: drive number:", bufferHexdump(this.dsk, 36,1));
 
 		var rootDirSectors = Math.ceil(rootEntCnt * 32 / sectorSize);
 
@@ -194,15 +197,16 @@ define(["scripts/utils.js"], function(Utils) {
 
 		var countOfClusters = Math.floor(dataSec / sectorsPerCluster);
 
-		console.log("FD1793: count of clusters:",countOfClusters);
+		//console.log("FD1793: count of clusters:",countOfClusters);
 
 
-		console.log("FD1793: disk dump finished");
+		//console.log("FD1793: disk dump finished");
 
 		this.sectorSize = sectorSize;
 		this.sectorsPerTrack = secPerTrk;
 		this.totSec = totSec;
 		this.numHeads = numHeads;
+        this.tracksPerSide = (this.totSec / this.sectorsPerTrack / this.numHeads) | 0;
 	};
 
 	// fdc
@@ -235,7 +239,7 @@ define(["scripts/utils.js"], function(Utils) {
 	//	- steps until !TRO0 goes low (track 0)
 	//
 	function FD1793() {
-		this._log = true;
+		this._log = false;
 		this._disks = [new FDisk(),new FDisk(),new FDisk(),new FDisk()];
 		// port 4, parameter register
 		// SS,MON,DDEN,HLD,DS3,DS2,DS1,DS0

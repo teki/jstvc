@@ -6,7 +6,11 @@
 <script src="3rdparty/jquery-1.9.0.min.js"></script>
 <script src="3rdparty/sink-min.js"></script>
 <script src="3rdparty/require.js"></script>
-<script src="data/datalist.json"></script>
+<script src="3rdparty/jszip.js"></script>
+<script src="3rdparty/jszip-inflate.js"></script>
+<script src="3rdparty/jszip-load.js"></script>
+<script src="3rdparty/mtools2.js"></script>
+<script src="games/list.json"></script>
 <script src="frontend.js"></script>
 <link rel="stylesheet" type="text/css" href="style/view.css">
 </head>
@@ -14,7 +18,7 @@
 	<div id="header" class="center">
 		<img src="vtvc.jpg" />
 		<ul>
-			<li><a href="https://github.com/teki/jstvc">jstvc v0.3.0</a></li>
+			<li><a href="https://github.com/teki/jstvc">jstvc v0.4.0</a></li>
 			<li><a href="http://tvc.hu/html/inenglish.html">TVC (en)</a></li>
 			<li><a href="http://z80.info">Z80 (en)</a></li>
 		</ul>
@@ -23,15 +27,16 @@
 			<li><a href="https://github.com/teki/jstvc">project (hu)</a></li>
 		</ul>
 	</div>
-	<div id="statusblock" class="center">
-		status: <span id="statusline">ok</span>
-	</div>
 	<div id="toolbar" class="center">
 		<button id="breset">reset</button>
-		<select id="scas"></select>
-		<button id="bload">load</button>
 		<button id="bstop">stop</button>
 		<select id="smach"></select>
+		status: <span id="statusline">ok</span>
+		<br />
+        games: <select id="sgames"></select>
+        <button id="loadgame">load</button>
+		local: <select id="slocal"></select>
+		<button id="loadlocal">load</button>
 	</div>
 	<div id="monitor" class="center" tabindex="0">
 		<canvas id="tvcanvas" width="608" height="288"></canvas>
