@@ -25,6 +25,7 @@ function appStart() {
 	requirejs(["scripts/tvc.js","scripts/utils.js"], function(TVC, UTILS) {
 		TVCModule = TVC;
 		Utils = UTILS;
+        Utils.dbInit();
 		emuInit();
 	});
 }
@@ -176,19 +177,34 @@ function emuInit() {
 	});
 	// img loading + selection
 	var i;
-	var imgdrop = $("#scas");
-	$("#bload").on("click", function () {
+	var imgdrop = $("#slocal");
+	$("#loadlocal").on("click", function () {
 		var imgname = imgdrop[0].value;
-		getData(imgname, "data/" + imgname)
+        Utils.dbLoadDisk(imgname, function(name,data) {
+            g.tvc.loadImg(name, new Uint8Array(data));
+            $("#monitor").focus();
+            notify("loaded", name + "\nTip: run + [enter]");
+        });
+	});
+    Utils.dbInit(function() {
+        Utils.dbListDisks(function (name, data) {
+            if (data) {
+                $("<option>").text(name).val(name).appendTo(imgdrop);
+            }
+        });
+    });
+	var gamesdrop = $("#sgames");
+	$("#loadgame").on("click", function () {
+		var name = gamesdrop[0].value;
+		getData(name, "games/" + name)
 			.then(function(dataname, data) {
 				g.tvc.loadImg(dataname, new Uint8Array(data));
 				$("#monitor").focus();
 				notify("loaded", dataname + "\nTip: run + [enter]");
 			});
 	});
-	for(i = 0; i < datalist.length; i++ )
-	{
-			$("<option>").text(datalist[i]).val(datalist[i]).appendTo(imgdrop);
+	for(i = 0; i < gamelist.length; i++ ) {
+			$("<option>").text(gamelist[i].replace(".zip","")).val(gamelist[i]).appendTo(gamesdrop);
 	}
 	// machine type
 	var machdrop = $("#smach");

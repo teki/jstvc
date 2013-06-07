@@ -43,7 +43,9 @@ TVC rajongói oldal: http://www.tvc.hu
 	* http://sourceforge.net/p/fuse-emulator/code/HEAD/tree/trunk/fuse/z80/tests/
 	* http://mdfs.net/Software/Z80/Exerciser/
 * zip: http://stuk.github.io/jszip/
-* vasm: http://sun.hasenbraten.de/vasm/
+* vasm z80 macro assembler: http://sun.hasenbraten.de/vasm/
+* codemirror editor: http://codemirror.net/
+* mtools lemezkezelés: http://www.gnu.org/software/mtools/
 
 # Debugger
 
@@ -57,6 +59,13 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 	* g.tvc.dasm(cím, [utasítások száma]) - disassembly memória
 
 # Verzió történet
+
+v0.4.0
+ * 720kB-os lemezkezelés javítva
+ * játékok (nem mind működik)
+ * diszk kezelés + assembler az editor.html alatt: http://teki.github.io/jstvc/editor.html, ez sem 100%-os még,
+   de már használható. A böngészőben nyitva lehet tartani az emu-t és az editor-t, s akkor az emu látja az editor
+   lemezeit. A frissítés nem automatikus, így újra kell tölteni a lemezt az emu-ban.
 
 v0.3.0
  * c-ből portolt wd1793 helyett írtam sajátot, már tud olvasni a lemezről

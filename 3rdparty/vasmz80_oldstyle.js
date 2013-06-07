@@ -22,7 +22,6 @@ var ASM = function(code, res) {
 			else {
 				res.data = null;
 			}
-			console.log(res);
 		}
 	};
 

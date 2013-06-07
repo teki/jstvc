@@ -1,5 +1,7 @@
 module.exports = function(grunt) {
 
+	require('shelljs/global');
+
 	grunt.loadNpmTasks("grunt-contrib-connect");
 
   grunt.initConfig({
@@ -17,23 +19,24 @@ module.exports = function(grunt) {
 
 	grunt.registerTask('imglist', function() {
 		var fs = require("fs");
-		var cl = fs.readdirSync("data");
-		var cl2 = [];
-		for (var i in cl) {
-			if (/.*cas$/i.test(cl[i]) || /.*dsk$/i.test(cl[i]))
-				cl2.push(cl[i]);
-		}
-		cl2.sort();
 
-		a = "var datalist = " + JSON.stringify(cl2) + ";\n";
-		fs.writeFileSync("data/datalist.json", a);
+		var gl = fs.readdirSync("games");
+		var gl2 = [];
+		for (i in gl) {
+			if (/.*zip$/i.test(gl[i]))
+				gl2.push(gl[i]);
+		}
+		gl2.sort();
+
+		b = "var gamelist = " + JSON.stringify(gl2) + ";\n";
+		fs.writeFileSync("games/list.json", b);
 	});
 
 	grunt.registerTask('build', function() {
 		var done = grunt.task.current.async();
 		var exec = require('child_process').exec;
 		exec("rm -rf build; mkdir build", function(e,i,o) {
-		exec("cp -R .gitignore data frontend.js index.html asm.html scripts 3rdparty style roms *jpg build", function(e,i,o) {
+		exec("cp -R .gitignore games frontend.js index.html asm.html scripts 3rdparty style roms *jpg build", function(e,i,o) {
 		exec("grep --colour=none -m 1 -E '^v' README.md", function(e,i,o) {
 		exec("sed -i 's/VVEERR/"+i.trim()+"/g' build/index.html", function(e,i,o) {
 			done();

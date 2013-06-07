@@ -1,5 +1,6 @@
 define(function() {
 	var Utils = {};
+    Utils.db = null;
 
 	Utils.toHex8 = function(x) {
 		var s = x.toString(16).toUpperCase();
@@ -80,6 +81,54 @@ define(function() {
 		var value = conf[name];
 		return value || defaultval;
 	};
+
+    Utils.dbInit = function(cb) {
+        var request = window.indexedDB.open("tvc-db",3);
+        request.onupgradeneeded = function(event) {
+            console.log("init disk database");
+            Utils.db = event.target.result;
+            var os = Utils.db.createObjectStore("disks", {keyPath: "name"});
+            if (cb)
+                cb();
+        };
+        request.onsuccess = function(event) {
+            Utils.db = event.target.result;
+            if (cb)
+                cb();
+        };
+    };
+    Utils.dbLoadDisk = function(name, cb) {
+        Utils.db.transaction(["disks"]).objectStore("disks").get(name).onsuccess = function(event) {
+            var disk = event.target.result;
+            if (cb)
+                cb(disk.name, disk.data);
+        };
+    };
+    Utils.dbSaveDisk = function(name, data, cb) {
+        Utils.db.transaction(["disks"],"readwrite").objectStore("disks").put({name:name, data:data}).onsuccess = function(event) {
+            if (cb)
+                cb(name, data);
+        };
+    };
+    Utils.dbDeleteDisk = function(name, cb) {
+        Utils.db.transaction(["disks"],"readwrite").objectStore("disks").delete(name).onsuccess = function(event) {
+            if (cb)
+                cb(name, null);
+        };
+    };
+    Utils.dbListDisks = function(cb) {
+        if (!cb) cb = function(n,d) {console.log(n,d);};
+        Utils.db.transaction(["disks"]).objectStore("disks").openCursor().onsuccess = function(event) {
+            var cursor = event.target.result;
+            if (cursor) {
+                cb(cursor.value.name, cursor.value.data);
+                cursor.continue();
+            }
+            else {
+                cb(null, null);
+            }
+        };
+    };
 
 	return Utils;
 });
