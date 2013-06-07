@@ -1,0 +1,569 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>tvc editor</title>
+    <script>
+        var textA;
+        var editor;
+        var Utils;
+        var diskL;
+        var diskName;
+        var diskData;
+        var diskPath;
+    </script>
+    <link rel="stylesheet" href="3rdparty/codemirror.css">
+    <script src="3rdparty/jquery-1.9.0.min.js"></script>
+    <script src="3rdparty/require.js"></script>
+    <script src="3rdparty/vasmz80_oldstyle.js"></script>
+    <script src="3rdparty/jszip.js"></script>
+    <script src="3rdparty/codemirror-compressed.js"></script>
+    <script src="3rdparty/mtools2.js"></script>
+    <script>
+        var testScript = "LIST\n\
+\n\
+startaddr = 6639-128-16\n\
+datalen = $3000 - startaddr + 1\n\
+applen = datalen - 128 - 16\n\
+blockcnt = datalen / 128\n\
+blockbyt = (datalen % 128) & 255\n\
+\n\
+; cas header (ez jobb lenne kulon progiba, majd kesobb)\n\
+		org startaddr\n\
+		byte $11, $00\n\
+		byte blockcnt % 256, blockcnt / 256\n\
+		byte blockbyt\n\
+		blk 128-5\n\
+		byte $00, $01\n\
+		byte applen & 255, applen / 256\n\
+		blk 16-4\n\
+\n\
+\n\
+; 10 print usr(6912)\n\
+		org 6639\n\
+		byte $0f,$0a,$00,$dd,$20,$55,$53,$52\n\
+		byte $96,$36,$39,$31,$32,$95,$ff\n\
+\n\
+; ide jon a kod\n\
+		org $1b00\n\
+\n\
+		ld hl,11\n\
+		ret\n\
+\n\
+; egy extra szegmens, hogy a fajlmeret fix legyen (bizti van vmi megoldas hogy ne kelljen)\n\
+		org $3000\n\
+		byte $76\n\
+\n\
+		end\n\
+";
+        function buffer2string(data) {
+            var str = "";
+            for(var i=0; i < data.length; i++) {
+                str += String.fromCharCode(data[i]);
+            }
+            return str;
+        }
+        function string2buffer(str) {
+            var data = new Uint8Array(str.length);
+            for(var i=0; i < str.length; i++) {
+                data[i] = str.charCodeAt(i);
+            }
+            return data;
+        }
+        function basename(path) {
+            return path.slice(path.lastIndexOf("/")+1);
+        }
+        function dirname(path) {
+            return path.slice(0,path.lastIndexOf("/"));
+        }
+        function suffix(path) {
+            return basename(path).replace(/.*\./,"").slice(0,3);
+        }
+        function pathJoin(p1,p2) {
+            if (!p1.length || (p1[p1.length-1] != "/")) {
+                p1 += "/";
+            }
+            return p1 + p2;
+        }
+        function showDownloadLink(name, blob) {
+            $("#datadownload").css("display","inline");
+            $("#dataname").text(" " + name);
+            var a = $("#datadownloadlink");
+            a.attr("href", window.URL.createObjectURL(blob));
+            a.attr("download", name);
+        }
+        function refreshDisk() {
+            var diskName = diskL[0].value;
+            Utils.dbLoadDisk(diskName, diskLoaded);
+        }
+        function saveAndUpdateDisk(name, data) {
+            Utils.dbSaveDisk(name, data, function(n,d) {
+                diskLoaded(n,d,diskPath);
+            });
+        }
+        function diskLoaded(name, data, path) {
+            diskName = name;
+            diskData = data;
+            diskPath = path || "";
+            updateContent();
+        }
+        function appStart() {
+            var editText;
+            textA = $("#myeditor");
+            diskL = $("#diskl");
+            editor = CodeMirror.fromTextArea(textA[0], {
+                mode: "z80",
+                lineNumbers: true,
+            });
+            // disk upload
+            $("#diskup").on("change", function(event) {
+                var file = event.target.files[0];
+                var reader = new FileReader();
+                reader.onload = function(event) {
+                    Utils.dbSaveDisk(file.name, new Uint8Array(event.target.result));
+                    $("<option>").text(file.name).val(file.name).appendTo(diskL);
+                }
+                reader.readAsArrayBuffer(file);
+            });
+            // file upload
+            $("#fileup").on("change", function(event) {
+                var file = event.target.files[0];
+                var reader = new FileReader();
+                reader.onload = function(event) {
+                    var fileName = pathJoin(diskPath, file.name);
+                    saveFile(fileName, new Uint8Array(event.target.result), function (mtp) {
+                        console.log(mtp);
+                        if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
+                        else console.error("Failed to save:",fileName);
+                    });
+                }
+                reader.readAsArrayBuffer(file);
+            });
+            // disk change
+            diskL.on("change", function(e) {
+                refreshDisk();
+            });
+            $("#dcont").on("click",".diskdir", function(event) {
+                changeDir(event.target.text);
+                event.preventDefault();
+            });
+            // disk delete
+            $("#ddelete").on("click", function(event) {
+                var name = diskL[0].value;
+                if (prompt('Type "Y" to delete: '+name) == "Y") {
+                    Utils.dbDeleteDisk(name, null);
+                    $("#diskl option[value='"+name+"']").remove();
+                }
+
+            });
+            // disk create
+            $("#dcreate").on("click", function(event) {
+                var diskName = prompt("Disk name (without extension)");
+                if (!diskName)
+                    return;
+                diskName = (diskName + ".dsk").toUpperCase();
+                var mtp = {
+                    cmd:"mformat",
+                    params: ["-f","720","-C","::"],
+                    cb: diskFormatted,
+                    dsk: null,
+                    data: null,
+                    dskName: diskName
+                };
+                MTOOLS(mtp);
+            });
+            function diskFormatted(mtp) {
+                if (mtp.data) {
+                    Utils.dbSaveDisk(mtp.dskName, mtp.data);
+                    $("<option>").text(mtp.dskName).val(mtp.dskName).appendTo(diskL);
+                }
+            }
+            // disk get/download
+            $("#dget").on("click", function(event) {
+                var zip = new JSZip();
+                zip.file(diskName, diskData);
+                var zipcontent = zip.generate({type:"blob"});
+                showDownloadLink(diskName+".zip", zipcontent);
+            });
+            // reload from database
+            $("#dreload").on("click", function(event) {
+                refreshDisk();
+            });
+            // save
+            $("#edsave").on("click", function(event) {
+                var fileName = $("#edfn").val().toUpperCase();
+                if (fileName[0] != "/")
+                    fileName = pathJoin(diskPath,fileName);
+                saveFile(fileName, string2buffer(editor.getValue()), function (mtp) {
+                    if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
+                    else console.error("Failed to save:",fileName);
+                });
+            });
+            // mkdir
+            $("#fmkdir").on("click", function(event) {
+                var name = prompt('Name for the directory?');
+                if (!name || name.length == 0) return;
+                name = name.toUpperCase();
+                if (name[0] != "/")
+                    name = pathJoin(diskPath,name);
+                mkDirectory(name, function(mtp) {
+                    if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
+                    else console.error("Failed to create directory:",name);
+                });
+            });
+            // download file(s)
+            $("#fget").on("click", function(event) {
+                var zip = new JSZip();
+                var fSel = $("#dcont li :checked");
+                if (!fSel.length) return;
+                for (var i=0; i < fSel.length; i++) {
+                    var fileName = fSel[i].parentElement.dataset.fname;
+                    var fileAbsPath = pathJoin(diskPath,fileName);
+                    getFile(fileAbsPath, function (mtp) {
+                        if (mtp.data) {
+                            zip.file(fileName, mtp.data);
+                            if (zip.file(/.*/).length == fSel.length) {
+                                var zipcontent = zip.generate({type:"blob"});
+                                showDownloadLink(fSel.length == 1 ? fileName : "files.zip", zipcontent);
+                            }
+                        }
+                        else {
+                            console.log("ERROR: failed to read file",fileAbsPath);
+                        }
+                    });
+                }
+            });
+            // delete file(s)
+            $("#fdelete").on("click", function(event) {
+                var fSel = $("#dcont li :checked");
+                if (!fSel.length) return;
+                var delCnt = 0;
+                var flist = [];
+                var dlist = [];
+                for (var i=0; i < fSel.length; i++) {
+                    var ds = fSel[i].parentElement.dataset;
+                    var fileName = ds.fname;
+                    var fileAbsPath = pathJoin(diskPath,fileName);
+                    if (ds.ftype == "f") {
+                        flist.push(fileAbsPath);
+                    }
+                    else {
+                        dlist.push(fileAbsPath);
+                    }
+                }
+                if (prompt('Type "Y" to delete:\n' + dlist + "\n" + flist) != "Y") {
+                    return;
+                }
+                if (flist.length > 0) {
+                    delFiles(flist, function (mtp) {
+                        if (dlist.length > 0) {
+                            delDirs(dlist, function (mtp) {
+                                if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
+                                else console.error("Failed to delete:",dlist);
+                            });
+                        }
+                        else  if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
+                        else console.error("Failed to delete:",flist);
+                    });
+                }
+                else  if (dlist.length > 0) {
+                    delDirs(dlist, function (mtp) {
+                        if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
+                        else console.error("Failed to delete:",dlist);
+                    });
+                }
+            });
+            // edit file
+            function fileNameChanged() {
+                var fileName = $("#edfn").val().toUpperCase();
+                var extension = suffix(fileName);
+                if (extension == "ASM") {
+                    $("#comp").removeAttr("disabled");
+                    editor.setOption("mode", "z80");
+                }
+                else {
+                    $("#comp").attr("disabled","disabled");
+                    editor.setOption("mode", "text");
+                }
+            }
+            $("#edfn").on("change", fileNameChanged);
+            $("#dcont").on("click",".diskedit", function(event) {
+                var fileName = event.target.parentElement.dataset.fname;
+                var fileAbsPath = pathJoin(diskPath,fileName);
+                getFile(fileAbsPath, function (mtp) {
+                    if (mtp.data) {
+                        editor.setValue(buffer2string(mtp.data));
+                        $("#edfn").val(fileAbsPath);
+                        fileNameChanged();
+                    }
+                    else {
+                        console.log("ERROR: failed to read file",fileAbsPath);
+                    }
+                });
+                event.preventDefault();
+            });
+            $("#datacdown").on("click", function(event) {
+                event.preventDefault();
+                $("#datadownload").css("display","none");
+                var a = $("#datadownloadlink");
+                a.attr("href", "#");
+                a.attr("download", "");
+            });
+            // init
+            requirejs(["scripts/utils.js"], function(UTILS) {
+                Utils = UTILS;
+                Utils.dbInit(function() {
+                    editText = Utils.loadLocal("tvc~asm1",testScript);
+                    $("#comp").on("click", function(e) {compileBuffer();}) ;
+                    editor.setValue(editText);
+
+                    Utils.dbListDisks(updateDskList);
+                });
+            });
+        }
+        function updateDskList(name, data) {
+            if (data) {
+                $("<option>").text(name).val(name).appendTo(diskL);
+            }
+            else {
+                refreshDisk();
+            }
+        }
+        function changeDir(path) {
+            if (path == "..") {
+                if (diskPath.length) {
+                    diskPath = dirname(diskPath);
+                    updateContent();
+                }
+            }
+            else {
+                diskPath = pathJoin(diskPath, path);
+                updateContent();
+            }
+        }
+        function updateContent() {
+            var mtp = {
+                cmd:"mdir",
+                params: ["::" + diskPath],
+                cb: dirCompleted,
+                dsk: diskData
+            };
+            MTOOLS(mtp);
+        }
+        function getFile(absPath, cb) {
+            var mtp = {
+                cmd:"mcopy",
+                params: ["::"+absPath,"."],
+                cb: cb,
+                dsk: diskData
+            };
+            MTOOLS(mtp);
+        }
+        function delFile(absPath, cb) {
+            var mtp = {
+                cmd:"mdel",
+                params: ["::" + absPath],
+                cb: cb,
+                dskName: diskName,
+                dsk: diskData
+            };
+            MTOOLS(mtp);
+        }
+        function delDirs(absPaths, cb) {
+            var mtp = {
+                cmd:"mdeltree",
+                flist: absPaths,
+                origcb: cb,
+                params: ["::" + absPaths[0]],
+                cb: function(mtp) {
+                    var flist = mtp.flist;
+                    var origcb = mtp.origcb;
+                    delete mtp.flist;
+                    delete mtp.origcb;
+                    if (flist.length == 1) {
+                        origcb(mtp);
+                    }
+                    else {
+                        delDirs(flist.slice(1),origcb);
+                    }
+                },
+                dskName: diskName,
+                dsk: diskData
+            };
+            MTOOLS(mtp);
+        }
+        function delFiles(absPaths, cb) {
+            var mtp = {
+                cmd:"mdel",
+                flist: absPaths,
+                origcb: cb,
+                params: ["::" + absPaths[0]],
+                cb: function(mtp) {
+                    var flist = mtp.flist;
+                    var origcb = mtp.origcb;
+                    delete mtp.flist;
+                    delete mtp.origcb;
+                    if (flist.length == 1) {
+                        origcb(mtp);
+                    }
+                    else {
+                        delFiles(flist.slice(1),origcb);
+                    }
+                },
+                dskName: diskName,
+                dsk: diskData
+            };
+            MTOOLS(mtp);
+        }
+        function mkDirectory(name, cb) {
+            var mtp = {
+                cmd:"mmd",
+                params: ["-D","s","::"+name],
+                cb: cb,
+                dsk: diskData,
+                dskName: diskName
+            };
+            MTOOLS(mtp);
+        }
+        function saveFile(absPath, fileData, cb) {
+            var mtp = {
+                cmd:"mcopy",
+                params: ["-ov",basename(absPath),"::"+absPath],
+                cb: cb,
+                dsk: diskData,
+                data: null,
+                dskName: diskName,
+                fileData: fileData
+            };
+            MTOOLS(mtp);
+        }
+        function parserDirList(str, dirs, files) {
+            var lst = str.split("\n");
+            dirs.length = 0;
+            files.length = 0;
+            for(var i in lst) {
+                var l = lst[i];
+                var md = l.match(/^([a-zA-Z0-9-_~]{1,8})\s+\<DIR\>/);
+                if (md) {
+                    dirs.push({
+                        name: md[1]
+                    });
+                    continue;
+                }
+                var mf = l.match(/^([a-zA-Z0-9-_~]{1,8})\s+([a-zA-Z]{0,3})\s+(\d+)/);
+                if (mf) {
+                    files.push({
+                        name: mf[1] + "." + mf[2],
+                        ext: mf[2],
+                        size: mf[3]
+                    });
+                    continue;
+                }
+            }
+        }
+        function dirCompleted(mtp) {
+            var strhtml ="";
+            var files = [];
+            var dirs = [];
+            parserDirList(mtp.out, dirs, files);
+            strhtml += '<li>path:'+diskPath+'</li>';
+            if (diskPath.length) {
+                strhtml += '<li><a href="#" class="diskdir">..</a></li>';
+            }
+            for(var i in dirs) {
+                strhtml += '<li data-ftype="d" data-fname="' + dirs[i].name + '"><input type="checkbox" /><a href="#" class="diskdir">' + dirs[i].name + "</a></li>";
+            }
+            for(var i in files) {
+                strhtml += "<li data-ftype='f' data-fname='" + files[i].name + "'>";
+                strhtml += "<input type='checkbox' />";
+                strhtml += '<span style="display:inline-block;width:120px;">' + files[i].name + "</span>";
+                strhtml += '<span style="display:inline-block;width:40px;">' + files[i].size + "</span>";
+                if (["ASM", "BAT"].indexOf(files[i].ext) != -1) {
+                    strhtml += '<a href="#" class="diskedit">edit</a>';
+                }
+                strhtml += "</li>";
+            }
+            $("#dcont").html(strhtml);
+        }
+        function compileBuffer() {
+            // save local so changes will not be lost
+            Utils.saveLocal("tvc~asm1", editor.getValue());
+            var code = Utils.loadLocal("tvc~asm1","");
+            // compile
+            var res = {'out': "", 'err': ""};
+            ASM(code, res);
+            // display error
+            if (!res.ret) {
+                $("#buildres").val(res.err);
+                return;
+            }
+            // output dump
+            var j = 0;
+            var strline = "";
+            var resstr = "";
+            for(var i = 0; i < res.data.length; i++) {
+                strline += res.data[i].toString(10);
+                if (j++ == 7) {
+                    resstr += strline + "\n";
+                    strline = "";
+                    j = 0;
+                }
+                else if (i != res.data.length -1) {
+                    strline += ",";
+                }
+            }
+            if (strline.length) {
+                resstr += strline + "\n";
+            }
+            $("#buildres").val(resstr);
+            // save the file as a cas to the disk
+            if (diskData) {
+                var fileName = $("#edfn").val().toUpperCase().replace(/ASM$/,"CAS");
+                if (fileName[0] != "/")
+                    fileName = pathJoin(diskPath,fileName);
+                saveFile(fileName, res.data, function (mtp) {
+                    if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
+                    else console.error("Failed to save:",fileName);
+                });
+            }
+            // var zip = new JSZip();
+            // zip.file("prog.cas", res.data);
+            // var zipcontent = zip.generate();
+            // $("#saveme").attr("href", "data:application/zip;base64,"+zipcontent);
+            // <a id="saveme" href="">save</a>
+        }
+    </script>
+</head>
+<body onload="appStart();">
+<div style="float:left;width:250px;">
+    <div id="datadownload" style="display:none;">
+        <a id="datadownloadlink" href="#">Download</a><span id="dataname"></span><span style="float:right;padding-right:1em;"><a id="datacdown" href="#">x</a></span>
+        <hr />
+    </div>
+    <button id="dcreate">Create disk</button>
+    Add: <input type="file" id="diskup" name="dskfile" style="width:6.5em;"/>
+    <hr />
+    <select id="diskl"></select>
+    <button id="dreload">Refr</button>
+    <button id="ddelete">Del</button>
+    <button id="dget">Get</button>
+    <hr />
+    <button id="fdelete">Del</button>
+    <button id="fmkdir">MkDir</button>
+    <input type="file" id="fileup" name="ffile" style="width:6.5em;"/>
+    <button id="fget">Get</button>
+    <ul id="dcont" style="font-size:12px;list-style-type: none;padding:0px;margin:0px;"></ul>
+</div>
+<div style="float:left;width: auto;">
+    <input id="edfn" type="text" style="text-transform:uppercase;" />
+    <button id="edsave">save</button>
+    <button id="comp">compile</button>
+    <br />
+	<textarea id="myeditor" style="width:auto;"></textarea>
+	<textarea id="buildres" rows="5" style="width:100%;"></textarea>
+</div>
+<div style="clear: both;"></div>
+
+</body>
+
+</html>
