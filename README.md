@@ -60,6 +60,9 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 
 # Verzió történet
 
+v0.4.1
+ * az assemblernek hozzáférése van az összes fájlhoz a forrásfájl mellett, működik az incbin és include!
+
 v0.4.0
  * 720kB-os lemezkezelés javítva
  * játékok (nem mind működik)
