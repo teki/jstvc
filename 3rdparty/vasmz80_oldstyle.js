@@ -1,26 +1,27 @@
-var ASM = function(code, res) {
+var ASM = function(asmp) {
 	var Module = {
-		'arguments': ["-o", "asm1.o", "-quiet", "-Fbin", "asm1.asm"],
+		'arguments': ["-o", "asmxxxxxxx.o", "-quiet", "-Fbin", asmp.fileName],
 		'print': function(x) {},
 		'noFSInit': true,
 		'preRun': function() {
 			FS.init(null,
-				function(x) {res.out += String.fromCharCode(x);},
-				function(x) {res.err += String.fromCharCode(x);}
+				function(x) {asmp.out += String.fromCharCode(x);},
+				function(x) {asmp.err += String.fromCharCode(x);}
 			);
-			FS.createDataFile("/", "asm1.asm", code, true, true);
+            FS.root = JSON.parse(asmp.fs.root);
+            FS.nextInode = JSON.parse(asmp.fs.nextInode);
 		},
 		'postRun': function() {
-			res.ret = FS.root.contents.hasOwnProperty("asm1.o");
-			if (res.ret) {
-				var content = FS.root.contents["asm1.o"].contents;
-				res.data = new Uint8Array(content.length);
+			asmp.ret = FS.root.contents.hasOwnProperty("asmxxxxxxx.o");
+			if (asmp.ret) {
+				var content = FS.root.contents["asmxxxxxxx.o"].contents;
+				asmp.data = new Uint8Array(content.length);
 				for(var i=0; i<content.length; i++) {
-					res.data[i] = content[i];
+					asmp.data[i] = content[i];
 				}
 			}
 			else {
-				res.data = null;
+				asmp.data = null;
 			}
 		}
 	};

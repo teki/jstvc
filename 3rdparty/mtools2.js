@@ -17,15 +17,20 @@ var MTOOLS = function(mtp) {
         },
         'postRun': function() {
             if (mtp.cmd == "mcopy" && mtp.params.slice(-1)[0] == ".") {
-                var fname = mtp.params[0];
-                fname = fname.slice(fname.lastIndexOf("/")+1);
+                if (mtp.hasOwnProperty("dumpFs")) {
+                    mtp.fs = {root: JSON.stringify(FS.root), nextInode: JSON.stringify(FS.nextInode)};
+                }
+                else {
+                    var fname = mtp.params[0];
+                    fname = fname.slice(fname.lastIndexOf("/")+1);
 
-                mtp.data = FS.root.contents.hasOwnProperty(fname);
-                if (mtp.data) {
-                    var content = FS.root.contents[fname].contents;
-                    mtp.data = new Uint8Array(content.length);
-                    for(var i=0; i<content.length; i++) {
-                        mtp.data[i] = content[i];
+                    mtp.data = FS.root.contents.hasOwnProperty(fname);
+                    if (mtp.data) {
+                        var content = FS.root.contents[fname].contents;
+                        mtp.data = new Uint8Array(content.length);
+                        for(var i=0; i<content.length; i++) {
+                            mtp.data[i] = content[i];
+                        }
                     }
                 }
             }
