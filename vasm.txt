@@ -1,0 +1,446 @@
+VASM
+====
+
+Dokumentáció: http://sun.hasenbraten.de/vasm/release/vasm.html
+
+Egy kicsit fura a doksi, mert a vasm moduláris. A doksi eleje vasm által megvalósított, közös a modulokban, funkcionalitást írja le, míg az utasításokat a modul dokumentációja tartalmazza. Ezen felül ha valamit nem tudtam lefordítani azt csak bemásoltam ide.
+
+Kifejezések
+===========
+
+## Operandusok + kiértékelési sorrend:
+
+	1.	+ - ! ~ (egyoperandusú +/- előjel, negálás, egyes komplemens)
+	2.	<< >> (bitléptetés balra, bitléptetés jobbra)
+	3.	* / % // (szorzás, osztás, moduló)
+	4.	& (bitenkénti és)
+	5.	^ ~ (bitenkénti kizáró vagy)
+	6.	| ! (bitenkénti kizárpó vagy)
+	7.	+ - (összedás, kivonás)
+	8.	< > <= >= (kisebb, nagyobb, kisebb vagy egyenlő, nagyobb vagy egyenlő)
+	9.	== != = <> (egyenlő, nem egyenlő)
+	10.	&& (logikai és)
+	11.	|| (logikai vagy)
+
+## Karakter konstansok: 'a' vagy "a", 'ab' is megengedett, az arhitektúrának megfelelő bájt sorrendben lesz értelmezve.
+
+## Speciális szekvenciák karakter konstansokban:
+
+\\
+	\
+
+\b
+	Harang.
+
+\f
+	Form feed.
+
+\n
+	Következő sor.
+
+\r
+	Kocsi vissza.
+
+\t
+	Tabulátor.
+
+\"
+	"
+
+\'
+	'
+
+\e
+	Esc (27)
+
+\<octal-digits>
+	Az oktális értéknek megfelelő karakter.
+
+\x<hexadecimal-digits>
+\X<hexadecimal-digits>
+	A hexa értéknek megfelelő karakter.
+
+
+VASM régi stílus (ezt a modult használja jstvc)
+===============================================
+
+## Alapok:
+
+globális (global) címke: a sor első karakterén kell kezdődnie, végződhet kettősponttal (:)
+helyi (local) címke: két globális címke közt érvényes, vagy ponttal (.) kell kezdődnie, vagy dollárra ($) végződnie. Helyi címkéket lehet globálissal együtt használni: global_name.local_name (de nem szükséges).
+
+A címke és a mnemonic közé whitespace kell.
+
+A mnemonic és az operandusok közé whitespace kell, az operandusokat vesszővel kell elválasztani.
+
+Címke és feltételes fordítési direktívák nem lehetnek egy sorban.
+
+Megjegyzés: ; a sor pontosvessző utáni része
+
+Példa:
+mylabel		instr op1, op2 ;comment
+
+Hexa számok: $ff, $f323, 0xff, 0xf333
+Bináris: %11010101, 0b11010101
+
+## Utasítások:
+
+<symbol> = <expression>
+
+	lásd:  <symbol> equ <expression>
+
+abyte <offset>,<exp1>[,<exp2>,"<string1>"...]
+
+	A kifejezések memóriába másolása, offset-el való megnövelés után.
+	
+addr <exp1>[,<exp2>...]
+
+	lásd: word <exp1>[,<exp2>...]
+
+align <bitcount>
+
+	Addig szór be 0-ákat a memóriába, amíg az aló bitcount bitje a címnek nulla nem lesz.
+	
+asc <exp1>[,<exp2>,"<string1>"...]
+
+	lásd: byte <exp1>[,<exp2>,"<string1>"...]
+
+ascii <exp1>[,<exp2>,"<string1>"...]
+
+	lásd: defm
+	
+asciiz "<string1>"[,"<string2>"...]
+
+	lásd: string
+
+assert <expression>[,<message>]
+
+	Hibaüzenet megjelenítése, ha a kifejezés hamis.
+	
+binary <file>
+
+	A fájl beszúrása az aktuális címtől. A fájlt először az aktuális könyvtárban, majd a '-I', majd az incdir beállításoknak megfefelően keresi.
+	
+blk <exp>[,<fill>]
+
+	A kifejezésnek megfelelő számú nulla vagy fill-t ír a szegmensbe.
+	
+blkw <exp>[,<fill>]
+
+	A kifejezésnek megfelelő számú nulla vagy fill-t ír a szegmensbe (16 bites értékeket, a CPU-nak megfelelő bájtsorrendben).
+
+byt
+
+	blk 1,0
+
+byte <exp1>[,<exp2>,"<string1>"...]
+
+	A megadott kifejezéseket, szövegeket rögzíti a szegmensben.
+	
+data <exp1>[,<exp2>,"<string1>"...]
+
+	lásd: byte
+	
+db <exp1>[,<exp2>,"<string1>"...]
+
+	lásd: byte
+
+dc <exp>[,<fill>]
+
+	lásd: blk
+	
+defb <exp1>[,<exp2>,"<string1>"...]
+
+	lásd: byte
+	
+defc <symbol> = <expression>
+
+	Új szimbólum definiálása. Egy név csak egyszer definálható.
+
+defl <exp1>[,<exp2>...]
+
+	A kifejezéseket 32 bites értékként rögzíti. (CPU bájtsorrend)
+	
+defp <exp1>[,<exp2>...]
+
+	A kifejezéseket 24 bites értékként rögzíti. (CPU bájtsorrend)
+
+defm "string"
+
+	lásd: text
+	
+defw <exp1>[,<exp2>...]
+
+	lásd: word
+	
+dfb <exp1>[,<exp2>,"<string1>"...]
+
+	lásd: byte
+
+dfw <exp1>[,<exp2>...]
+
+	lásd word
+
+defs <exp>[,<fill>]
+
+	lásd: blk
+
+dephase
+
+	lásd: rend
+	
+ds <exp>[,<fill>]
+
+	lásd: blk
+
+dsb <exp>[,<fill>]
+
+	lásd: blk
+
+dsw <exp>[,<fill>]
+
+	lásd: blkw
+
+dw <exp1>[,<exp2>...]
+
+	lásd: word
+
+end
+
+	Befejezi a fordítást.
+	
+endif
+
+	Feltételes fordítási szakasz vége.
+	
+el
+
+	lásd: else
+
+else
+
+	A következő szakasz csak akkor kerül fordításra, ha a megelőző if feltétele hamis volt.
+
+endm
+endmac
+endmacro
+
+	Macro vége.
+
+endr
+endrep
+endrepeat
+
+	Ismétődő szakasz vége.
+	
+endstruct
+endstructure
+
+	Struktúra vége.
+	
+<symbol> eq <expression>
+<symbol> equ <expression>
+
+	Új szimbólum definiálása. Egy név csak egyszer definálható.
+	
+extern <symbol>[,<symbol>...]
+
+	lásd: global
+	
+even
+
+	align 1
+	
+fail <message>
+
+	Kilép a megadott üzenettel.
+	
+fill <exp>
+
+	blk <exp>,0
+	
+global <symbol>[,<symbol>...]
+
+	Külső szimbólum definálása, ami elérhető több modulból.
+
+if <expression>
+
+	Feltételes fordítás. A következő szakasz akkor fordul, ha a feltétel igaz.
+	
+ifdef <symbol>
+
+	A következő szakasz csak akkor fordul ha a szimbólum létezik.
+	
+ifndef <symbol>
+
+	A következő szakasz csak akkor fordul ha a szimbólum nem létezik.
+	
+ifeq <expression>
+
+	A következő szakasz csak akkor fordul ha a kifejezés értéke 0.
+
+ifne <expression>
+
+	A következő szakasz csak akkor fordul ha a kifejezés értéke <> 0.
+
+ifgt <expression>
+
+	A következő szakasz csak akkor fordul ha a kifejezés értéke nagyobb mint 0.
+
+ifge <expression>
+
+	A következő szakasz csak akkor fordul ha a kifejezés értéke nagyobb vagy egyenlő 0.
+
+iflt <expression>
+
+	A következő szakasz csak akkor fordul ha a kifejezés értéke kisebb mint 0.
+	
+iflt <expression>
+
+	A következő szakasz csak akkor fordul ha a kifejezés értéke kisebb vagy egyenlő mint 0.
+	
+ifused <symbol>
+
+	A következő szakasz csak akkor fordul ha a szimbólummal már találkozott a fordító a megelőző sorokban.
+	
+incbin <file>[,<offset>[,<nbytes>]]
+
+	A fájl beillesztése. offset: ennyi bájtot kihagyni az elejéről, nbytes: ennyi bájtot olvasni. Fájl keresés: aktuális könyvtár, -I, incdir
+
+incdir <path>
+
+	A megadott könyvtárban is fogja keresni a beillesztendő fájlokat.
+	
+include <file>
+
+	A megadott forrásfájl beillesztése. Fájl keresés: aktuális könyvtár, -I, incdir
+
+mac <name>
+
+	macro <name>
+
+list
+
+	A következő sorok meg fognak jelenni a listázási fájlban.
+	
+local <symbol>[,<symbol>...]
+
+	Lokális szimbólumok. Ezeket más modul nem fogja látni.
+
+macro <name>[,<argname>...]
+
+	Macro létrehozása.
+	A macro-t le kell zárni endmacro-val.
+	Max 9 paraméter használható.
+	A paramétereket vagy meg kell nevezni, vagy \1 \2 .. \9 jelöléssel használhatóak. \# a paraméterek száma. \?n az n-edik paraméter hossza. Argument \0 is set to the macro's first qualifier (mnemonic extension), when given. 
+	\@ egy egyedi azonosító (_nnnnnnnn, ahol n egy szám), jó címkékhez. Egyedi hívásonként. \@! ugyan ezt teszi, de az id-t elteszi egy stack-be is. \@@ beilleszti a legfelső id-t ebből a stack-ből.
+	\() may be used as a separator between the name of a macro argument and the subsequent text. < és > közötti rész egy paraméternek számít makró híváskor, > duplázással hasznáéható ezen belül (>>-ből > lesz).
+
+mdat <file>
+
+	incbin <file>
+
+nolist
+
+	Listába másolás megszüntetése. Lásd: list
+	
+org <expression>
+
+	A cél cím módosítása. Megegyezik: $=<expression>
+
+phase <expression>
+
+	rorg <expression>
+
+repeat <expression>
+
+	rept <expression>
+	
+rept <expression>
+
+	Az endr végéig tartó szakasz ismétlése a kifejezés szerint.
+
+reserve <exp>
+
+	blk <exp>,0
+
+rend
+
+	rorg szakasz vége.
+
+rorg <expression>
+
+	A rend-el jelzett szakaszvégig a kód átcímezése az értéknek megfelelően.
+
+section <name>[,"<attributes>"]
+
+	Szekció létrehozása.
+	
+<symbol> set <expression>
+
+	Szimbólum definálása, módosítása.
+
+spc <exp>
+
+	blk <exp>,0
+
+string "<string1>"[,"<string2>"...]
+
+	Szöveg tárolása, záró nullával.
+	
+struct <name>
+structure <name>
+
+	Struktúra meghatározása. Címkék a struktúrában eltolásként használhatók. Lezárás endstruct-al. A struktúra neve egy globális szimbólum, értéke a struktúra mérete. Az eltolás használata: name.label Adat definíciók használhatók, hasznosak mikor a struktúra inicializálásra van használva.
+	
+	Példa:
+		  struct point
+		x    db 4
+		y    db 5
+		z    db 6
+		  endstruct
+
+	Hatás:
+		point.x  ; 0   eltolások
+		point.y  ; 1
+		point.z  ; 2
+		point    ; 3   méret
+
+	Mezők értéke felülírható:
+		point1 point
+		point2 point 1, 2, 3
+		point3 point ,,4
+	
+text "string"
+
+	Egy string beillsztése.
+	
+weak <symbol>[,<symbol>...]
+
+	Gyenge szimbólumok. Láthatóak minden modul által, de nem kell definíció linkeléshez. Ha nincs definíció, akkor az értéke 0.
+
+wor <exp1>[,<exp2>...]
+word <exp1>[,<exp2>...]
+
+	16 bites értékek tárolása a CPU-nak megfelelő bájt sorrendben.
+
+xdef <symbol>[,<symbol>...]
+xlib <symbol>[,<symbol>...]
+xref <symbol>[,<symbol>...]
+
+	Lásd: global
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
