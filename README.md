@@ -3,6 +3,7 @@
 Javascript VIDEOTON TV Computer emulátor.
 
 Demo: http://teki.github.io/jstvc
+Editor: http://teki.github.io/jstvc/editor.html
 
 Tesztelve:
 - Google Chrome (ajánlott)
@@ -62,6 +63,7 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 
 v0.4.1
  * az assemblernek hozzáférése van az összes fájlhoz a forrásfájl mellett, működik az incbin és include!
+ * fordítottan doksit vasm-hoz, linkelve az editor oldalán
 
 v0.4.0
  * 720kB-os lemezkezelés javítva
