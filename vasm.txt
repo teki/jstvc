@@ -430,6 +430,41 @@ xref <symbol>[,<symbol>...]
 
 	Lásd: global
 	
+Példa
+=====
+
+startaddr = 6639-128-16
+datalen = $3000 - startaddr + 1
+applen = datalen - 128 - 16
+blockcnt = datalen / 128
+blockbyt = (datalen % 128) & 255
+
+; cas header (ez jobb lenne kulon progiba, majd kesobb)
+	org startaddr
+	byte $11, $00
+	byte blockcnt % 256, blockcnt / 256
+	byte blockbyt
+	blk 128-5
+	byte $00, $01
+	byte applen & 255, applen / 256
+	blk 16-4
+
+
+; 10 print usr(6912)
+	org 6639
+	byte $0f,$0a,$00,$dd,$20,$55,$53,$52
+	byte $96,$36,$39,$31,$32,$95,$ff
+
+; ide jon a kod
+	org $1b00
+	ld hl, 'a' + 1
+	ret
+
+; egy extra szegmens, hogy a fajlmeret fix legyen (bizti van vmi megoldas hogy ne kelljen)
+	org $3000
+	byte $76
+
+end
 
 
 

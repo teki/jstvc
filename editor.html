@@ -186,19 +186,9 @@ blockbyt = (datalen % 128) & 255\n\
                 showDownloadLink(diskName+".zip", zipcontent);
             });
             // reload from database
-            $("#dreload").on("click", function(event) {
-                refreshDisk();
-            });
+            $("#dreload").on("click", function(event) { refreshDisk(); });
             // save
-            $("#edsave").on("click", function(event) {
-                var fileName = $("#edfn").val().toUpperCase();
-                if (fileName[0] != "/")
-                    fileName = pathJoin(diskPath,fileName);
-                saveFile(fileName, string2buffer(editor.getValue()), function (mtp) {
-                    if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
-                    else console.error("Failed to save:",fileName);
-                });
-            });
+            $("#edsave").on("click", function(event) { saveEditor(); });
             // mkdir
             $("#fmkdir").on("click", function(event) {
                 var name = prompt('Name for the directory?');
@@ -275,7 +265,7 @@ blockbyt = (datalen % 128) & 255\n\
             });
             // edit file
             function fileNameChanged() {
-                var fileName = $("#edfn").val().toUpperCase();
+                var fileName = getEditorFilename();
                 var extension = suffix(fileName);
                 if (extension == "ASM") {
                     $("#comp").removeAttr("disabled");
@@ -313,12 +303,25 @@ blockbyt = (datalen % 128) & 255\n\
             requirejs(["scripts/utils.js"], function(UTILS) {
                 Utils = UTILS;
                 Utils.dbInit(function() {
-                    editText = Utils.loadLocal("tvc~asm1",testScript);
                     $("#comp").on("click", function(e) {compileBuffer();}) ;
-                    editor.setValue(editText);
-
                     Utils.dbListDisks(updateDskList);
                 });
+            });
+        }
+        // save file from editor
+        function getEditorFilename() {
+            var fileName = $("#edfn").val().toUpperCase();
+            if (fileName[0] != "/")
+                fileName = pathJoin(diskPath,fileName);
+            return fileName;
+        }
+        function saveEditor(cb) {
+            var fileName = getEditorFilename();
+            saveFile(fileName, string2buffer(editor.getValue()), function (mtp) {
+                if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
+                else console.error("Failed to save:",fileName);
+                if (cb)
+                    cb();
             });
         }
         function updateDskList(name, data) {
@@ -347,6 +350,16 @@ blockbyt = (datalen % 128) & 255\n\
                 params: ["::" + diskPath],
                 cb: dirCompleted,
                 dsk: diskData
+            };
+            MTOOLS(mtp);
+        }
+        function getAllFiles(absPath, cb) {
+            var mtp = {
+                cmd:"mcopy",
+                params: ["::"+pathJoin(absPath,"*"),"."],
+                cb: cb,
+                dsk: diskData,
+                dumpFs: true
             };
             MTOOLS(mtp);
         }
@@ -487,28 +500,37 @@ blockbyt = (datalen % 128) & 255\n\
         }
         function compileBuffer() {
             // save local so changes will not be lost
-            Utils.saveLocal("tvc~asm1", editor.getValue());
-            var code = Utils.loadLocal("tvc~asm1","");
+            saveEditor(compileBuffer2);
+        }
+        function compileBuffer2() {
+            getAllFiles(dirname(getEditorFilename()), compileBuffer3);
+        }
+        function compileBuffer3(mtp) {
             // compile
-            var res = {'out': "", 'err': ""};
-            ASM(code, res);
+            var asmp = {
+                out: "",
+                err: "",
+                fileName: getEditorFilename(),
+                fs: mtp.fs
+            }
+            ASM(asmp);
             // display error
-            if (!res.ret) {
-                $("#buildres").val(res.err);
+            if (!asmp.ret) {
+                $("#buildres").val(asmp.err);
                 return;
             }
             // output dump
             var j = 0;
             var strline = "";
             var resstr = "";
-            for(var i = 0; i < res.data.length; i++) {
-                strline += res.data[i].toString(10);
+            for(var i = 0; i < asmp.data.length; i++) {
+                strline += asmp.data[i].toString(10);
                 if (j++ == 7) {
                     resstr += strline + "\n";
                     strline = "";
                     j = 0;
                 }
-                else if (i != res.data.length -1) {
+                else if (i != asmp.data.length -1) {
                     strline += ",";
                 }
             }
@@ -518,10 +540,8 @@ blockbyt = (datalen % 128) & 255\n\
             $("#buildres").val(resstr);
             // save the file as a cas to the disk
             if (diskData) {
-                var fileName = $("#edfn").val().toUpperCase().replace(/ASM$/,"CAS");
-                if (fileName[0] != "/")
-                    fileName = pathJoin(diskPath,fileName);
-                saveFile(fileName, res.data, function (mtp) {
+                var fileName = getEditorFilename().replace(/ASM$/,"CAS");
+                saveFile(fileName, asmp.data, function (mtp) {
                     if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
                     else console.error("Failed to save:",fileName);
                 });
@@ -558,6 +578,8 @@ blockbyt = (datalen % 128) & 255\n\
     <input id="edfn" type="text" style="text-transform:uppercase;" />
     <button id="edsave">save</button>
     <button id="comp">compile</button>
+    <a href="vasm.txt" target="_blank">vasm doc (hun)</a>
+    <a href="http://ep128.hu/Sp_Konyv/Z80_sorozat_1.htm" target="_blank">z80 doc (hun)</a>
     <br />
 	<textarea id="myeditor" style="width:auto;"></textarea>
 	<textarea id="buildres" rows="5" style="width:100%;"></textarea>
