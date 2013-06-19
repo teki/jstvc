@@ -10,10 +10,10 @@
         var diskL;
         var diskName;
         var diskData;
-        var diskPath;
+        var diskPath = "";
     </script>
     <link rel="stylesheet" href="3rdparty/codemirror.css">
-    <script src="3rdparty/jquery-1.9.0.min.js"></script>
+    <script src="3rdparty/jquery-1.10.1.min.js"></script>
     <script src="3rdparty/require.js"></script>
     <script src="3rdparty/vasmz80_oldstyle.js"></script>
     <script src="3rdparty/jszip.js"></script>
@@ -94,7 +94,9 @@ blockbyt = (datalen % 128) & 255\n\
         }
         function refreshDisk() {
             var diskName = diskL[0].value;
-            Utils.dbLoadDisk(diskName, diskLoaded);
+            if (diskName.length > 0) {
+                Utils.dbLoadDisk(diskName, diskLoaded);
+            }
         }
         function saveAndUpdateDisk(name, data) {
             Utils.dbSaveDisk(name, data, function(n,d) {
@@ -561,7 +563,7 @@ blockbyt = (datalen % 128) & 255\n\
         <hr />
     </div>
     <button id="dcreate">Create disk</button>
-    Add: <input type="file" id="diskup" name="dskfile" style="width:6.5em;"/>
+    Add: <input type="file" id="diskup" name="dskfile" style="width:7em;"/>
     <hr />
     <select id="diskl"></select>
     <button id="dreload">Refr</button>
@@ -570,7 +572,7 @@ blockbyt = (datalen % 128) & 255\n\
     <hr />
     <button id="fdelete">Del</button>
     <button id="fmkdir">MkDir</button>
-    <input type="file" id="fileup" name="ffile" style="width:6.5em;"/>
+    <input type="file" id="fileup" name="ffile" style="width:7em;"/>
     <button id="fget">Get</button>
     <ul id="dcont" style="font-size:12px;list-style-type: none;padding:0px;margin:0px;"></ul>
 </div>

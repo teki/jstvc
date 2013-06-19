@@ -85,11 +85,8 @@ define(function() {
     Utils.dbInit = function(cb) {
         var request = window.indexedDB.open("tvc-db",3);
         request.onupgradeneeded = function(event) {
-            console.log("init disk database");
             Utils.db = event.target.result;
             var os = Utils.db.createObjectStore("disks", {keyPath: "name"});
-            if (cb)
-                cb();
         };
         request.onsuccess = function(event) {
             Utils.db = event.target.result;

@@ -61,6 +61,9 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 
 # Verzió történet
 
+v0.4.2
+ * adatbazis fix az editorban
+
 v0.4.1
  * az assemblernek hozzáférése van az összes fájlhoz a forrásfájl mellett, működik az incbin és include!
  * fordítottan doksit vasm-hoz, linkelve az editor oldalán
