@@ -417,6 +417,7 @@ define([
 		};
 		console.log(this._z80.toString());
 		console.log(this._mmu.toString());
+		this.dmem("SP");
 		console.log(this._z80.btToString(5).slice(0,-1).join("\n"));
 		line = DASM.Dasm([r, addr]);
 		console.log("%c%s", "color: green; font-weight: bold;", Utils.toHex16(addr) + " " + line[0]);
