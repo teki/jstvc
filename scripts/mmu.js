@@ -21,7 +21,7 @@ define(["scripts/utils.js"], function(Utils) {
 		this._sys = new MemBlock("SYS", false, 16384);
 		this._cart = new MemBlock("CART", false, 16384);
 		this._exth = new MemBlock("EXT", false, 8192);
-		this._map = [];
+		this._map = [undefined, undefined, undefined, undefined];
 		this._mapVal = -1;
 		this._mapValVid = -1;
 		this._log = false;
@@ -220,7 +220,12 @@ define(["scripts/utils.js"], function(Utils) {
 		var block = this._map[mapIdx];
 		var result = 0;
 		var addr = addrP & 0x3FFF;
-		if ((mapIdx == 3) && !block) { // ext
+		if (block) {
+			result = block.m[addr];
+		}
+		else {
+			// it should be ext
+			if (mapIdx != 3) throw("Invalid memory mapping!");
 			if (addr < 0x2000) {
 				if (this.extmmu) {
 					result = this.extmmu.r8(addr);
@@ -229,9 +234,6 @@ define(["scripts/utils.js"], function(Utils) {
 			else {
 				result = this._exth.m[addr - 0x2000];
 			}
-		}
-		else {
-			result = block.m[addr];
 		}
 		return result;
 	};

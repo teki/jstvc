@@ -37,11 +37,11 @@ define(["scripts/utils.js"], function(Utils) {
 	AUD.prototype.schedule = function(buffer, ch) {
 		var k = 2* Math.PI * this._freq / this._sink.sampleRate;
 		var needsUpdate = (this._voln >= 0) || (this._freqn >= 0);
-		var sample,dist,spc;
+		var sample,dist,spc,i;
 		if (needsUpdate) {
 			spc = this._sink.sampleRate / this._freq;
 			dist = spc - (this._idx % spc);
-			for (var i=0; i < buffer.length; i++) {
+			for (i=0; i < buffer.length; i++) {
 				if (needsUpdate && ((dist--) < 0)) { // switch on 0
 					this._idx = 0;
 					if (this._freqn >= 0) {
@@ -61,13 +61,13 @@ define(["scripts/utils.js"], function(Utils) {
 			}
 		}
 		else {
-			for (var i=0; i < buffer.length; i++) {
+			for (i=0; i < buffer.length; i++) {
 				sample = Math.sin(k * this._idx) * this._vol;
 				buffer[i] = sample;
 				this._idx++;
 			}
 		}
-	}
+	};
 
 	exports.AUD = AUD;
 	return exports;

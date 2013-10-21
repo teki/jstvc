@@ -102,6 +102,28 @@ function notify(msg, msg2) {
 	$("#statusline").text(msg);
 }
 
+function refreshGui() {
+	g.fb.imageData.data.set(g.fb.buf8);
+	g.ctx.putImageData(g.fb.imageData, 0, 0);
+	g.fb.updatecnt++;
+	var timenow = g.timenow();
+	if ((timenow - g.fb.prevUpdateTime) > 1000) {
+		g.fb.prevUpdateTime = timenow;
+
+		g.fb.updates.push([g.fb.updatecnt, timenow]);
+		if (g.fb.updates.length > 5) g.fb.updates.shift();
+
+
+		var lastUpdateIdx = g.fb.updates.length - 1;
+		var cntdiff = g.fb.updates[lastUpdateIdx][0] - g.fb.updates[0][0];
+		var timediff = g.fb.updates[lastUpdateIdx][1] - g.fb.updates[0][1];
+
+		g.fb.fpsv = ~~(cntdiff / (timediff / 1000));
+		//console.log(g.fb.updates,g.fb.fpsv);
+		notify("running " + g.fb.fpsv.toString(10) + "fps");
+	}
+}
+
 function emuInit() {
 	notify("init page");
 	/* polyfills */
@@ -132,27 +154,7 @@ function emuInit() {
 	g.fb.buf = new ArrayBuffer(g.fb.imageData.data.length);
 	g.fb.buf8 = new Uint8ClampedArray(g.fb.buf);
 	g.fb.buf32 = new Uint32Array(g.fb.buf);
-	g.fb.refresh = function() {
-		g.fb.imageData.data.set(g.fb.buf8);
-		g.ctx.putImageData(g.fb.imageData, 0, 0);
-		g.fb.updatecnt++;
-		var timenow = g.timenow();
-		if ((timenow - g.fb.prevUpdateTime) > 1000) {
-			g.fb.prevUpdateTime = timenow;
-
-			g.fb.updates.push([g.fb.updatecnt, timenow]);
-			if (g.fb.updates.length > 5) g.fb.updates.shift();
-
-
-			var lastUpdateIdx = g.fb.updates.length - 1;
-			var cntdiff = g.fb.updates[lastUpdateIdx][0] - g.fb.updates[0][0];
-			var timediff = g.fb.updates[lastUpdateIdx][1] - g.fb.updates[0][1];
-
-			g.fb.fpsv = ~~(cntdiff / (timediff / 1000));
-			//console.log(g.fb.updates,g.fb.fpsv);
-			notify("running " + g.fb.fpsv.toString(10) + "fps");
-		}
-	};
+	g.fb.refresh = refreshGui;
 	var emuDefs = [
 		"64k  1.2",
 		"64k+ 1.2",
@@ -254,12 +256,22 @@ function emuContinue() {
 }
 
 function emuRunFrame() {
-	if (!g.isRunning)
-		return;
-	var breakPointHit = g.tvc.runForAFrame();
-	if (breakPointHit)
-		emuBreak();
+	var skipRun;
 	if (g.isRunning)
-		emuContinue();
+	{
+		skipRun = false;
+		g.fb.skipcnt++;
+		if (g.fb.skipcnt == 6) {
+			skipRun = g.fb.fpsv > 49;
+			g.fb.skipcnt = 0;
+		}
+		if (!skipRun)
+		{
+			if(g.tvc.runForAFrame())
+				emuBreak();
+		}
+		if (g.isRunning)
+			emuContinue();
+	}
 }
 
