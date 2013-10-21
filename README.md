@@ -61,6 +61,9 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 
 # Verzió történet
 
+v0.5.0
+ * Firefox gyorsítás (hang sajna nincs, FFox 25-ben lesz új hang API, azt megvárom)
+
 v0.4.2
  * adatbazis fix az editorban
 
