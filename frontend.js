@@ -156,11 +156,11 @@ function emuInit() {
 	g.fb.buf32 = new Uint32Array(g.fb.buf);
 	g.fb.refresh = refreshGui;
 	var emuDefs = [
+		"64k+ 1.2, VT-DOS",
+		"64k+ 2.2, VT-DOS",
 		"64k  1.2",
 		"64k+ 1.2",
-		"64k+ 2.2",
-		"64k+ 1.2, VT-DOS",
-		"64k+ 2.2, VT-DOS"
+		"64k+ 2.2"
 			];
 	var defaultType = Utils.loadLocal("tvc~defmachtype", emuDefs[0]);
 	emuCreate(defaultType);
