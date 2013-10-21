@@ -1,6 +1,8 @@
 module.exports = function(grunt) {
 
 	require('shelljs/global');
+	var hostName = process.env.IP || "127.0.0.1";
+	var hostPort = process.env.PORT || "5000";
 
 	grunt.loadNpmTasks("grunt-contrib-connect");
 
@@ -9,8 +11,8 @@ module.exports = function(grunt) {
 		connect: {
 			server: {
 				options: {
-					port: process.env.PORT,
-                    hostname: process.env.IP,
+					port: hostPort,
+					hostname: hostName,
 					base: require("path").resolve("."),
 					keepalive: true
 				}
