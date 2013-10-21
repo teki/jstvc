@@ -112,11 +112,11 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm
 			function(port, addr) {fakemmu.out8(port,addr);},
 			null);
 		z80._btmaxlen = 0;
-		z80._s.PC = 0x100;
+		z80.setRegVal("PC", 0x100);
 
 		while (true) {
 			z80.step(0);
-			var pc = z80._s.PC;
+			var pc = z80.getRegVal("PC");
 			if (pc == 0x1D42 && doDasm) {
 				var r = function(addr) {
 					return fakemmu.r8(addr);
@@ -129,12 +129,12 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm
 			}
 			// 5 = system call
 			else if (pc == 5) {
-				if (z80._s.C == 2) {
-					process.stdout.write(String.fromCharCode(z80._s.E));
+				if (z80.getRegVal("C") == 2) {
+					process.stdout.write(String.fromCharCode(z80.getRegVal("E")));
 				}
-				else if (z80._s.C == 9) {
+				else if (z80.getRegVal("C") == 9) {
 					var txtaddr,txtchr,txtstr;
-					txtaddr = z80._s.DE;
+					txtaddr = z80.getRegVal("DE");
 					txtstr = "";
 					while ((txtchr = String.fromCharCode(fakemmu.r8(txtaddr))) != "$") {
 						txtstr += txtchr;
@@ -145,7 +145,7 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm
 						break;
 					}
 				}
-				z80._s.PC = z80.pop16();
+				z80.setRegVal("PC", z80.pop16());
 			}
 		}
 	};
@@ -166,27 +166,27 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm
 		}
 
 		val = [];
-		val.push(z80._s.AF);
-		val.push(z80._s.BC);
-		val.push(z80._s.DE);
-		val.push(z80._s.HL);
-		val.push(z80._s.AFa);
-		val.push(z80._s.BCa);
-		val.push(z80._s.DEa);
-		val.push(z80._s.HLa);
-		val.push(z80._s.IX);
-		val.push(z80._s.IY);
-		val.push(z80._s.SP);
-		val.push(z80._s.PC);
+		val.push(z80.getRegVal("AF"));
+		val.push(z80.getRegVal("BC"));
+		val.push(z80.getRegVal("DE"));
+		val.push(z80.getRegVal("HL"));
+		val.push(z80.getRegVal("AFa"));
+		val.push(z80.getRegVal("BCa"));
+		val.push(z80.getRegVal("DEa"));
+		val.push(z80.getRegVal("HLa"));
+		val.push(z80.getRegVal("IX"));
+		val.push(z80.getRegVal("IY"));
+		val.push(z80.getRegVal("SP"));
+		val.push(z80.getRegVal("PC"));
 		result.push(val.map(function(x) {return Utils.toHex16(x);}).join(" "));
 
 		val = [];
-		val.push(Utils.toHex8(z80._s.I));
-		val.push(Utils.toHex8(z80._s.R));
-		val.push(z80._s.IFF1);
-		val.push(z80._s.IFF2);
-		val.push(z80._s.im);
-		val.push(z80._s.halted);
+		val.push(Utils.toHex8(z80.getRegVal("I")));
+		val.push(Utils.toHex8(z80.getRegVal("R")));
+		val.push(z80.getRegVal("IFF1"));
+		val.push(z80.getRegVal("IFF2"));
+		val.push(z80.getRegVal("im"));
+		val.push(z80.getRegVal("halted"));
 		val.push(totalRunTime);
 
 		result.push(val.join(" "));
@@ -241,28 +241,28 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm
 				continue;
 			case 1: // registers
 				val = line.split(/\s+/).map(function(x) {return parseInt(x,16);});
-				z80._s.AF = val[0];
-				z80._s.BC = val[1];
-				z80._s.DE = val[2];
-				z80._s.HL = val[3];
-				z80._s.AFa = val[4];
-				z80._s.BCa = val[5];
-				z80._s.DEa = val[6];
-				z80._s.HLa = val[7];
-				z80._s.IX = val[8];
-				z80._s.IY = val[9];
-				z80._s.SP = val[10];
-				z80._s.PC = val[11];
+				z80.setRegVal("AF", val[0]);
+				z80.setRegVal("BC", val[1]);
+				z80.setRegVal("DE", val[2]);
+				z80.setRegVal("HL", val[3]);
+				z80.setRegVal("AFa", val[4]);
+				z80.setRegVal("BCa", val[5]);
+				z80.setRegVal("DEa", val[6]);
+				z80.setRegVal("HLa", val[7]);
+				z80.setRegVal("IX", val[8]);
+				z80.setRegVal("IY", val[9]);
+				z80.setRegVal("SP", val[10]);
+				z80.setRegVal("PC", val[11]);
 				state = 2;
 				continue;
 			case 2: // state
 				val = line.split(/\s+/).filter(function(x) {return x.length > 0;}).map(function(x) {return parseInt(x,16);});
-				z80._s.I = val[0];
-				z80._s.R = val[1];
-				z80._s.IFF1 = val[2];
-				z80._s.IFF2 = val[3];
-				z80._s.im = val[4];
-				z80._s.halted = val[5];
+				z80.setRegVal("I", val[0]);
+				z80.setRegVal("R", val[1]);
+				z80.setRegVal("IFF1", val[2]);
+				z80.setRegVal("IFF2", val[3]);
+				z80.setRegVal("im", val[4]);
+				z80.setRegVal("halted", val[5]);
 				runTime = parseInt(val[6].toString(16), 10);
 				state = 3;
 				continue;
@@ -368,6 +368,12 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm
 		testVid();
 		},
 	};
+
+	process.on('uncaughtException', function (err) {
+		console.error('ERROR: uncaught exception');
+		console.error(err);
+		console.error(err.stack);
+	});
 
 	if (process.argv.length < 3) {
 		throw("ERROR: missing test id: " + Object.keys(tests));

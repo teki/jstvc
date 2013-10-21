@@ -116,10 +116,11 @@ define([
 		while (!doBreak && maxTime > 0) {
 			cpuTime = this._z80.step(0);
 			if (this._breakpoints) {
-				doBreak = (this._breakpoints[this._z80._s.PC] !== undefined);
+				doBreak = (this._breakpoints[this._z80.getRegVal("PC")] !== undefined);
 			}
 			this._clock += cpuTime;
 			maxTime -= cpuTime;
+
 			drawInfo = this._vid.streamSome(cpuTime);
 			if (drawInfo[0]) { // crtc is not yet initialized
 				if (drawInfo[1] && this._z80.irqEnabled()) { // it
@@ -135,7 +136,7 @@ define([
 		}
 
 		if (doBreak) {
-			this._callback({id: "notify", str: "breakpoint: " + Utils.toHex16(this._z80._s.PC)});
+			this._callback({id: "notify", str: "breakpoint: " + Utils.toHex16(this._z80.getRegVal("PC"))});
 			console.warn("BREAK");
 			this.dreg();
 		}
@@ -242,8 +243,8 @@ define([
 					this._ext1.writePort(addr & 0x0F, val);
 			}
 			else {
-				//debugger;
-				console.warn("Unhandled port write: " + Utils.toHex8(addr) + " " + Utils.toHex8(val)," (PC:",Utils.toHex16(this._z80._s.PC),")");
+				debugger;
+				console.warn("Unhandled port write: " + Utils.toHex8(addr) + " " + Utils.toHex8(val)," (PC:",Utils.toHex16(this._z80.getRegVal("PC")),")");
 			}
 		}
 	};
@@ -274,7 +275,7 @@ define([
 				result = this._ext1.readPort(addr & 0x0F);
 			}
 			else {
-				console.warn("Unhandled port read: ", Utils.toHex8(addr)," (PC:",Utils.toHex16(this._z80._s.PC),")");
+				console.warn("Unhandled port read: ", Utils.toHex8(addr)," (PC:",Utils.toHex16(this._z80.getRegVal("PC")),")");
 				result = 0xff;
 			}
 		}
@@ -306,7 +307,7 @@ define([
 
 	var bpMap = {"kbd-int" : 0xd62d };
 	TVC.prototype.resolveAddr = function(val) {
-		var addr = this._z80._s[val];
+		var addr = this._z80.getRegVal(val);
 		if (isNaN(addr)) addr = parseInt(val, 16);
 		if (isNaN(addr)) addr = bpMap[val];
 		return addr;
@@ -408,7 +409,7 @@ define([
 	TVC.prototype.dreg = function() {
 		var l = 3;
 		var arr = [];
-		var addr = this._z80._s.PC;
+		var addr = this._z80.getRegVal("PC");
 		var line;
 		var arr = [];
 		var self = this;
@@ -442,8 +443,8 @@ define([
 			return self._mmu.r8(addrr);
 		};
 		var line;
-		line = DASM.Dasm([r, this._z80._s.PC]);
-		var dstPC = this._z80._s.PC + line[1];
+		line = DASM.Dasm([r, this._z80.getRegVal("PC")]);
+		var dstPC = this._z80.getRegVal("PC") + line[1];
 		while (true) {
 			cpuTime = this._z80.step(0);
 			this._clock += cpuTime;
@@ -458,7 +459,7 @@ define([
 					this._fb.refresh();
 				}
 			}
-			if (!breakOnNext || (this._z80._s.PC == dstPC))
+			if (!breakOnNext || (this._z80.getRegVal("PC") == dstPC))
 				break;
 		}
 		this.dreg();
