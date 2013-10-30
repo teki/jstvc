@@ -62,7 +62,8 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 
 
 v0.5.1
- * Firefox 25 hang (időzítés még mindig nincs)
+ * Firefox 25 hang (időzítés még mindig nincs), hang elvileg van ahol web audio vagyon (IE-ben nincs)
+ * Safari fix
 
 v0.5.0
  * Firefox gyorsítás (hang sajna nincs, FFox 25-ben lesz új hang API, azt megvárom)
