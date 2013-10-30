@@ -34,7 +34,7 @@ define([
 		this._mmu = new MMU.MMU(type);
 		this._fb = callback({id:"fb"});
 		this._vid = new VID.VID(this._mmu, this._fb);
-		this._aud = new AUD.AUD();
+		this._aud = new AUD.AUD(callback({id:"aud"}));
 		this._aud_it = false;
 		this._key = new KEY.KEY();
 		this._z80 = new Z80.Z80(this._mmu, function(addr, val) {

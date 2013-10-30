@@ -377,7 +377,6 @@ define(["scripts/utils.js","scripts/dasm.js"], function (Utils,Dasm) {
 			var addr = this._s.R16[R_HL];
 			var srcval = this._mmu.r8(addr);
 			var val = srcval & mask;
-			console.log(((addr >>> 8) & (F_3|F_5)));
 			this._s.R8[R_F] =
 				(val & F_S) |
 				((val) ? (0) : (F_Z|F_PV)) |
