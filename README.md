@@ -6,9 +6,7 @@ Demo: http://teki.github.io/jstvc
 Editor: http://teki.github.io/jstvc/editor.html
 
 Tesztelve:
-- Google Chrome (ajánlott)
-- Safari 6+
-- Firefox műküdik, de lassú
+- Google Chrome, Safari, Firefox
 
 # TVC
 
@@ -59,7 +57,6 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 	* g.tvc.dasm(cím, [utasítások száma]) - disassembly memória
 
 # Verzió történet
-
 
 v0.5.1
  * Firefox 25 hang (időzítés még mindig nincs), hang elvileg van ahol web audio vagyon (IE-ben nincs)
