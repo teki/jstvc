@@ -37,7 +37,6 @@ TVC rajongói oldal: http://www.tvc.hu
 
 # Nem általam írt kódok
 
-* hang: https://github.com/jussi-kalliokoski/sink.js/
 * web: http://jquery.com/
 * modulok: http://requirejs.org/
 * z80 tesztek:
@@ -60,6 +59,10 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 	* g.tvc.dasm(cím, [utasítások száma]) - disassembly memória
 
 # Verzió történet
+
+
+v0.5.1
+ * Firefox 25 hang (időzítés még mindig nincs)
 
 v0.5.0
  * Firefox gyorsítás (hang sajna nincs, FFox 25-ben lesz új hang API, azt megvárom)

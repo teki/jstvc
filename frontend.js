@@ -17,6 +17,17 @@ var callback = function(e) {
 		case "notify":
 			notify(e.str);
 			break;
+		case "aud":
+			if (window.webkitAudioContext) {
+				res = new webkitAudioContext();
+			}
+			else if (window.AudioContext) {
+				res = new AudioContext();
+			}
+			else {
+				res = undefined;
+			}
+			break;
 	}
 	return res;
 };
