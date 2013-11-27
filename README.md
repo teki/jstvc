@@ -58,6 +58,9 @@ A böngésző javascript konzolán érhető el. A g.tvc objektumon a d betűvel 
 
 # Verzió történet
 
+v0.5.2
+ * automatikus billentyűzet felderítés (Nem 100%-os. Sajna a böngészők nem túl következetesek a karakter kódokkal, amikor magyar billentyűzetről van szó - legalábbis Linux-on.)
+
 v0.5.1
  * Firefox 25 hang (időzítés még mindig nincs), hang elvileg van ahol web audio vagyon (IE-ben nincs)
  * Safari fix
