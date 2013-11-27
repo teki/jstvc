@@ -233,6 +233,7 @@ function emuInit() {
 	// keyboard
 	$(document).keydown(handleKeyDown);
 	$(document).keyup(handleKeyUp);
+	$(document).keypress(handleKeyPress);
 	// focus on canvas
 	$(window).focus(handleFocus);
 	$(window).blur(handleFocusLost);
@@ -241,10 +242,16 @@ function emuInit() {
 }
 
 // event handlers
+function handleKeyPress(e) {
+	if (g.tvc) {
+		g.tvc.keyPress(e.which);
+		e.preventDefault();
+	}
+}
 function handleKeyDown(e) {
 	if (g.tvc) {
-		g.tvc.keyDown(e.which);
-		e.preventDefault();
+		if (g.tvc.keyDown(e.which))
+			e.preventDefault();
 	}
 }
 function handleKeyUp(e) {

@@ -70,9 +70,12 @@ define([
 	};
 
 	TVC.prototype.keyDown = function(code) {
-		this._key.keyDown(code);
+		return this._key.keyDown(code);
 	};
 
+	TVC.prototype.keyPress = function(code) {
+		this._key.keyPress(code);
+	};
 	
 	TVC.prototype.focusChange = function(hasFocus) {
 		if (!hasFocus) {
