@@ -53,19 +53,20 @@ define(["scripts/utils.js", "3rdparty/lodash.min.js"], function(Utils,_) {
 			" ?:   _M";
 
 		// keys which are not in the table
+		this._keymap[0][46] = [5,0,0]; // del
 		this._keymap[0][ 8] = [5,0,0]; // backspace
 		this._keymap[0][13] = [5,4,0]; // return
 		this._keymap[0][16] = [6,3,0]; // shift
-		this._keymap[0][17] = [7,4,0]; // ctrl
-		this._keymap[0][18] = [7,0,0]; // alt
 		this._keymap[0][20] = [6,5,0]; // lock
+		this._keymap[0][18] = [7,0,0]; // alt
 		this._keymap[0][27] = [7,3,0]; // esc
+		this._keymap[0][17] = [7,4,0]; // ctrl
 		this._keymap[0][32] = [7,5,0]; // space
-		this._keymap[0][37] = [8,6,0]; // left
 		this._keymap[0][38] = [8,1,0]; // up
-		this._keymap[0][39] = [8,5,0]; // right
 		this._keymap[0][40] = [8,2,0]; // down
-		this._keymap[0][46] = [5,0,0]; // del
+		this._keymap[0][ 9] = [8,3,0]; // tab -> fire
+		this._keymap[0][39] = [8,5,0]; // right
+		this._keymap[0][37] = [8,6,0]; // left
 
 		// copy mappings
 		_.map(this._keymap[0], function(m,key) {
@@ -75,6 +76,7 @@ define(["scripts/utils.js", "3rdparty/lodash.min.js"], function(Utils,_) {
 		}, this);
 		// pre map special keys
 		this._isMapped[8] = 1;
+		this._isMapped[9] = 1;
 		this._isMapped[13] = 1;
 		this._isMapped[32] = 1;
 	}
@@ -157,11 +159,22 @@ define(["scripts/utils.js", "3rdparty/lodash.min.js"], function(Utils,_) {
 	KEY.prototype.keyDown = function(code) {
 		//console.log("kd: " + code + " shift: " + this._mod);
 		this._lastPress = code;
-		return this.keyUpdate(code, true);
+		var res;
+		if (code) {
+			res = this.keyUpdate(code, true);
+		}
+		else {
+			// ignore 0 keycodes
+			// Firefox likes to send them.
+			res = true;
+		}
+		return res;
 	};
 	KEY.prototype.keyUp = function(code) {
 		//console.log("ku: " + code + " shift: " + this._mod);
-		this.keyUpdate(code, false);
+		if (code) {
+			this.keyUpdate(code, false);
+		}
 	};
 	KEY.prototype.keyPress = function(code) {
 		//console.log("kp: " + code + " " + String.fromCharCode(code) + " shift:" + this._mod);
