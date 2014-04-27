@@ -274,6 +274,7 @@ define(["scripts/utils.js"], function(Utils) {
 
 	FD1793.prototype.loadDsk = function(drive, name, dsk) {
 		if (drive < 0 || drive > 3) throw("FD1793: illegal drive:", drive);
+		if (this._log) console.log("FD1793: loadDsk: " + name);
 		this._disks[drive].loadDsk(name, dsk);
 	};
 

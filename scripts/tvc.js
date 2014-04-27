@@ -116,6 +116,7 @@ define([
 		var maxTime = 2 * this._clockperframe;
 		var cpuTime = 0;
 		var drawInfo = [false,false];
+		var clocksave = this._clock;
 		while (!doBreak && maxTime > 0) {
 			cpuTime = this._z80.step(0);
 			if (this._breakpoints) {
@@ -125,7 +126,7 @@ define([
 			maxTime -= cpuTime;
 
 			drawInfo = this._vid.streamSome(cpuTime);
-			if (drawInfo[0]) { // crtc is not yet initialized
+			if (drawInfo[0]) { // crtc is initialized
 				if (drawInfo[1] && this._z80.irqEnabled()) { // it
 					var irqDuration = this._z80.irq();
 					this._pendIt &= ~(0x10); // cursor IT

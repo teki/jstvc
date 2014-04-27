@@ -4,7 +4,7 @@ requirejs.config({
     nodeRequire: require
 });
 
-requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm.js"], function(Z80Module, Utils, VIDModule, DASM) {
+requirejs(["util", "scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm.js"], function(util, Z80Module, Utils, VIDModule, DASM) {
 /*
 	var F_S = 0x80; // sign
 	var F_Z = 0x40; // zero
@@ -20,6 +20,7 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm
 
 	function FakeMMU(logIntoThis) {
 		this._mem = new Uint8Array(0x10000);
+    this.crtmem = this._mem;
 		this.log = logIntoThis;
 
 		this.clear = function() {
@@ -330,20 +331,39 @@ requirejs(["scripts/z80.js", "scripts/utils.js", "scripts/vid.js", "scripts/dasm
 			vid = new VIDModule.VID(mmu, fb),
 			regs = [ 99, 64, 75, 50, 77,  2, 60, 66,  0,  3,  3,  3,  0,  0, 14, 255,  0,  0 ],
 			l=0,
-			i;
+      i,rf, clk;
 
 		for (i = regs.length - 1; i >= 0; i--) {
 			vid.setRegIdx(i);
 			vid.setReg(regs[i]);
-			var timing = vid.streamLine();
-			console.log(l++,timing,vid._streamt,vid._streamh);
 		}
+    vid.setMode(0);
+    vid.setBorder(1);
+    vid.setPalette(0,2);
+    vid.setPalette(1,3);
+    vid.setPalette(2,4);
+    vid.setPalette(3,5);
 
-		for (i = 0; i < 3*320; i++) {
-			var timing = vid.streamLine();
-			console.log(l++,timing,vid._streamt,vid._streamh);
-			var haveAFrame = vid.renderStream();
-			if (haveAFrame) console.log("haveAFrame");
+    var clockfreq = 3125000;
+    var clockperline = clockfreq * 0.000064;// 64us = 200
+    var clockperframe = clockfreq / 50; // 62500, for interrupt
+
+    i = 10 * clockperframe;
+    clk = 0;
+    var prevclk = 0;
+    while (i > 0) {
+      /*rf = clockperline;*/
+      rf = Math.random() * 6 | 0;
+			var runRes = vid.streamSome(rf);
+      if (!runRes[0]) console.log("CRTC is not initialized")
+      if (runRes[1]) console.log("CRTC IRQ" + " diff: " + (clk-prevclk) + vid.statusStr());
+
+      clk += rf;
+      if (vid.renderStream()) {
+        console.log("CRTC have a frame!" + clk + " diff: " + (clk-prevclk));
+        prevclk = clk;
+      }
+      i -= rf;
 		}
 	}
 

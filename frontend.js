@@ -1,15 +1,13 @@
 var TVCModule;
 var Utils;
 var g = {};
-g.isRunning = true;
-g.tvc = undefined;
-g.canvas = undefined;
-g.regs = undefined;
-g.fb = undefined;
-g.bgcolor = -1;
+g.isRunning = true; /* run the emu in the animation callback */
+g.tvc = undefined; /* TVC object */
+g.canvas = undefined; /* canvas dom object */
+g.fb = undefined; /* frame buffer object */
 
-var callback = function(e) {
-	var res,valstr;
+var tvcInfoCallback = function(e) {
+	var res;
 	switch(e.id) {
 		case "fb":
 			res = g.fb;
@@ -41,6 +39,7 @@ function appStart() {
 	});
 }
 
+/* jQuery promise based async data download */
 function getData(name, url) {
 	var defer = $.Deferred();
 	var oReq = new XMLHttpRequest();
@@ -58,6 +57,7 @@ function getData(name, url) {
 	oReq.send(null);
 	return defer.promise();
 }
+
 function emuBreak() {
 	g.isRunning = false;
 	$("#bstop").text("continue");
@@ -68,7 +68,7 @@ function emuReset() {
 function emuCreate(type) {
 	notify("loading roms");
 	g.isRunning = false;
-	g.tvc = new TVCModule.TVC(type,callback);
+	g.tvc = new TVCModule.TVC(type, tvcInfoCallback);
 	var roms;
 	if (/2\.2/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
 	else roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
@@ -96,6 +96,7 @@ function emuCreate(type) {
 		// start
 		g.isRunning = true;
 		emuContinue();
+		$(document).trigger("emu.started");
 	});
 }
 function emuToggleRun() {
@@ -147,7 +148,6 @@ function emuInit() {
 	else
 		g.timenow = Date.now;
 	/* init */
-	g.regs = $("#regs")[0];
 	g.statusline = $("#statusline")[0];
 	// frame buffer
 	g.canvas = $("#tvcanvas");
@@ -206,15 +206,18 @@ function emuInit() {
             }
         });
     });
-	var gamesdrop = $("#sgames");
-	$("#loadgame").on("click", function () {
-		var name = gamesdrop[0].value;
+	var gamesdrop = $("#disks");
+	var loadDiskByName = function(name) {
 		getData(name, "games/" + name)
 			.then(function(dataname, data) {
 				g.tvc.loadImg(dataname, new Uint8Array(data));
 				$("#monitor").focus();
-				notify("loaded", dataname + "\nTip: run + [enter]");
+				notify("loaded", dataname);
 			});
+	};
+	$("#disks").change(function () {
+		var name = gamesdrop[0].value;
+		loadDiskByName(name);
 	});
 	for(i = 0; i < gamelist.length; i++ ) {
 			$("<option>").text(gamelist[i].replace(".zip","")).val(gamelist[i]).appendTo(gamesdrop);
@@ -230,6 +233,10 @@ function emuInit() {
 		emuCreate(machType);
 	});
 	machdrop.val(defaultType);
+	// load first disk
+	$(document).on("emu.started", function () {
+		loadDiskByName(gamesdrop[0].value);
+	});
 	// keyboard
 	$(document).keydown(handleKeyDown);
 	$(document).keyup(handleKeyUp);
@@ -239,6 +246,48 @@ function emuInit() {
 	$(window).blur(handleFocusLost);
 	// disable selection
 	g.canvas.on("selectstart", function(e) { e.preventDefault(); return false; });
+	// show/hide debugger
+	$("#modemain").click(function() {reconfigUi("main")});
+	$("#modedebug").click(function() {reconfigUi("debug")});
+	$("#modeeditor").click(function() {reconfigUi("editor")});
+	reconfigUi("main");
+}
+
+function reconfigUi(mode) {
+	var activecss = {"background-color":"black", "color":"white"};
+	var inactivecss = {"background-color":"white", "color":"black"};
+	$("#modedebug").css(mode == "debug" ? activecss : inactivecss);
+	$("#modeeditor").css(mode == "editor" ? activecss : inactivecss);
+	$("#modemain").css(mode == "main" ? activecss : inactivecss);
+
+	if (mode == "debug") {
+		$("#debugger").show();
+		$("#monitor").css({
+			"transform" : "scale(0.7,0.7)",
+			"-webkit-transform" : "scale(0.7,0.7)",
+			"width" : "425px",
+			"height" : "322px"
+		});
+	}
+	else
+	{
+		$("#debugger").hide();
+		$("#monitor").css({
+			"transform" : "scale(1,1)",
+			"-webkit-transform" : "scale(1,1)",
+			"width" : "608px",
+			"height" : "460px"
+		});
+	}
+	if (mode == "main") {
+		$("#header").show();
+		$("#help").show();
+	}
+	else
+	{
+		$("#help").hide();
+		$("#header").hide();
+	}
 }
 
 // event handlers
@@ -285,8 +334,11 @@ function emuRunFrame() {
 		}
 		if (!skipRun)
 		{
+      var t1 = g.timenow()
 			if(g.tvc.runForAFrame())
 				emuBreak();
+      var t2 = g.timenow();
+      var tdiff = t2 - t1;
 		}
 		if (g.isRunning)
 			emuContinue();

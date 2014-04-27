@@ -1,0 +1,36 @@
+--- Makefile	2009-08-31 08:59:00.000000000 +1000
++++ Makefile.emscripten	2014-04-05 23:14:11.904843919 +1100
+@@ -1,8 +1,12 @@
++STRIP = strip
+ ISMINGW := $(shell uname | grep MINGW)
+ ifneq ($(ISMINGW),)
+ 	EXTENSION = .exe
++else ifneq (,$(findstring em++,$(CXX)))
++	EXTENSION = .js
++	STRIP = echo
+ else
+-	EXTENSION = 
++	EXTENSION =
+ endif
+ 
+ TARGETS	 = sjasm$(EXTENSION)
+@@ -11,7 +15,7 @@ OBJECTS  = datadir.o datastructures.o di
+ BINDIR   = /usr/local/bin
+ 
+ CXXFLAGS = -O2
+-LDFLAGS  = 
++LDFLAGS  = -O2
+ 
+ DEPDIR = .deps
+ DEPFILE = $(DEPDIR)/$(*F)
+@@ -19,8 +23,8 @@ DEPFILE = $(DEPDIR)/$(*F)
+ all: $(TARGETS)
+ 
+ sjasm$(EXTENSION): $(DEPDIR) $(OBJECTS)
+-	g++ $(LDFLAGS) -o $@ $(OBJECTS) 
+-	strip $@
++	$(CXX) $(LDFLAGS) -o $@ $(OBJECTS) 
++	$(STRIP) $@
+ 
+ clean:
+ 	$(RM) $(OBJECTS) $(TARGETS)

@@ -13,12 +13,13 @@
         var diskPath = "";
     </script>
     <link rel="stylesheet" href="3rdparty/codemirror.css">
-    <script src="3rdparty/jquery-1.10.1.min.js"></script>
+    <script src="3rdparty/jquery-2.1.0.min.js"></script>
+    <script src="3rdparty/lodash.min.js"></script>
     <script src="3rdparty/require.js"></script>
-    <script src="3rdparty/vasmz80_oldstyle.js"></script>
+    <script src="3rdparty/sjasm.js"></script>
     <script src="3rdparty/jszip.js"></script>
     <script src="3rdparty/codemirror-compressed.js"></script>
-    <script src="3rdparty/mtools2.js"></script>
+    <script src="3rdparty/mtools.js"></script>
     <script>
         var testScript = "LIST\n\
 \n\
@@ -56,35 +57,6 @@ blockbyt = (datalen % 128) & 255\n\
 \n\
 		end\n\
 ";
-        function buffer2string(data) {
-            var str = "";
-            for(var i=0; i < data.length; i++) {
-                str += String.fromCharCode(data[i]);
-            }
-            return str;
-        }
-        function string2buffer(str) {
-            var data = new Uint8Array(str.length);
-            for(var i=0; i < str.length; i++) {
-                data[i] = str.charCodeAt(i);
-            }
-            return data;
-        }
-        function basename(path) {
-            return path.slice(path.lastIndexOf("/")+1);
-        }
-        function dirname(path) {
-            return path.slice(0,path.lastIndexOf("/"));
-        }
-        function suffix(path) {
-            return basename(path).replace(/.*\./,"").slice(0,3);
-        }
-        function pathJoin(p1,p2) {
-            if (!p1.length || (p1[p1.length-1] != "/")) {
-                p1 += "/";
-            }
-            return p1 + p2;
-        }
         function showDownloadLink(name, blob) {
             $("#datadownload").css("display","inline");
             $("#dataname").text(" " + name);
@@ -132,7 +104,7 @@ blockbyt = (datalen % 128) & 255\n\
                 var file = event.target.files[0];
                 var reader = new FileReader();
                 reader.onload = function(event) {
-                    var fileName = pathJoin(diskPath, file.name);
+                    var fileName = Utils.Path.join(diskPath, file.name);
                     saveFile(fileName, new Uint8Array(event.target.result), function (mtp) {
                         console.log(mtp);
                         if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
@@ -170,7 +142,8 @@ blockbyt = (datalen % 128) & 255\n\
                     cb: diskFormatted,
                     dsk: null,
                     data: null,
-                    dskName: diskName
+                    dskName: diskName,
+                    utils: Utils
                 };
                 MTOOLS(mtp);
             });
@@ -197,7 +170,7 @@ blockbyt = (datalen % 128) & 255\n\
                 if (!name || name.length == 0) return;
                 name = name.toUpperCase();
                 if (name[0] != "/")
-                    name = pathJoin(diskPath,name);
+                    name = Utils.Path.join(diskPath,name);
                 mkDirectory(name, function(mtp) {
                     if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
                     else console.error("Failed to create directory:",name);
@@ -210,7 +183,7 @@ blockbyt = (datalen % 128) & 255\n\
                 if (!fSel.length) return;
                 for (var i=0; i < fSel.length; i++) {
                     var fileName = fSel[i].parentElement.dataset.fname;
-                    var fileAbsPath = pathJoin(diskPath,fileName);
+                    var fileAbsPath = Utils.Path.join(diskPath,fileName);
                     getFile(fileAbsPath, function (mtp) {
                         if (mtp.data) {
                             zip.file(fileName, mtp.data);
@@ -235,7 +208,7 @@ blockbyt = (datalen % 128) & 255\n\
                 for (var i=0; i < fSel.length; i++) {
                     var ds = fSel[i].parentElement.dataset;
                     var fileName = ds.fname;
-                    var fileAbsPath = pathJoin(diskPath,fileName);
+                    var fileAbsPath = Utils.Path.join(diskPath,fileName);
                     if (ds.ftype == "f") {
                         flist.push(fileAbsPath);
                     }
@@ -268,7 +241,7 @@ blockbyt = (datalen % 128) & 255\n\
             // edit file
             function fileNameChanged() {
                 var fileName = getEditorFilename();
-                var extension = suffix(fileName);
+                var extension = Utils.Path.extension3(fileName);
                 if (extension == "ASM") {
                     $("#comp").removeAttr("disabled");
                     editor.setOption("mode", "z80");
@@ -281,10 +254,10 @@ blockbyt = (datalen % 128) & 255\n\
             $("#edfn").on("change", fileNameChanged);
             $("#dcont").on("click",".diskedit", function(event) {
                 var fileName = event.target.parentElement.dataset.fname;
-                var fileAbsPath = pathJoin(diskPath,fileName);
+                var fileAbsPath = Utils.Path.join(diskPath,fileName);
                 getFile(fileAbsPath, function (mtp) {
                     if (mtp.data) {
-                        editor.setValue(buffer2string(mtp.data));
+                        editor.setValue(Utils.b2s(mtp.data));
                         $("#edfn").val(fileAbsPath);
                         fileNameChanged();
                     }
@@ -314,12 +287,12 @@ blockbyt = (datalen % 128) & 255\n\
         function getEditorFilename() {
             var fileName = $("#edfn").val().toUpperCase();
             if (fileName[0] != "/")
-                fileName = pathJoin(diskPath,fileName);
+                fileName = Utils.Path.join(diskPath,fileName);
             return fileName;
         }
         function saveEditor(cb) {
             var fileName = getEditorFilename();
-            saveFile(fileName, string2buffer(editor.getValue()), function (mtp) {
+            saveFile(fileName, Utils.s2b(editor.getValue()), function (mtp) {
                 if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
                 else console.error("Failed to save:",fileName);
                 if (cb)
@@ -337,12 +310,12 @@ blockbyt = (datalen % 128) & 255\n\
         function changeDir(path) {
             if (path == "..") {
                 if (diskPath.length) {
-                    diskPath = dirname(diskPath);
+                    diskPath = Utils.Path.dirname(diskPath);
                     updateContent();
                 }
             }
             else {
-                diskPath = pathJoin(diskPath, path);
+                diskPath = Utils.Path.join(diskPath, path);
                 updateContent();
             }
         }
@@ -351,17 +324,20 @@ blockbyt = (datalen % 128) & 255\n\
                 cmd:"mdir",
                 params: ["::" + diskPath],
                 cb: dirCompleted,
-                dsk: diskData
+                dsk: diskData,
+                utils: Utils
             };
             MTOOLS(mtp);
         }
         function getAllFiles(absPath, cb) {
             var mtp = {
                 cmd:"mcopy",
-                params: ["::"+pathJoin(absPath,"*"),"."],
+                params: ["-s", "::"+Utils.Path.join(absPath,"*"),"."],
                 cb: cb,
                 dsk: diskData,
-                dumpFs: true
+                dumpFs: true,
+                utils: Utils,
+                fsRoot: "myroot"
             };
             MTOOLS(mtp);
         }
@@ -370,7 +346,8 @@ blockbyt = (datalen % 128) & 255\n\
                 cmd:"mcopy",
                 params: ["::"+absPath,"."],
                 cb: cb,
-                dsk: diskData
+                dsk: diskData,
+                utils: Utils
             };
             MTOOLS(mtp);
         }
@@ -380,7 +357,8 @@ blockbyt = (datalen % 128) & 255\n\
                 params: ["::" + absPath],
                 cb: cb,
                 dskName: diskName,
-                dsk: diskData
+                dsk: diskData,
+                utils: Utils
             };
             MTOOLS(mtp);
         }
@@ -403,7 +381,8 @@ blockbyt = (datalen % 128) & 255\n\
                     }
                 },
                 dskName: diskName,
-                dsk: diskData
+                dsk: diskData,
+                utils: Utils
             };
             MTOOLS(mtp);
         }
@@ -426,7 +405,8 @@ blockbyt = (datalen % 128) & 255\n\
                     }
                 },
                 dskName: diskName,
-                dsk: diskData
+                dsk: diskData,
+                utils: Utils
             };
             MTOOLS(mtp);
         }
@@ -436,21 +416,38 @@ blockbyt = (datalen % 128) & 255\n\
                 params: ["-D","s","::"+name],
                 cb: cb,
                 dsk: diskData,
-                dskName: diskName
+                dskName: diskName,
+                utils: Utils
             };
             MTOOLS(mtp);
         }
         function saveFile(absPath, fileData, cb) {
             var mtp = {
                 cmd:"mcopy",
-                params: ["-ov",basename(absPath),"::"+absPath],
+                params: ["-D","o",Utils.Path.basename(absPath),"::"+absPath],
                 cb: cb,
                 dsk: diskData,
                 data: null,
                 dskName: diskName,
-                fileData: fileData
+                fileData: fileData,
+                utils: Utils
             };
             MTOOLS(mtp);
+        }
+        function saveFiles(fileList, cb, mtp) {
+            var next = null;
+            if (!mtp || (!mtp.err && !mtp.out))
+                next = fileList.pop();
+            if (next) {
+                saveFile(next.path, next.data,
+                        function(mtp) {
+                            saveFiles(fileList, cb, mtp);
+                        }
+                );
+            }
+            else {
+                cb(mtp);
+            }
         }
         function parserDirList(str, dirs, files) {
             var lst = str.split("\n");
@@ -467,8 +464,11 @@ blockbyt = (datalen % 128) & 255\n\
                 }
                 var mf = l.match(/^([a-zA-Z0-9-_~]{1,8})\s+([a-zA-Z]{0,3})\s+(\d+)/);
                 if (mf) {
+                    var fullName = mf[1];
+                    if (mf[2])
+                        fullName += "." + mf[2];
                     files.push({
-                        name: mf[1] + "." + mf[2],
+                        name: fullName,
                         ext: mf[2],
                         size: mf[3]
                     });
@@ -486,7 +486,8 @@ blockbyt = (datalen % 128) & 255\n\
                 strhtml += '<li><a href="#" class="diskdir">..</a></li>';
             }
             for(var i in dirs) {
-                strhtml += '<li data-ftype="d" data-fname="' + dirs[i].name + '"><input type="checkbox" /><a href="#" class="diskdir">' + dirs[i].name + "</a></li>";
+                strhtml += '<li data-ftype="d" data-fname="' + dirs[i].name +
+                '"><input type="checkbox" /><a href="#" class="diskdir">' + dirs[i].name + "</a></li>";
             }
             for(var i in files) {
                 strhtml += "<li data-ftype='f' data-fname='" + files[i].name + "'>";
@@ -505,22 +506,25 @@ blockbyt = (datalen % 128) & 255\n\
             saveEditor(compileBuffer2);
         }
         function compileBuffer2() {
-            getAllFiles(dirname(getEditorFilename()), compileBuffer3);
+            getAllFiles(Utils.Path.dirname(getEditorFilename()), compileBuffer3);
         }
         function compileBuffer3(mtp) {
             // compile
             var asmp = {
                 out: "",
                 err: "",
-                fileName: getEditorFilename(),
-                fs: mtp.fs
+                fileName: Utils.Path.join("/myroot", getEditorFilename()),
+                fs: mtp.fs,
+                utils: Utils,
+                fsRoot: "/myroot"
             }
             ASM(asmp);
             // display error
-            if (!asmp.ret) {
-                $("#buildres").val(asmp.err);
+            if (asmp.out.indexOf("(") != -1) {
+                $("#buildres").val(asmp.out);
                 return;
             }
+            /*
             // output dump
             var j = 0;
             var strline = "";
@@ -540,7 +544,9 @@ blockbyt = (datalen % 128) & 255\n\
                 resstr += strline + "\n";
             }
             $("#buildres").val(resstr);
+            */
             // save the file as a cas to the disk
+            /*
             if (diskData) {
                 var fileName = getEditorFilename().replace(/ASM$/,"CAS");
                 saveFile(fileName, asmp.data, function (mtp) {
@@ -548,6 +554,52 @@ blockbyt = (datalen % 128) & 255\n\
                     else console.error("Failed to save:",fileName);
                 });
             }
+            */
+            if (diskData) {
+                var fileList = [];
+                var lstName = getEditorFilename().replace(/ASM$/,"lst");
+                var fileData = Utils.Emscripten.fsGetFromDump(lstName, asmp.resFs);
+                if (fileData) {
+                    fileList.push({path:lstName, data:fileData});
+                    var fileLines = Utils.b2s(fileData).split("\n");
+                    var parseState = "nothing";
+                    var fileName = null;
+                    for(var lineNo = 0; lineNo < fileLines.length; lineNo++) {
+                        var line = fileLines[lineNo];
+                        if (parseState == "nothing") {
+                            if (line.indexOf(" Output: ") != -1) {
+                                fileName = "/" + line.slice(9).trim();
+                                parseSate = "haveName";
+                            }
+                        }
+                        else if (parseState == "haveName") {
+                            if (line.indexOf(" Output: ") != -1) {
+                                fileList.push({path:fileName, data:Utils.Emscripten.fsGetFromDump(fileName, asmp.resFs)});
+                                fileName = "/" + line.slice(9).trim();
+                            }
+                            else if (line.indexOf("No output") != -1) {
+                                fileName = null;
+                                parseState = "nothing";
+                            }
+
+                        }
+
+                    }
+                    if (fileName)
+                        fileList.push({path:fileName, data:Utils.Emscripten.fsGetFromDump(fileName, asmp.resFs)});
+                    if (fileList.length > 0) {
+                        saveFiles(fileList,
+                                function (mtp) {
+                                    if (mtp.dsk) saveAndUpdateDisk(mtp.dskName, mtp.dsk);
+                                    if (mtp.err || mtp.out)
+                                        console.error("Failed to save:",fileName,"\nerr:\n",mtp.err,"\nout:\n",mtp.out);
+                                 }
+                        );
+
+                    }
+                }
+            }
+
             // var zip = new JSZip();
             // zip.file("prog.cas", res.data);
             // var zipcontent = zip.generate();
@@ -559,7 +611,9 @@ blockbyt = (datalen % 128) & 255\n\
 <body onload="appStart();">
 <div style="float:left;width:250px;">
     <div id="datadownload" style="display:none;">
-        <a id="datadownloadlink" href="#">Download</a><span id="dataname"></span><span style="float:right;padding-right:1em;"><a id="datacdown" href="#">x</a></span>
+        <a id="datadownloadlink" href="#">Download</a>
+        <span id="dataname"></span>
+        <span style="float:right;padding-right:1em;"><a id="datacdown" href="#">x</a></span>
         <hr />
     </div>
     <button id="dcreate">Create disk</button>
