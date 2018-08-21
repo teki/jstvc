@@ -30,11 +30,13 @@ body {
 #monitor {
 	width: 608px;
 	height: 460px;
-	float: left;
-	margin: 3px;
-	transform-origin: left top 0;
-	-webkit-transform-origin: left top 0;
+	padding-left: 0;
+    padding-right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
 }
+
 #tvcanvas {
 	transform-origin: left top 0;
 	transform: scaleY(1.6);
