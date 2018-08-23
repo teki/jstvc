@@ -1,30 +1,39 @@
-var TVC = require("./scripts/tvc.js");
+var TVC = require("./tvc.js");
 
 var notify = function(msg, msg2) {
-	$("#statusline").text(msg);
+}
+
+var getElement = function(n) {
+	return document.querySelector(n);
+}
+
+function triggerEvent(name) {
+	var event = document.createEvent('Event');
+	event.initEvent(name, true, true); //can bubble, and is cancellable
+	document.dispatchEvent(event);
 }
 
 /* jQuery promise based async data download */
-var getData = function(name, url) {
-	var defer = $.Deferred();
-	var oReq = new XMLHttpRequest();
-	oReq.open("GET", url, true);
-	oReq.responseType = "arraybuffer";
-	oReq.onload = function (oEvent) {
-		var arrayBuffer = oReq.response;
-		if (arrayBuffer) {
-			defer.resolve(name, arrayBuffer);
-		}
-		else {
-			defer.reject(this);
-		}
-	};
-	oReq.send(null);
-	return defer.promise();
+var getData = function (name, url) {
+	return new Promise(function (resolve, reject) {
+		var oReq = new XMLHttpRequest();
+		oReq.open("GET", url, true);
+		oReq.responseType = "arraybuffer";
+		oReq.onload = function (oEvent) {
+			if (oReq.status == 200) {
+				var ab = oReq.response;
+				resolve(name, new Uint8Array(ab));
+			}
+			else {
+				console.log("Error, failed to load:",name,oReq);
+				reject(this);
+			}
+		};
+		oReq.send(null);
+	});
 }
 
-
-var Emu = function()
+function Emu()
 {
 	this.isRunning = true; /* run the emu in the animation callback */
 	this.tvc = undefined; /* TVC object */
@@ -62,7 +71,7 @@ Emu.prototype.appStart = function() {
 
 Emu.prototype.emuBreak = function() {
 	this.isRunning = false;
-	$("#bstop").text("continue");
+	//getElement("#bstop").text("continue");
 }
 
 Emu.prototype.emuReset = function() {
@@ -71,7 +80,7 @@ Emu.prototype.emuReset = function() {
 
 Emu.prototype.emuCreate = function(type) {
 	notify("loading roms");
-	var self = this;
+	let self = this;
 	this.isRunning = false;
 	this.tvc = new TVC(type, function(e){return self.tvcInfoCallback(e);});
 	var roms;
@@ -79,40 +88,37 @@ Emu.prototype.emuCreate = function(type) {
 	else roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
 	if (/DOS/.test(type)) roms.push("D_TVCDOS.128");
 	// load roms
-	getData(roms[0], "roms/"+roms[0])
-	.then(function(dataname, data) {
-		self.tvc.addRom(dataname, new Uint8Array(data));
-		return getData(roms[1], "roms/"+roms[1]);
-	})
-	.then(function(dataname, data) {
-		self.tvc.addRom(dataname, new Uint8Array(data));
-		return getData(roms[2], "roms/"+roms[2]);
-	})
-	.then(function(dataname, data) {
-		self.tvc.addRom(dataname, new Uint8Array(data));
-		if (roms.length > 3) {
-			return getData(roms[3], "roms/"+roms[3]);
+	var loadRom = function(idx) {
+		if (idx === roms.length) {
+			// start
+			self.isRunning = true;
+			self.emuContinue();
+			triggerEvent("emu.started");
+			return;
 		}
-	})
-	.then(function(dataname, data) {
-		if (dataname) {
-			self.tvc.addRom(dataname, new Uint8Array(data));
-		}
-		// start
-		self.isRunning = true;
-		self.emuContinue();
-		$(document).trigger("emu.started");
-	});
+		return fetch("roms/" + roms[idx])
+		.then(function(r) {
+			if (r.status === 200)
+				return r.arrayBuffer()
+			else
+				console.log("Failed to load:", name);
+		})
+		.then(function(data) {
+			self.tvc.addRom(roms[idx], new Uint8Array(data));
+			return loadRom(idx + 1);
+		})
+	}
+	loadRom(0);
 }
 
 Emu.prototype.emuToggleRun = function() {
 	this.isRunning = !this.isRunning;
 	if (this.isRunning) {
-		$("#bstop").text("stop");
+		//getElement("#bstop").text("stop");
 		this.emuContinue();
 	}
 	else {
-		$("#bstop").text("continue");
+		//getElement("#bstop").text("continue");
 		notify("stopped");
 	}
 }
@@ -151,20 +157,18 @@ Emu.prototype.emuInit = function() {
 		this.timenow = function() {return performance.now();};
 	else
 		this.timenow = Date.now;
-	/* init */
-	this.statusline = $("#statusline")[0];
 	// frame buffer
-	this.canvas = $("#tvcanvas");
-	this.ctx = this.canvas[0].getContext("2d");
+	this.canvas = getElement("#tvcanvas");
+	this.ctx = this.canvas.getContext("2d");
 	this.fb = {};
 	this.fb.prevUpdateTime = this.timenow();
 	this.fb.updatecnt = 0;
 	this.fb.updates = [];
 	this.fb.skipcnt = 0;
-	this.fb.fps = $("#fps")[0];
+	//this.fb.fps = getElement("#fps");
 	this.fb.fpsv = 0;
-	this.fb.width = this.canvas[0].width;
-	this.fb.height = this.canvas[0].height;
+	this.fb.width = this.canvas.width;
+	this.fb.height = this.canvas.height;
 	this.fb.imageData = this.ctx.createImageData(this.fb.width, this.fb.height);
 	this.fb.buf = new ArrayBuffer(this.fb.imageData.data.length);
 	this.fb.buf8 = new Uint8ClampedArray(this.fb.buf);
@@ -179,35 +183,37 @@ Emu.prototype.emuInit = function() {
 			];
 	var defaultType = emuDefs[0];
 	this.emuCreate(defaultType);
+	/*
 	// gui
-	$("#breset").on("click", function() {
+	getElement("#breset").on("click", function() {
 		self.emuReset();
 	});
-	$("#bstop").on("click", function() {
+	getElement("#bstop").on("click", function() {
 		self.emuToggleRun();
 	});
+	*/
 	// img loading + selection
 	var loadDiskByName = function(name) {
 		getData(name, "games2/" + name)
 			.then(function(dataname, data) {
 				self.tvc.loadImg(dataname, new Uint8Array(data));
-				$("#monitor").focus();
+				getElement("#monitor").focus();
 				notify("loaded", dataname);
 			});
 	};
 	// load first disk
-	$(document).on("emu.started", function () {
-		loadDiskByName("MRALEX.CAS");
+	document.addEventListener("emu.started", function () {
+		//loadDiskByName("MRALEX.CAS");
 	});
 	// keyboard
-	$(document).keydown(function(e){self.handleKeyDown(e);});
-	$(document).keyup(function(e){self.handleKeyUp(e);});
-	$(document).keypress(function(e){self.handleKeyPress(e);});
+	document.addEventListener("keydown", function(e){self.handleKeyDown(e);});
+	document.addEventListener("keyup", function(e){self.handleKeyUp(e);});
+	document.addEventListener("keypress", function(e){self.handleKeyPress(e);});
 	// focus on canvas
-	$(window).focus(function(e){self.handleFocus(e);});
-	$(window).blur(function(e){self.handleFocusLost(e);});
+	window.addEventListener("focus", function(e){self.handleFocus(e);});
+	window.addEventListener("blur", function(e){self.handleFocusLost(e);});
 	// disable selection
-	this.canvas.on("selectstart", function(e) { e.preventDefault(); return false; });
+	this.canvas.addEventListener("selectstart", function(e) { e.preventDefault(); return false; });
 }
 
 // event handlers
@@ -260,7 +266,7 @@ Emu.prototype.emuRunFrame = function() {
 		if (!skipRun)
 		{
       var t1 = this.timenow()
-			if(this.tvc.runForAFrame())
+			if(this.tvc.runForAFrame2())
 				this.emuBreak();
       var t2 = this.timenow();
       var tdiff = t2 - t1;

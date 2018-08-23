@@ -498,7 +498,31 @@ VID.prototype.writePixel = function(fbd, actPixel, pixelData) {
   }
 }
 
+VID.prototype.renderFrame = function() {
+  var vidmem = this._mmu.crtmem + this._smem;
+  var border = toRGBA(this._border);
+  var fbd = this._fb.buf32;
+  var actPixel = 0;
+  var i;
+  // top border
+  for (i = 0; i < 24 * 608; ++i) {
+    fbd[actPixel++] = border;
+  }
+  switch (this._mode) {
+    case 0:
+    case 1:
+    default:
+    for (var i = 0; i < 64 * 240; ++i) {
+      rgba = toRGBA(vidmem[i]);
+      fbd[actPixel++] = rgba;
+      fbd[actPixel++] = rgba;
+      fbd[actPixel++] = rgba;
+      fbd[actPixel++] = rgba;
+    }
 
+    
+  }
+}
 
 VID.prototype.setPalette = function(idx, color) {
   this._palette[idx].setColor(color);

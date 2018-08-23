@@ -3,70 +3,14 @@
 <head>
 <meta http-equiv="Content-type" content="text/html; charset=utf-8">
 <title>jstvc - Videoton TV Computer Emulator</title>
-<script src="3rdparty/jquery-2.1.0.min.js"></script>
-<script src="3rdparty/require.js"></script>
-<script src="3rdparty/jszip.js"></script>
-<script src="3rdparty/jszip-inflate.js"></script>
-<script src="3rdparty/jszip-load.js"></script>
-<script src="games/list.json"></script>
-<script src="frontend.js"></script>
-<link rel="stylesheet" type="text/css" href="style/view.css">
+<link rel="stylesheet" type="text/css" href="style/view2.css">
 </head>
-<body onload="appStart();">
+<body>
 <!-- tvc monitor -->
 	<div id="monitor" tabindex="0">
-		<canvas id="tvcanvas" width="608" height="288"></canvas>
+		<canvas id="tvcanvas" width="608" height="288" tabindex='1'></canvas>
 	</div>
-<!-- mode -->
-    <div class="rightcolumn">
-		<a id="modemain">main</a>
-		<a id="modedebug">debug</a>
-		<a id="modeeditor">editor</a>
-    </div>
-<!-- header -->
-	<div id="header" class="rightcolumn">
-		<img src="vtvc.jpg" />
-		<ul>
-			<li><a href="https://github.com/teki/jstvc">jstvc VVEERR</a></li>
-			<li><a href="http://tvc.hu/html/inenglish.html">TVC (en)</a></li>
-			<li><a href="http://z80.info">Z80 (en)</a></li>
-		</ul>
-		<ul>
-			<li><a href="http://www.tvc.hu">tvc.hu (hu)</a></li>
-			<li><a href="https://github.com/teki/jstvc">project (hu)</a></li>
-		</ul>
-	</div>
-<!-- common toolbar -->
-	<div class="rightcolumn">
-        Disks: <select id="disks"></select>
-		<button id="breset">reset</button>
-	</div>
-<!-- help -->
-	<div id="help" class="rightcolumn">
-		<strong>To load a disk:</strong>
-		<ul style="margin-left: 2em;">
-			<li>Select a disk. (this will insert the selected disk into the A: drive).</li>
-			<li>Type: load "*" then Enter.</li>
-			<li>Most programs will run automatically, just type "run" if you got an "ok" after load.</li>
-		</ul>
-        <strong>Keyboard mapping:</strong>
-        <ul style="margin-left: 2em;">
-            <li>The PC keyboard is automatically mapped to the right TVC keys (it can fail on some browser + OS combinations).</li>
-            <li>The built in joystick is mapped to the cursor keys, fire => TAB.</li>
-        </ul>
-	</div>
-<!-- dev toolbar -->
-	<div class="rightcolumn">
-		status: <span id="statusline">ok</span><br />
-		<button id="bstop">stop</button>
-		local: <select id="slocal"></select>
-		<button id="loadlocal">load</button>
-		ROM: <select id="smach"></select>
-	</div>
-<!-- debugger -->
-	<div id="debugger" class="rightcolumn">
-		debugger here!
-	</div>
-<!-- -------- -->
+<!-- done -->
+<script src="bundle.js"></script>
 </body>
 </html>

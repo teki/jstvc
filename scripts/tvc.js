@@ -147,6 +147,16 @@ TVC.prototype.runForAFrame = function() {
 	return doBreak;
 };
 
+TVC.prototype.runForAFrame2 = function() {
+	var cpuTime = 0;
+	cpuTime = this._z80.step(this._clockperframe);
+	this._clock += cpuTime;
+	this._vid.renderFrame();
+	this._fb.refresh();
+
+	return false;
+};
+
 // /////////////////////////////
 // IO
 // /////////////////////////////

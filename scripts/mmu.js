@@ -51,40 +51,53 @@ MMU.prototype.init = function() {
 };
 
 MMU.prototype.addRom = function(name, data) {
-	var i;
-	var dataCrc = Utils.crc32(data);
+	const dataCrc = Utils.crc32(data);
+	let dst = undefined;
+	let offset = 0;
 	switch(name) {
 		case "TVC12_D7.64K":
-			if (dataCrc != 0x1cbbeac6) throw ("invalid rom ("+name+")!");
-			for (i = 0; i < data.length; i++) this._exth.m[i] = data[i];
+			if (dataCrc === 0x1cbbeac6)
+				dst = this._exth.m;
 			break;
 
 		case "TVC12_D4.64K":
-			if (dataCrc != 0x834ca9be) throw ("invalid rom ("+name+")!");
-			for (i = 0; i < data.length; i++) this._sys.m[i] = data[i];
+			if (dataCrc === 0x834ca9be)
+				dst = this._sys.m;
 			break;
 
 		case "TVC12_D3.64K":
-			if (dataCrc != 0x71753d02) throw ("invalid rom ("+name+")!");
-			for (i = 0; i < data.length; i++) this._sys.m[0x2000+i] = data[i];
+			if (dataCrc === 0x71753d02) {
+				dst = this._sys.m;
+				offset = 0x2000;
+			}
 			break;
 
 		case "TVC22_D7.64K":
-			if (dataCrc != 0x05e1c3a8) throw ("invalid rom ("+name+")!");
-			for (i = 0; i < data.length; i++) this._exth.m[i] = data[i];
-			break;
-
-		case "TVC22_D6.64K":
-			if (dataCrc != 0x05ac3a34) throw ("invalid rom ("+name+")!");
-			for (i = 0; i < data.length; i++) this._sys.m[i] = data[i];
+			if (dataCrc === 0x05e1c3a8)
+				dst = this._exth.m;
 			break;
 
 		case "TVC22_D4.64K":
-			if (dataCrc != 0xba6ad589) throw ("invalid rom ("+name+")!");
-			for (i = 0; i < data.length; i++) this._sys.m[0x2000+i] = data[i];
+			if (dataCrc === 0xba6ad589) {
+				dst = this._sys.m;
+				offset = 0x2000;
+			}
 			break;
+
+		case "TVC22_D6.64K":
+			if (dataCrc === 0x05ac3a34)
+				dst = this._sys.m;
+			break;
+
 	}
-};
+	if (dst) {
+		for (let i = 0; i < data.length; i++)
+			dst[i] = data[i];
+	}
+	else {
+		console.log("invalid rom ("+name+")!");
+	}
+}
 
 MMU.prototype.reset = function() {
 	this.setVidMap(0);

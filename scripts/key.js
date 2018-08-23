@@ -68,7 +68,7 @@ function KEY() {
 	this._keymap.get(0).set(37, [8,6,0]); // left
 
 	// copy mappings
-	for (var [key, m] of this._keymap.get(0)) {
+	for (const [key, m] of this._keymap.get(0)) {
 		this._keymap.get(SHIFT_ON).set(key, m);
 		this._keymap.get(ALTGR_ON).set(key, m);
 		this._keymap.get(SHIFT_ALTGR_ON).set(key, m);
@@ -139,8 +139,8 @@ KEY.prototype.keyUpdate = function(code, down) {
 	// on up release keys from the other tables too
 	// to avoid key stuck from early shift release
 	if (!down) {
-		for (var k of this._keymap) {
-			m = this._keymap.get(k).get(code);
+		for (const [k,v] of this._keymap) {
+			m = v.get(code);
 			if (m) {
 				this.keySet(m[0], m[1], down);
 			}
