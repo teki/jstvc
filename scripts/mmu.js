@@ -77,6 +77,11 @@ MMU.prototype.addRom = function(name, data) {
 				dst = this._exth.m;
 			break;
 
+		case "TVC22_D6.64K":
+			if (dataCrc === 0x05ac3a34)
+				dst = this._sys.m;
+			break;
+
 		case "TVC22_D4.64K":
 			if (dataCrc === 0xba6ad589) {
 				dst = this._sys.m;
@@ -84,15 +89,12 @@ MMU.prototype.addRom = function(name, data) {
 			}
 			break;
 
-		case "TVC22_D6.64K":
-			if (dataCrc === 0x05ac3a34)
-				dst = this._sys.m;
+		default:
 			break;
-
 	}
 	if (dst) {
 		for (let i = 0; i < data.length; i++)
-			dst[i] = data[i];
+			dst[offset + i] = data[i];
 	}
 	else {
 		console.log("invalid rom ("+name+")!");

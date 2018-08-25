@@ -499,28 +499,111 @@ VID.prototype.writePixel = function(fbd, actPixel, pixelData) {
 }
 
 VID.prototype.renderFrame = function() {
-  var vidmem = this._mmu.crtmem + this._smem;
-  var border = toRGBA(this._border);
-  var fbd = this._fb.buf32;
-  var actPixel = 0;
-  var i;
+  let vidmem = this._mmu.crtmem;
+  let offset = this._smem;
+  const borderRGBA = toRGBA(this._border2);
+  let fbd = this._fb.buf32;
+  let actPixel = 0;
+  let pixelData2, d3, d2, d1, d0, p0, p1, p2, p3;
   // top border
-  for (i = 0; i < 24 * 608; ++i) {
-    fbd[actPixel++] = border;
+  for (let row = 0; row < 24 * 608; ++row) {
+    fbd[actPixel++] = borderRGBA;
   }
-  switch (this._mode) {
-    case 0:
-    case 1:
-    default:
-    for (var i = 0; i < 64 * 240; ++i) {
-      rgba = toRGBA(vidmem[i]);
-      fbd[actPixel++] = rgba;
-      fbd[actPixel++] = rgba;
-      fbd[actPixel++] = rgba;
-      fbd[actPixel++] = rgba;
+  if (this._mode === 0) {
+    for (let row = 0; row < 240; ++row) {
+      for (let b = 0; b < 48; ++b) {
+        fbd[actPixel++] = borderRGBA;
+      }
+      for (let col = 0; col < 64; ++col) {
+        let pixelData = vidmem[offset + col];
+        p0 = this._palette[(pixelData >> 7) & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[(pixelData >> 6) & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[(pixelData >> 5) & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[(pixelData >> 4) & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[(pixelData >> 3) & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[(pixelData >> 2) & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[(pixelData >> 1) & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[pixelData & 1];
+        fbd[actPixel++] = p0.rgba;
+      }
+      offset += 64;
+      for (let b = 0; b < 48; ++b) {
+        fbd[actPixel++] = borderRGBA;
+      }
     }
-
-    
+  }
+  else if (this._mode === 1) {
+    for (let row = 0; row < 240; ++row) {
+      for (let b = 0; b < 48; ++b) {
+        fbd[actPixel++] = borderRGBA;
+      }
+      for (let col = 0; col < 64; ++col) {
+        let pixelData = vidmem[offset + col];
+        pixelData2 = pixelData >>> 4;
+        pixelData <<= 1;
+        d3 = (pixelData & 2) | (pixelData2 & 1);
+        pixelData >>= 1;
+        pixelData2 >>= 1;
+        d2 = (pixelData & 2) | (pixelData2 & 1);
+        pixelData >>= 1;
+        pixelData2 >>= 1;
+        d1 = (pixelData & 2) | (pixelData2 & 1);
+        pixelData >>= 1;
+        pixelData2 >>= 1;
+        d0 = (pixelData & 2) | (pixelData2 & 1);
+        p0 = this._palette[d0];
+        fbd[actPixel++] = p0.rgba;
+        fbd[actPixel++] = p0.rgba;
+        p1 = this._palette[d1];
+        fbd[actPixel++] = p1.rgba;
+        fbd[actPixel++] = p1.rgba;
+        p2 = this._palette[d2];
+        fbd[actPixel++] = p2.rgba;
+        fbd[actPixel++] = p2.rgba;
+        p3 = this._palette[d3];
+        fbd[actPixel++] = p3.rgba;
+        fbd[actPixel++] = p3.rgba;
+      }
+      offset += 64;
+      for (let b = 0; b < 48; ++b) {
+        fbd[actPixel++] = borderRGBA;
+      }
+    }
+  }
+  else {
+    for (let row = 0; row < 240; ++row) {
+      for (let b = 0; b < 48; ++b) {
+        fbd[actPixel++] = borderRGBA;
+      }
+      for (let col = 0; col < 64; ++col) {
+        let pixelData = vidmem[offset + col];
+        rgba = toRGBA(pixelData >> 1);
+        fbd[actPixel++] = rgba;
+        fbd[actPixel++] = rgba;
+        fbd[actPixel++] = rgba;
+        fbd[actPixel++] = rgba;
+        rgba = toRGBA(pixelData);
+        fbd[actPixel++] = rgba;
+        fbd[actPixel++] = rgba;
+        fbd[actPixel++] = rgba;
+        fbd[actPixel++] = rgba;
+      }
+      offset += 64;
+      for (let b = 0; b < 48; ++b) {
+        fbd[actPixel++] = borderRGBA;
+      }
+    }
+  }
+  // bottom border
+  for (let row = 0; row < 24 * 608; ++row) {
+    fbd[actPixel++] = borderRGBA;
   }
 }
 

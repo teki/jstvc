@@ -153,7 +153,10 @@ TVC.prototype.runForAFrame2 = function() {
 	this._clock += cpuTime;
 	this._vid.renderFrame();
 	this._fb.refresh();
-
+	if (this._z80.irqEnabled()) { // it
+		this._z80.irq();
+		this._pendIt &= ~(0x10); // cursor IT
+	}
 	return false;
 };
 

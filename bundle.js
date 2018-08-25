@@ -8640,6 +8640,10 @@ MMU.prototype.addRom = function (name, data) {
 			if (dataCrc === 0x05e1c3a8) dst = this._exth.m;
 			break;
 
+		case "TVC22_D6.64K":
+			if (dataCrc === 0x05ac3a34) dst = this._sys.m;
+			break;
+
 		case "TVC22_D4.64K":
 			if (dataCrc === 0xba6ad589) {
 				dst = this._sys.m;
@@ -8647,14 +8651,12 @@ MMU.prototype.addRom = function (name, data) {
 			}
 			break;
 
-		case "TVC22_D6.64K":
-			if (dataCrc === 0x05ac3a34) dst = this._sys.m;
+		default:
 			break;
-
 	}
 	if (dst) {
 		for (var i = 0; i < data.length; i++) {
-			dst[i] = data[i];
+			dst[offset + i] = data[i];
 		}
 	} else {
 		console.log("invalid rom (" + name + ")!");
@@ -9331,27 +9333,117 @@ VID.prototype.writePixel = function (fbd, actPixel, pixelData) {
 };
 
 VID.prototype.renderFrame = function () {
-  var vidmem = this._mmu.crtmem + this._smem;
-  var border = toRGBA(this._border);
+  var vidmem = this._mmu.crtmem;
+  var offset = this._smem;
+  var borderRGBA = toRGBA(this._border2);
   var fbd = this._fb.buf32;
   var actPixel = 0;
-  var i;
+  var pixelData2 = void 0,
+      d3 = void 0,
+      d2 = void 0,
+      d1 = void 0,
+      d0 = void 0,
+      p0 = void 0,
+      p1 = void 0,
+      p2 = void 0,
+      p3 = void 0;
   // top border
-  for (i = 0; i < 24 * 608; ++i) {
-    fbd[actPixel++] = border;
+  for (var row = 0; row < 24 * 608; ++row) {
+    fbd[actPixel++] = borderRGBA;
   }
-  switch (this._mode) {
-    case 0:
-    case 1:
-    default:
-      for (var i = 0; i < 64 * 240; ++i) {
-        rgba = toRGBA(vidmem[i]);
+  if (this._mode === 0) {
+    for (var _row = 0; _row < 240; ++_row) {
+      for (var b = 0; b < 48; ++b) {
+        fbd[actPixel++] = borderRGBA;
+      }
+      for (var col = 0; col < 64; ++col) {
+        var pixelData = vidmem[offset + col];
+        p0 = this._palette[pixelData >> 7 & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[pixelData >> 6 & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[pixelData >> 5 & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[pixelData >> 4 & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[pixelData >> 3 & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[pixelData >> 2 & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[pixelData >> 1 & 1];
+        fbd[actPixel++] = p0.rgba;
+        p0 = this._palette[pixelData & 1];
+        fbd[actPixel++] = p0.rgba;
+      }
+      offset += 64;
+      for (var _b = 0; _b < 48; ++_b) {
+        fbd[actPixel++] = borderRGBA;
+      }
+    }
+  } else if (this._mode === 1) {
+    for (var _row2 = 0; _row2 < 240; ++_row2) {
+      for (var _b2 = 0; _b2 < 48; ++_b2) {
+        fbd[actPixel++] = borderRGBA;
+      }
+      for (var _col = 0; _col < 64; ++_col) {
+        var _pixelData = vidmem[offset + _col];
+        pixelData2 = _pixelData >>> 4;
+        _pixelData <<= 1;
+        d3 = _pixelData & 2 | pixelData2 & 1;
+        _pixelData >>= 1;
+        pixelData2 >>= 1;
+        d2 = _pixelData & 2 | pixelData2 & 1;
+        _pixelData >>= 1;
+        pixelData2 >>= 1;
+        d1 = _pixelData & 2 | pixelData2 & 1;
+        _pixelData >>= 1;
+        pixelData2 >>= 1;
+        d0 = _pixelData & 2 | pixelData2 & 1;
+        p0 = this._palette[d0];
+        fbd[actPixel++] = p0.rgba;
+        fbd[actPixel++] = p0.rgba;
+        p1 = this._palette[d1];
+        fbd[actPixel++] = p1.rgba;
+        fbd[actPixel++] = p1.rgba;
+        p2 = this._palette[d2];
+        fbd[actPixel++] = p2.rgba;
+        fbd[actPixel++] = p2.rgba;
+        p3 = this._palette[d3];
+        fbd[actPixel++] = p3.rgba;
+        fbd[actPixel++] = p3.rgba;
+      }
+      offset += 64;
+      for (var _b3 = 0; _b3 < 48; ++_b3) {
+        fbd[actPixel++] = borderRGBA;
+      }
+    }
+  } else {
+    for (var _row3 = 0; _row3 < 240; ++_row3) {
+      for (var _b4 = 0; _b4 < 48; ++_b4) {
+        fbd[actPixel++] = borderRGBA;
+      }
+      for (var _col2 = 0; _col2 < 64; ++_col2) {
+        var _pixelData2 = vidmem[offset + _col2];
+        rgba = toRGBA(_pixelData2 >> 1);
+        fbd[actPixel++] = rgba;
+        fbd[actPixel++] = rgba;
+        fbd[actPixel++] = rgba;
+        fbd[actPixel++] = rgba;
+        rgba = toRGBA(_pixelData2);
         fbd[actPixel++] = rgba;
         fbd[actPixel++] = rgba;
         fbd[actPixel++] = rgba;
         fbd[actPixel++] = rgba;
       }
-
+      offset += 64;
+      for (var _b5 = 0; _b5 < 48; ++_b5) {
+        fbd[actPixel++] = borderRGBA;
+      }
+    }
+  }
+  // bottom border
+  for (var _row4 = 0; _row4 < 24 * 608; ++_row4) {
+    fbd[actPixel++] = borderRGBA;
   }
 };
 
@@ -10099,7 +10191,11 @@ TVC.prototype.runForAFrame2 = function () {
 	this._clock += cpuTime;
 	this._vid.renderFrame();
 	this._fb.refresh();
-
+	if (this._z80.irqEnabled()) {
+		// it
+		this._z80.irq();
+		this._pendIt &= ~0x10; // cursor IT
+	}
 	return false;
 };
 
@@ -10600,7 +10696,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = '' || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + '38199' + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + '41865' + '/');
   ws.onmessage = function (event) {
     var data = JSON.parse(event.data);
 
