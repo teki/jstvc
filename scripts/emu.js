@@ -194,16 +194,22 @@ Emu.prototype.emuInit = function() {
 	*/
 	// img loading + selection
 	var loadDiskByName = function(name) {
-		getData(name, "games2/" + name)
-			.then(function(dataname, data) {
-				self.tvc.loadImg(dataname, new Uint8Array(data));
-				getElement("#monitor").focus();
-				notify("loaded", dataname);
-			});
+		fetch("games2/" + name)
+		.then(function(r) {
+			if (r.status === 200)
+				return r.arrayBuffer()
+			else
+				console.log("Failed to load:", name);
+		})
+		.then(function(data) {
+			self.tvc.loadImg(name, new Uint8Array(data));
+			getElement("#monitor").focus();
+			notify("loaded", name);
+		});
 	};
 	// load first disk
 	document.addEventListener("emu.started", function () {
-		//loadDiskByName("MRALEX.CAS");
+		loadDiskByName("mralex.dsk");
 	});
 	// keyboard
 	document.addEventListener("keydown", function(e){self.handleKeyDown(e);});
@@ -219,8 +225,16 @@ Emu.prototype.emuInit = function() {
 // event handlers
 Emu.prototype.handleKeyPress = function(e) {
 	if (this.tvc) {
-		this.tvc.keyPress(e.which);
 		e.preventDefault();
+		if (e.which === 'w'.charCodeAt(0)) {
+			this.tvc.saveState();
+		}
+		else if (e.which === 'q'.charCodeAt(0)) {
+			this.tvc.restoreState();
+		}
+		else {
+			this.tvc.keyPress(e.which);
+		}
 	}
 }
 

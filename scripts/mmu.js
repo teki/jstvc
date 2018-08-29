@@ -5,6 +5,7 @@ function MemBlock(name, isRam, size) {
 	this.isRam = isRam;
 	this.m = new Uint8Array(size);
 }
+
 function MMU(type) {
 	this._isPlus = /\+/.test(type);
 	this._u0 = new MemBlock("U0", true, 16384);

@@ -8561,6 +8561,7 @@ function MemBlock(name, isRam, size) {
 	this.isRam = isRam;
 	this.m = new Uint8Array(size);
 }
+
 function MMU(type) {
 	this._isPlus = /\+/.test(type);
 	this._u0 = new MemBlock("U0", true, 16384);
@@ -10044,6 +10045,7 @@ var VID = require("./vid.js");
 var HBF = require("./hbf.js");
 var MMU = require("./mmu.js");
 //var AdmZip = require('adm-zip');
+//var LZMA = require('lzma');
 
 ////////////////////////////////////////////
 // TVC
@@ -10140,6 +10142,115 @@ TVC.prototype.loadImg = function (name, data) {
  		this.loadImg(e[0].entryName, e[0].getData());
  	}
  	*/
+};
+
+TVC.prototype.saveState = function () {
+	// save memory: u0, u1, u2, u3, sys, exth
+	var vidState = new Uint8Array(this._vid._reg.length + 4 + 3);
+	var vidStateIdx = 0;
+	var _iteratorNormalCompletion = true;
+	var _didIteratorError = false;
+	var _iteratorError = undefined;
+
+	try {
+		for (var _iterator = this._vid._reg[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+			var r = _step.value;
+
+			vidState[vidStateIdx++] = r;
+		}
+	} catch (err) {
+		_didIteratorError = true;
+		_iteratorError = err;
+	} finally {
+		try {
+			if (!_iteratorNormalCompletion && _iterator.return) {
+				_iterator.return();
+			}
+		} finally {
+			if (_didIteratorError) {
+				throw _iteratorError;
+			}
+		}
+	}
+
+	vidState[vidStateIdx++] = this._vid._palette[0];
+	vidState[vidStateIdx++] = this._vid._palette[1];
+	vidState[vidStateIdx++] = this._vid._palette[2];
+	vidState[vidStateIdx++] = this._vid._palette[3];
+	vidState[vidStateIdx++] = this._vid._border;
+	vidState[vidStateIdx++] = this._vid._regIdx;
+	vidState[vidStateIdx++] = this._vid._mode;
+	var bufferList = [this._mmu._u0.m, this._mmu._u1.m, this._mmu._u2.m, this._mmu._u3.m, this._mmu._sys.m, this._mmu._exth.m, this._mmu._vid0.m, vidState];
+	var data = [];
+	var _iteratorNormalCompletion2 = true;
+	var _didIteratorError2 = false;
+	var _iteratorError2 = undefined;
+
+	try {
+		for (var _iterator2 = bufferList[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+			var m = _step2.value;
+
+			for (var a = 0; a < m.length; ++a) {
+				data.push(m[a]);
+			}
+		}
+	} catch (err) {
+		_didIteratorError2 = true;
+		_iteratorError2 = err;
+	} finally {
+		try {
+			if (!_iteratorNormalCompletion2 && _iterator2.return) {
+				_iterator2.return();
+			}
+		} finally {
+			if (_didIteratorError2) {
+				throw _iteratorError2;
+			}
+		}
+	}
+
+	this.savedState = data;
+};
+
+TVC.prototype.restoreState = function () {
+	// save memory: u0, u1, u2, u3, sys, exth
+	function copyBlock(s, o, d, size) {
+		for (var i = 0; i < size; ++i) {
+			d[i] = s[o + i];
+		}
+		return offset + size;
+	}
+	var data = this.savedState;
+	var offset = 0;
+	var bufferList = [this._mmu._u0.m, this._mmu._u1.m, this._mmu._u2.m, this._mmu._u3.m, this._mmu._sys.m, this._mmu._exth.m, this._mmu._vid0.m];
+	var _iteratorNormalCompletion3 = true;
+	var _didIteratorError3 = false;
+	var _iteratorError3 = undefined;
+
+	try {
+		for (var _iterator3 = bufferList[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+			var actBuff = _step3.value;
+
+			offset = copyBlock(data, offset, actBuff, actBuff.length);
+		}
+		// disable full reset
+	} catch (err) {
+		_didIteratorError3 = true;
+		_iteratorError3 = err;
+	} finally {
+		try {
+			if (!_iteratorNormalCompletion3 && _iterator3.return) {
+				_iterator3.return();
+			}
+		} finally {
+			if (_didIteratorError3) {
+				throw _iteratorError3;
+			}
+		}
+	}
+
+	this._mmu._u0.m[0x0b22] = 0;
+	this.reset();
 };
 
 // /////////////////////////////
@@ -10573,15 +10684,17 @@ Emu.prototype.emuInit = function () {
  */
 	// img loading + selection
 	var loadDiskByName = function loadDiskByName(name) {
-		getData(name, "games2/" + name).then(function (dataname, data) {
-			self.tvc.loadImg(dataname, new Uint8Array(data));
+		fetch("games2/" + name).then(function (r) {
+			if (r.status === 200) return r.arrayBuffer();else console.log("Failed to load:", name);
+		}).then(function (data) {
+			self.tvc.loadImg(name, new Uint8Array(data));
 			getElement("#monitor").focus();
-			notify("loaded", dataname);
+			notify("loaded", name);
 		});
 	};
 	// load first disk
 	document.addEventListener("emu.started", function () {
-		//loadDiskByName("MRALEX.CAS");
+		loadDiskByName("mralex.dsk");
 	});
 	// keyboard
 	document.addEventListener("keydown", function (e) {
@@ -10609,8 +10722,14 @@ Emu.prototype.emuInit = function () {
 // event handlers
 Emu.prototype.handleKeyPress = function (e) {
 	if (this.tvc) {
-		this.tvc.keyPress(e.which);
 		e.preventDefault();
+		if (e.which === 'w'.charCodeAt(0)) {
+			this.tvc.saveState();
+		} else if (e.which === 'q'.charCodeAt(0)) {
+			this.tvc.restoreState();
+		} else {
+			this.tvc.keyPress(e.which);
+		}
 	}
 };
 
@@ -10696,7 +10815,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = '' || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + '41865' + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + '40417' + '/');
   ws.onmessage = function (event) {
     var data = JSON.parse(event.data);
 

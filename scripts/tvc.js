@@ -6,6 +6,7 @@ var VID = require("./vid.js");
 var HBF = require("./hbf.js");
 var MMU = require("./mmu.js");
 //var AdmZip = require('adm-zip');
+//var LZMA = require('lzma');
 
 ////////////////////////////////////////////
 // TVC
@@ -105,6 +106,53 @@ TVC.prototype.loadImg = function(name,data) {
 	}
 	*/
 };
+
+TVC.prototype.saveState = function() {
+	// save memory: u0, u1, u2, u3, sys, exth
+	let vidState = new Uint8Array(this._vid._reg.length + 4 + 3);
+	let vidStateIdx = 0;
+	for (let r of this._vid._reg) {
+		vidState[vidStateIdx++] = r;
+	}
+	vidState[vidStateIdx++] = this._vid._palette[0];
+	vidState[vidStateIdx++] = this._vid._palette[1];
+	vidState[vidStateIdx++] = this._vid._palette[2];
+	vidState[vidStateIdx++] = this._vid._palette[3];
+	vidState[vidStateIdx++] = this._vid._border;
+	vidState[vidStateIdx++] = this._vid._regIdx;
+	vidState[vidStateIdx++] = this._vid._mode;
+	let bufferList = [this._mmu._u0.m, this._mmu._u1.m, this._mmu._u2.m, this._mmu._u3.m,
+		this._mmu._sys.m, this._mmu._exth.m, this._mmu._vid0.m,
+		vidState
+	];
+	let data = [];
+	for (let m of bufferList) {
+		for (let a = 0; a < m.length; ++a) {
+			data.push(m[a]);
+		}
+	}
+	this.savedState = data;
+}
+
+TVC.prototype.restoreState = function() {
+	// save memory: u0, u1, u2, u3, sys, exth
+	function copyBlock(s,o,d,size) {
+		for (let i = 0; i < size; ++i) {
+			d[i] = s[o + i];
+		}
+		return offset + size;
+	}
+	let data = this.savedState;
+	let offset = 0;
+	let bufferList = [this._mmu._u0.m, this._mmu._u1.m, this._mmu._u2.m,
+		this._mmu._u3.m, this._mmu._sys.m, this._mmu._exth.m, this._mmu._vid0.m];
+	for (let actBuff of bufferList) {
+		offset = copyBlock(data, offset, actBuff, actBuff.length);
+	}
+	// disable full reset
+	this._mmu._u0.m[0x0b22] = 0;
+	this.reset();
+}
 
 // /////////////////////////////
 // the show must go on!
