@@ -6,7 +6,7 @@ var VID = require("./vid.js");
 var HBF = require("./hbf.js");
 var MMU = require("./mmu.js");
 //var AdmZip = require('adm-zip');
-//var LZMA = require('lzma');
+var LZMA = require('../node_modules/lzma/src/lzma_worker.js');
 
 ////////////////////////////////////////////
 // TVC
@@ -84,6 +84,7 @@ TVC.prototype.focusChange = function(hasFocus) {
 // load cas/dsk
 // /////////////////////////////
 TVC.prototype.loadImg = function(name,data) {
+	console.log("load:", name);
 	var extension = name.slice(-4).toLowerCase();
 	if (extension == ".cas") {
 		console.log("loaded:",name);
@@ -99,39 +100,58 @@ TVC.prototype.loadImg = function(name,data) {
 			this._ext0.loadDisk(name, data);
 		}
 	}
-/*	else if (extension == ".zip") {
-		var z = new AdmZip(Buffer.from(data));
-		var e = z.getEntries();
-		this.loadImg(e[0].entryName, e[0].getData());
+	else if (extension == ".tvz") {
+		this.savedState = data;
+		//this.restoreState();
 	}
-	*/
 };
 
 TVC.prototype.saveState = function() {
-	// save memory: u0, u1, u2, u3, sys, exth
+	// vid
 	let vidState = new Uint8Array(this._vid._reg.length + 4 + 3);
 	let vidStateIdx = 0;
-	for (let r of this._vid._reg) {
-		vidState[vidStateIdx++] = r;
+	for (let i = 0; i < this._vid._reg.length; ++i) {
+		vidState[vidStateIdx++] = this._vid._reg[i];
 	}
-	vidState[vidStateIdx++] = this._vid._palette[0];
-	vidState[vidStateIdx++] = this._vid._palette[1];
-	vidState[vidStateIdx++] = this._vid._palette[2];
-	vidState[vidStateIdx++] = this._vid._palette[3];
+	vidState[vidStateIdx++] = this._vid._palette[0].color;
+	vidState[vidStateIdx++] = this._vid._palette[1].color;
+	vidState[vidStateIdx++] = this._vid._palette[2].color;
+	vidState[vidStateIdx++] = this._vid._palette[3].color;
 	vidState[vidStateIdx++] = this._vid._border;
 	vidState[vidStateIdx++] = this._vid._regIdx;
 	vidState[vidStateIdx++] = this._vid._mode;
+	// z80
+	let z80State = new Uint8Array(this._z80._s.R8.length + 4);
+	let z80StateIdx = 0;
+	for (let i = 0; i < this._z80._s.R8.length; ++i) {
+		z80State[z80StateIdx++] = this._z80._s.R8[i];
+	}
+	z80State[z80StateIdx++] = this._z80._s.halted;
+	z80State[z80StateIdx++] = this._z80._s.im;
+	z80State[z80StateIdx++] = this._z80._s.IFF1;
+	z80State[z80StateIdx++] = this._z80._s.IFF2;
+	// mmu
+	let mmuState = new Uint8Array(2);
+	mmuState[0] = this._mmu._mapVal;
+	mmuState[1] = this._mmu._mapValVid;
+
 	let bufferList = [this._mmu._u0.m, this._mmu._u1.m, this._mmu._u2.m, this._mmu._u3.m,
 		this._mmu._sys.m, this._mmu._exth.m, this._mmu._vid0.m,
-		vidState
+		vidState, z80State, mmuState
 	];
-	let data = [];
+	let data = new Uint8Array(106523 + 256);
+	let dataIdx = 0;
 	for (let m of bufferList) {
 		for (let a = 0; a < m.length; ++a) {
-			data.push(m[a]);
+			data[dataIdx++] = m[a];
 		}
 	}
-	this.savedState = data;
+	console.log("save state offset:", dataIdx);
+	console.log("save state offset pc:", this._z80.getRegVal("PC"));
+
+	result = LZMA.LZMA.compress(data, 1);
+
+	this.savedState = result;
 }
 
 TVC.prototype.restoreState = function() {
@@ -142,16 +162,46 @@ TVC.prototype.restoreState = function() {
 		}
 		return offset + size;
 	}
-	let data = this.savedState;
+	let data = new Uint8Array(LZMA.LZMA.decompress(this.savedState));
+	if (!data) {
+		console.log("failed to decompress svaed state");
+		return;
+	}
 	let offset = 0;
 	let bufferList = [this._mmu._u0.m, this._mmu._u1.m, this._mmu._u2.m,
 		this._mmu._u3.m, this._mmu._sys.m, this._mmu._exth.m, this._mmu._vid0.m];
 	for (let actBuff of bufferList) {
 		offset = copyBlock(data, offset, actBuff, actBuff.length);
 	}
+	// vid
+	for (let i = 0; i < this._vid._reg.length; ++i) {
+		this._vid._reg[i] = data[offset++];
+	}
+	this._vid._palette[0].setColor(data[offset++]);
+	this._vid._palette[1].setColor(data[offset++]);
+	this._vid._palette[2].setColor(data[offset++]);
+	this._vid._palette[3].setColor(data[offset++]);
+	this._vid._border = data[offset++];
+	this._vid._regIdx = data[offset++];
+	this._vid._mode = data[offset++];
+	this._vid.reconfig();
+	// z80
+	let z80StateIdx = 0;
+	for (let i = 0; i < this._z80._s.R8.length; ++i) {
+		this._z80._s.R8[i] = data[offset++];
+	}
+	this._z80._s.halted = data[offset++];
+	this._z80._s.im = data[offset++];
+	this._z80._s.IFF1 = data[offset++];
+	this._z80._s.IFF2 = data[offset++];
+	// mmu
+	this._mmu.setMap(data[offset++]);
+	this._mmu.setVidMap(data[offset++]);
+	console.log("restore state size:", offset);
+	console.log("restore state pc:", this._z80.getRegVal("PC"));
 	// disable full reset
-	this._mmu._u0.m[0x0b22] = 0;
-	this.reset();
+	//this._mmu._u0.m[0x0b22] = 0;
+	//this.reset();
 }
 
 // /////////////////////////////

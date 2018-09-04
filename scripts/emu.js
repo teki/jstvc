@@ -209,7 +209,7 @@ Emu.prototype.emuInit = function() {
 	};
 	// load first disk
 	document.addEventListener("emu.started", function () {
-		loadDiskByName("mralex.dsk");
+		loadDiskByName("mralex.tvz");
 	});
 	// keyboard
 	document.addEventListener("keydown", function(e){self.handleKeyDown(e);});
@@ -224,25 +224,38 @@ Emu.prototype.emuInit = function() {
 
 // event handlers
 Emu.prototype.handleKeyPress = function(e) {
-	if (this.tvc) {
+	if (!this.tvc)
+		return;
+	switch (e.key) {
+	case '4':
 		e.preventDefault();
-		if (e.which === 'w'.charCodeAt(0)) {
-			this.tvc.saveState();
-		}
-		else if (e.which === 'q'.charCodeAt(0)) {
-			this.tvc.restoreState();
-		}
-		else {
-			this.tvc.keyPress(e.which);
-		}
+		this.tvc.saveState();
+		var a = getElement("#downloadState");
+		a.setAttribute("href", window.URL.createObjectURL(new Blob([this.tvc.savedState], {type : 'application/octet-stream'})));
+		a.setAttribute("download", "tvc_save_state");
+		return;
+	case '3':
+		e.preventDefault();
+		this.tvc.restoreState();
+		return;
+	case '2':
+		e.preventDefault();
+		this.tvc.reset();
+		return;
+	case '1':
+		e.preventDefault();
+		this.emuToggleRun();
+		return;
 	}
+	e.preventDefault();
+	this.tvc.keyPress(e.which);
 }
 
 Emu.prototype.handleKeyDown = function(e) {
-	if (this.tvc) {
-		if (this.tvc.keyDown(e.which))
-			e.preventDefault();
-	}
+	if (!this.tvc)
+		return;
+	if (this.tvc.keyDown(e.which))
+		e.preventDefault();
 }
 
 Emu.prototype.handleKeyUp = function(e) {
