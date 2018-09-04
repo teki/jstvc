@@ -183,18 +183,9 @@ Emu.prototype.emuInit = function() {
 			];
 	var defaultType = emuDefs[0];
 	this.emuCreate(defaultType);
-	/*
-	// gui
-	getElement("#breset").on("click", function() {
-		self.emuReset();
-	});
-	getElement("#bstop").on("click", function() {
-		self.emuToggleRun();
-	});
-	*/
 	// img loading + selection
 	var loadDiskByName = function(name) {
-		fetch("games2/" + name)
+		return fetch("games2/" + name)
 		.then(function(r) {
 			if (r.status === 200)
 				return r.arrayBuffer()
@@ -209,7 +200,10 @@ Emu.prototype.emuInit = function() {
 	};
 	// load first disk
 	document.addEventListener("emu.started", function () {
-		loadDiskByName("mralex.tvz");
+		//loadDiskByName("mralex.dsk");
+		loadDiskByName("mralex.tvz").then(function(){
+			self.tvc.restoreState();
+		});
 	});
 	// keyboard
 	document.addEventListener("keydown", function(e){self.handleKeyDown(e);});
@@ -231,8 +225,9 @@ Emu.prototype.handleKeyPress = function(e) {
 		e.preventDefault();
 		this.tvc.saveState();
 		var a = getElement("#downloadState");
-		a.setAttribute("href", window.URL.createObjectURL(new Blob([this.tvc.savedState], {type : 'application/octet-stream'})));
-		a.setAttribute("download", "tvc_save_state");
+		const dataUrl = window.URL.createObjectURL(new Blob([this.tvc.savedState], {type : 'application/octet-stream'}));
+		a.setAttribute("href", dataUrl);
+		a.setAttribute("download", "tvc_save_state.tvz");
 		return;
 	case '3':
 		e.preventDefault();

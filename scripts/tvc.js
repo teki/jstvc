@@ -149,7 +149,11 @@ TVC.prototype.saveState = function() {
 	console.log("save state offset:", dataIdx);
 	console.log("save state offset pc:", this._z80.getRegVal("PC"));
 
-	result = LZMA.LZMA.compress(data, 1);
+	result = new Uint8Array(LZMA.LZMA.compress(data, 1));
+	if (!result) {
+		console.log("failed to compress saved state");
+		return;
+	}
 
 	this.savedState = result;
 }
@@ -164,7 +168,7 @@ TVC.prototype.restoreState = function() {
 	}
 	let data = new Uint8Array(LZMA.LZMA.decompress(this.savedState));
 	if (!data) {
-		console.log("failed to decompress svaed state");
+		console.log("failed to decompress saved state");
 		return;
 	}
 	let offset = 0;
