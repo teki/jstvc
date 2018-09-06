@@ -4,3 +4,4 @@ node_modules
 .c9revisions
 .cache
 lib/build
+dist

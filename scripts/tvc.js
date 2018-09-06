@@ -1,11 +1,10 @@
 var Utils = require("./utils.js");
 var Z80 = require("./z80.js");
 var KEY = require("./key.js");
-var AUD = require("./aud.js");
+//var AUD = require("./aud.js");
 var VID = require("./vid.js");
-var HBF = require("./hbf.js");
+//var HBF = require("./hbf.js");
 var MMU = require("./mmu.js");
-//var AdmZip = require('adm-zip');
 var LZMA = require('../node_modules/lzma/src/lzma_worker.js');
 
 ////////////////////////////////////////////
@@ -32,7 +31,7 @@ function TVC(type,callback) {
 	this._mmu = new MMU(type);
 	this._fb = callback({id:"fb"});
 	this._vid = new VID(this._mmu, this._fb);
-	this._aud = new AUD(callback({id:"aud"}));
+//	this._aud = new AUD(callback({id:"aud"}));
 	this._aud_it = false;
 	this._key = new KEY();
 	this._z80 = new Z80(this._mmu, function(addr, val) {
@@ -52,7 +51,7 @@ TVC.prototype.reset = function() {
 TVC.prototype.addRom = function(name, data) {
 	console.log("ADD ROM: ", name);
 	if (/DOS/.test(name)) {
-		this.extensionAttach(0, new HBF(data));
+		//this.extensionAttach(0, new HBF(data));
 	}
 	else {
 		this._mmu.addRom(name, data);
@@ -105,7 +104,7 @@ TVC.prototype.loadImg = function(name,data) {
 		//this.restoreState();
 	}
 };
-
+/*
 TVC.prototype.saveState = function() {
 	// vid
 	let vidState = new Uint8Array(this._vid._reg.length + 4 + 3);
@@ -157,7 +156,7 @@ TVC.prototype.saveState = function() {
 
 	this.savedState = result;
 }
-
+*/
 TVC.prototype.restoreState = function() {
 	// save memory: u0, u1, u2, u3, sys, exth
 	function copyBlock(s,o,d,size) {
@@ -293,13 +292,13 @@ TVC.prototype.writePort = function (addr, val) {
 		break;
 
 	case 0x04:
-		this._aud.setFreqL(val & 0xFF);
+		//this._aud.setFreqL(val & 0xFF);
 		break;
 
 	case 0x05:
-		this._aud_it = (val & 0x20) !== 0;
-		this._aud.setFreqH(val & 0x0F);
-		this._aud.setOn((val & 0x10) !== 0);
+		//this._aud_it = (val & 0x20) !== 0;
+		//this._aud.setFreqH(val & 0x0F);
+		//this._aud.setOn((val & 0x10) !== 0);
 		//console.log("AUD: it: " + this._aud_it);
 		break;
 
@@ -308,7 +307,7 @@ TVC.prototype.writePort = function (addr, val) {
 		val2 = (val >> 2) & 0x0F; // Sound amp
 		val3 = val & 0x03; // video mode
 		this._vid.setMode(val3);
-		this._aud.setAmp(val2);
+		//this._aud.setAmp(val2);
 		break;
 
 	case 0x07:

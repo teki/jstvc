@@ -83,10 +83,11 @@ Emu.prototype.emuCreate = function(type) {
 	let self = this;
 	this.isRunning = false;
 	this.tvc = new TVC(type, function(e){return self.tvcInfoCallback(e);});
+	/*
 	var roms;
 	if (/2\.2/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
 	else roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
-	if (/DOS/.test(type)) roms.push("D_TVCDOS.128");
+	//if (/DOS/.test(type)) roms.push("D_TVCDOS.128");
 	// load roms
 	var loadRom = function(idx) {
 		if (idx === roms.length) {
@@ -109,6 +110,10 @@ Emu.prototype.emuCreate = function(type) {
 		})
 	}
 	loadRom(0);
+	*/
+//	self.isRunning = true;
+//	self.emuContinue();
+//	triggerEvent("emu.started");
 }
 
 Emu.prototype.emuToggleRun = function() {
@@ -185,7 +190,7 @@ Emu.prototype.emuInit = function() {
 	this.emuCreate(defaultType);
 	// img loading + selection
 	var loadDiskByName = function(name) {
-		return fetch("games2/" + name)
+		return fetch(name)
 		.then(function(r) {
 			if (r.status === 200)
 				return r.arrayBuffer()
@@ -199,12 +204,12 @@ Emu.prototype.emuInit = function() {
 		});
 	};
 	// load first disk
-	document.addEventListener("emu.started", function () {
-		//loadDiskByName("mralex.dsk");
-		loadDiskByName("mralex.tvz").then(function(){
-			self.tvc.restoreState();
-		});
-	});
+//	document.addEventListener("emu.started", function () {
+//		//loadDiskByName("mralex.dsk");
+//		loadDiskByName("mralex.tvz").then(function(){
+//			self.tvc.restoreState();
+//		});
+//	});
 	// keyboard
 	document.addEventListener("keydown", function(e){self.handleKeyDown(e);});
 	document.addEventListener("keyup", function(e){self.handleKeyUp(e);});
@@ -214,6 +219,11 @@ Emu.prototype.emuInit = function() {
 	window.addEventListener("blur", function(e){self.handleFocusLost(e);});
 	// disable selection
 	this.canvas.addEventListener("selectstart", function(e) { e.preventDefault(); return false; });
+	loadDiskByName("mralex.tvz").then(function(){
+		self.tvc.restoreState();
+		self.isRunning = true;
+		self.emuContinue();
+	});
 }
 
 // event handlers
@@ -223,7 +233,7 @@ Emu.prototype.handleKeyPress = function(e) {
 	switch (e.key) {
 	case '4':
 		e.preventDefault();
-		this.tvc.saveState();
+		//this.tvc.saveState();
 		var a = getElement("#downloadState");
 		const dataUrl = window.URL.createObjectURL(new Blob([this.tvc.savedState], {type : 'application/octet-stream'}));
 		a.setAttribute("href", dataUrl);

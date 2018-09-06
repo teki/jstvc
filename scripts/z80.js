@@ -1,5 +1,5 @@
 var Utils = require("./utils.js");
-var Dasm = require("./dasm.js");
+//var Dasm = require("./dasm.js");
 
 var F_S = 0x80; // sign
 var F_Z = 0x40; // zero
@@ -5747,11 +5747,13 @@ Z80.prototype.step = function (runFor) {
 			this.bt.push([btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ]);
 			if (this.bt.length > this._btmaxlen) this.bt.shift();
 		}
+		/*
 		if (this._logdasm) {
 			var o = [btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ];
 			var strinn = Utils.toHex16(o[0]) + " " + Dasm.Dasm(o)[0] + "\n";
 			this._dasmtxt += strinn;
 		}
+		*/
 		if (this._op_t === 0) {
 			throw ("you forgot something!");
 		}
@@ -5789,7 +5791,7 @@ Z80.prototype.reset = function () {
 	this._s.reset();
 	this.bt = [];
 };
-
+/*
 Z80.prototype.btToString = function(limit) {
 	var self = this;
 	var arr = [];
@@ -5808,7 +5810,7 @@ Z80.prototype.btToString = function(limit) {
 	arr.push(Utils.toHex16(this._s.R16[R_PC]) + " " + Dasm.Dasm([r, this._s.R16[R_PC]])[0]);
 	return arr;
 };
-
+*/
 var strToReg = {
 	"PC" : R_PC,
 	"SP" : R_SP,
