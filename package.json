@@ -1,6 +1,11 @@
 {
   "name": "jstvc",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:teki/jstvc.git"
+  },
+  "license": "MIT",
   "devDependencies": {
     "lzma": "^2.3.2",
     "parcel-bundler": "^1.9.7"
