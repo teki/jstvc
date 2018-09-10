@@ -5,3 +5,7 @@ node_modules
 .cache
 lib/build
 dist
+package-lock.json
+bundle.js
+bundle.map
+.DS_Store

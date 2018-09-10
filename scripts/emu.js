@@ -219,7 +219,11 @@ Emu.prototype.emuInit = function() {
 	window.addEventListener("blur", function(e){self.handleFocusLost(e);});
 	// disable selection
 	this.canvas.addEventListener("selectstart", function(e) { e.preventDefault(); return false; });
-	loadDiskByName("mralex.tvz").then(function(){
+	// touch
+	window.addEventListener("touchstart", function(e){self.handleTouchStart(e);}, false);
+	window.addEventListener("touchend", function(e){self.handleTouchEnd(e);}, false);
+
+	loadDiskByName("games2/mralex.tvz").then(function(){
 		self.tvc.restoreState();
 		self.isRunning = true;
 		self.emuContinue();
@@ -277,6 +281,50 @@ Emu.prototype.handleFocus = function(e) {
 Emu.prototype.handleFocusLost = function(e) {
 	if (this.tvc)
 		this.tvc.focusChange(false);
+}
+
+function touchToKey(w, h, t) {
+	if (t.clientY < (h / 2))
+		return 9;
+	if (t.clientX < (w / 2))
+		return 37;
+	return 39;
+}
+
+Emu.prototype.handleTouchStart = function(e) {
+	if (!this.tvc)
+		return;
+	var width = window.innerWidth
+		|| document.documentElement.clientWidth
+		|| document.body.clientWidth;
+
+	var height = window.innerHeight
+		|| document.documentElement.clientHeight
+		|| document.body.clientHeight;
+
+	for (let i = 0; i < e.changedTouches.length; ++i) {
+		let k = touchToKey(width, height, e.changedTouches[i]);
+		this.tvc.keyDown(k);
+	}
+	e.preventDefault();
+}
+
+Emu.prototype.handleTouchEnd = function(e) {
+	if (!this.tvc)
+		return;
+	var width = window.innerWidth
+		|| document.documentElement.clientWidth
+		|| document.body.clientWidth;
+
+	var height = window.innerHeight
+		|| document.documentElement.clientHeight
+		|| document.body.clientHeight;
+
+	for (let i = 0; i < e.changedTouches.length; ++i) {
+		let k = touchToKey(width, height, e.changedTouches[i]);
+		this.tvc.keyUp(k);
+	}
+	e.preventDefault();
 }
 
 // emulator functions

@@ -2,6 +2,7 @@
   "name": "jstvc",
   "version": "0.0.1",
   "devDependencies": {
-    "lzma": "^2.3.2"
+    "lzma": "^2.3.2",
+    "parcel-bundler": "^1.9.7"
   }
 }
