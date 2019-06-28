@@ -275,7 +275,7 @@ define([
 			if (addr >= 0x10 && addr <= 0x1F && this._ext0) {
 				result = this._ext0.readPort(addr & 0x0F);
 			}
-			else if (addr >= 0x20 && addr <= 0x2F && tihs._ext1) {
+			else if (addr >= 0x20 && addr <= 0x2F && this._ext1) {
 				result = this._ext1.readPort(addr & 0x0F);
 			}
 			else {
