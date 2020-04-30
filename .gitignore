@@ -3,3 +3,5 @@ node_modules
 .idea
 .c9revisions
 lib/build
+.vscode
+package-lock.json
