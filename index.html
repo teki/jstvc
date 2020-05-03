@@ -4,15 +4,17 @@
 <meta http-equiv="Content-type" content="text/html; charset=utf-8">
 <title>jstvc - Videoton TV Computer Emulator</title>
 <script src="3rdparty/jquery-2.1.0.min.js"></script>
-<script src="3rdparty/require.js"></script>
 <script src="3rdparty/jszip.js"></script>
 <script src="3rdparty/jszip-inflate.js"></script>
 <script src="3rdparty/jszip-load.js"></script>
 <script src="games/list.json"></script>
-<script src="frontend.js"></script>
+<script type="module">
+	import { appStart } from './frontend.js';
+	appStart();
+</script>
 <link rel="stylesheet" type="text/css" href="style/view.css">
 </head>
-<body onload="appStart();">
+<body>
 <!-- tvc monitor -->
 	<div id="monitor" tabindex="0">
 		<canvas id="tvcanvas" width="608" height="288"></canvas>

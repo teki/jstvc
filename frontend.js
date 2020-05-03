@@ -1,5 +1,5 @@
-var TVCModule;
-var Utils;
+import { Utils } from "./scripts/utils.js";
+import { TVC } from "./scripts/tvc.js";
 var g = {};
 g.isRunning = true; /* run the emu in the animation callback */
 g.tvc = undefined; /* TVC object */
@@ -30,13 +30,9 @@ var tvcInfoCallback = function(e) {
 	return res;
 };
 
-function appStart() {
-	requirejs(["scripts/tvc.js","scripts/utils.js"], function(TVC, UTILS) {
-		TVCModule = TVC;
-		Utils = UTILS;
-        Utils.dbInit();
-		emuInit();
-	});
+export function appStart() {
+	Utils.dbInit();
+	emuInit();
 }
 
 /* jQuery promise based async data download */
@@ -68,7 +64,7 @@ function emuReset() {
 function emuCreate(type) {
 	notify("loading roms");
 	g.isRunning = false;
-	g.tvc = new TVCModule.TVC(type, tvcInfoCallback);
+	g.tvc = new TVC(type, tvcInfoCallback);
 	var roms;
 	if (/2\.2/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
 	else roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
