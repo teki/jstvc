@@ -6,9 +6,9 @@ g.tvc = undefined; /* TVC object */
 g.canvas = undefined; /* canvas dom object */
 g.fb = undefined; /* frame buffer object */
 
-var tvcInfoCallback = function(e) {
+var tvcInfoCallback = function (e) {
 	var res;
-	switch(e.id) {
+	switch (e.id) {
 		case "fb":
 			res = g.fb;
 			break;
@@ -30,38 +30,28 @@ var tvcInfoCallback = function(e) {
 	return res;
 };
 
+let app = undefined;
 export function appStart() {
+	app = new Vue({
+		el: '#app',
+		data: {
+			message: 'Hello Vue!'
+		}
+	});
 	Utils.dbInit();
 	emuInit();
-}
-
-/* jQuery promise based async data download */
-function getData(name, url) {
-	var defer = $.Deferred();
-	var oReq = new XMLHttpRequest();
-	oReq.open("GET", url, true);
-	oReq.responseType = "arraybuffer";
-	oReq.onload = function (oEvent) {
-		var arrayBuffer = oReq.response;
-		if (arrayBuffer) {
-			defer.resolve(name, arrayBuffer);
-		}
-		else {
-			defer.reject(this);
-		}
-	};
-	oReq.send(null);
-	return defer.promise();
 }
 
 function emuBreak() {
 	g.isRunning = false;
 	$("#bstop").text("continue");
 }
+
 function emuReset() {
 	g.tvc.reset();
 }
-function emuCreate(type) {
+
+async function emuCreate(type) {
 	notify("loading roms");
 	g.isRunning = false;
 	g.tvc = new TVC(type, tvcInfoCallback);
@@ -70,30 +60,14 @@ function emuCreate(type) {
 	else roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
 	if (/DOS/.test(type)) roms.push("D_TVCDOS.128");
 	// load roms
-	getData(roms[0], "roms/"+roms[0])
-	.then(function(dataname, data) {
-		g.tvc.addRom(dataname, new Uint8Array(data));
-		return getData(roms[1], "roms/"+roms[1]);
-	})
-	.then(function(dataname, data) {
-		g.tvc.addRom(dataname, new Uint8Array(data));
-		return getData(roms[2], "roms/"+roms[2]);
-	})
-	.then(function(dataname, data) {
-		g.tvc.addRom(dataname, new Uint8Array(data));
-		if (roms.length > 3) {
-			return getData(roms[3], "roms/"+roms[3]);
-		}
-	})
-	.then(function(dataname, data) {
-		if (dataname) {
-			g.tvc.addRom(dataname, new Uint8Array(data));
-		}
-		// start
-		g.isRunning = true;
-		emuContinue();
-		$(document).trigger("emu.started");
-	});
+	for (const romName of roms) {
+		let resp = await fetch("roms/" + romName);
+		g.tvc.addRom(romName, new Uint8Array(await resp.arrayBuffer()));
+	}
+	// start
+	g.isRunning = true;
+	emuContinue();
+	$(document).trigger("emu.started");
 }
 function emuToggleRun() {
 	g.isRunning = !g.isRunning;
@@ -135,12 +109,12 @@ function refreshGui() {
 function emuInit() {
 	notify("init page");
 	/* polyfills */
-	if(window.requestAnimationFrame) g.requestAnimationFrame = function(f) {window.requestAnimationFrame(f);};
-	else if (window.mozRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.mozRequestAnimationFrame(f);};
-	else if (window.webkitRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.webkitRequestAnimationFrame(f);};
-	else if (window.msRequestAnimationFrame) g.requestAnimationFrame = function(f) {window.msRequestAnimationFrame(f);};
-	if (typeof(performance) != "undefined")
-		g.timenow = function() {return performance.now();};
+	if (window.requestAnimationFrame) g.requestAnimationFrame = function (f) { window.requestAnimationFrame(f); };
+	else if (window.mozRequestAnimationFrame) g.requestAnimationFrame = function (f) { window.mozRequestAnimationFrame(f); };
+	else if (window.webkitRequestAnimationFrame) g.requestAnimationFrame = function (f) { window.webkitRequestAnimationFrame(f); };
+	else if (window.msRequestAnimationFrame) g.requestAnimationFrame = function (f) { window.msRequestAnimationFrame(f); };
+	if (typeof (performance) != "undefined")
+		g.timenow = function () { return performance.now(); };
 	else
 		g.timenow = Date.now;
 	/* init */
@@ -168,14 +142,14 @@ function emuInit() {
 		"64k  1.2",
 		"64k+ 1.2",
 		"64k+ 2.2"
-			];
+	];
 	var defaultType = Utils.loadLocal("tvc~defmachtype", emuDefs[0]);
 	emuCreate(defaultType);
 	// gui
-	$("#breset").on("click", function() {
+	$("#breset").on("click", function () {
 		emuReset();
 	});
-	$("#bstop").on("click", function() {
+	$("#bstop").on("click", function () {
 		emuToggleRun();
 	});
 	$("#bpoints").change(function (e) {
@@ -189,41 +163,39 @@ function emuInit() {
 	var imgdrop = $("#slocal");
 	$("#loadlocal").on("click", function () {
 		var imgname = imgdrop[0].value;
-        Utils.dbLoadDisk(imgname, function(name,data) {
-            g.tvc.loadImg(name, new Uint8Array(data));
-            $("#monitor").focus();
-            notify("loaded", name + "\nTip: run + [enter]");
-        });
+		Utils.dbLoadDisk(imgname, function (name, data) {
+			g.tvc.loadImg(name, new Uint8Array(data));
+			$("#monitor").focus();
+			notify("loaded", name + "\nTip: run + [enter]");
+		});
 	});
-    Utils.dbInit(function() {
-        Utils.dbListDisks(function (name, data) {
-            if (data) {
-                $("<option>").text(name).val(name).appendTo(imgdrop);
-            }
-        });
-    });
+	Utils.dbInit(function () {
+		Utils.dbListDisks(function (name, data) {
+			if (data) {
+				$("<option>").text(name).val(name).appendTo(imgdrop);
+			}
+		});
+	});
 	var gamesdrop = $("#disks");
-	var loadDiskByName = function(name) {
-		getData(name, "games/" + name)
-			.then(function(dataname, data) {
-				g.tvc.loadImg(dataname, new Uint8Array(data));
-				$("#monitor").focus();
-				notify("loaded", dataname);
-			});
+	var loadDiskByName = async function (name) {
+		let resp = await fetch("games/" + name);
+		g.tvc.loadImg(name, new Uint8Array(await resp.arrayBuffer()));
+		$("#monitor").focus();
+		notify("loaded", name);
 	};
-	$("#disks").change(function () {
+	$("#disks").change(async function () {
 		var name = gamesdrop[0].value;
 		loadDiskByName(name);
 	});
-	for(i = 0; i < gamelist.length; i++ ) {
-			$("<option>").text(gamelist[i].replace(".zip","")).val(gamelist[i]).appendTo(gamesdrop);
+	for (i = 0; i < gamelist.length; i++) {
+		$("<option>").text(gamelist[i].replace(".zip", "")).val(gamelist[i]).appendTo(gamesdrop);
 	}
 	// machine type
 	var machdrop = $("#smach");
-	for (i = 0; i < emuDefs.length; i++ ) {
+	for (i = 0; i < emuDefs.length; i++) {
 		$("<option>").text(emuDefs[i]).val(emuDefs[i]).appendTo(machdrop);
 	}
-	machdrop.on("change", function(e) {
+	machdrop.on("change", function (e) {
 		var machType = machdrop[0].value;
 		Utils.saveLocal("tvc~defmachtype", machType);
 		emuCreate(machType);
@@ -241,17 +213,17 @@ function emuInit() {
 	$(window).focus(handleFocus);
 	$(window).blur(handleFocusLost);
 	// disable selection
-	g.canvas.on("selectstart", function(e) { e.preventDefault(); return false; });
+	g.canvas.on("selectstart", function (e) { e.preventDefault(); return false; });
 	// show/hide debugger
-	$("#modemain").click(function() {reconfigUi("main")});
-	$("#modedebug").click(function() {reconfigUi("debug")});
-	$("#modeeditor").click(function() {reconfigUi("editor")});
+	$("#modemain").click(function () { reconfigUi("main") });
+	$("#modedebug").click(function () { reconfigUi("debug") });
+	$("#modeeditor").click(function () { reconfigUi("editor") });
 	reconfigUi("main");
 }
 
 function reconfigUi(mode) {
-	var activecss = {"background-color":"black", "color":"white"};
-	var inactivecss = {"background-color":"white", "color":"black"};
+	var activecss = { "background-color": "black", "color": "white" };
+	var inactivecss = { "background-color": "white", "color": "black" };
 	$("#modedebug").css(mode == "debug" ? activecss : inactivecss);
 	$("#modeeditor").css(mode == "editor" ? activecss : inactivecss);
 	$("#modemain").css(mode == "main" ? activecss : inactivecss);
@@ -259,28 +231,26 @@ function reconfigUi(mode) {
 	if (mode == "debug") {
 		$("#debugger").show();
 		$("#monitor").css({
-			"transform" : "scale(0.7,0.7)",
-			"-webkit-transform" : "scale(0.7,0.7)",
-			"width" : "425px",
-			"height" : "322px"
+			"transform": "scale(0.7,0.7)",
+			"-webkit-transform": "scale(0.7,0.7)",
+			"width": "425px",
+			"height": "322px"
 		});
 	}
-	else
-	{
+	else {
 		$("#debugger").hide();
 		$("#monitor").css({
-			"transform" : "scale(1,1)",
-			"-webkit-transform" : "scale(1,1)",
-			"width" : "608px",
-			"height" : "460px"
+			"transform": "scale(1,1)",
+			"-webkit-transform": "scale(1,1)",
+			"width": "608px",
+			"height": "460px"
 		});
 	}
 	if (mode == "main") {
 		$("#header").show();
 		$("#help").show();
 	}
-	else
-	{
+	else {
 		$("#help").hide();
 		$("#header").hide();
 	}
@@ -320,21 +290,19 @@ function emuContinue() {
 
 function emuRunFrame() {
 	var skipRun;
-	if (g.isRunning)
-	{
+	if (g.isRunning) {
 		skipRun = false;
 		g.fb.skipcnt++;
 		if (g.fb.skipcnt == 6) {
 			skipRun = g.fb.fpsv > 49;
 			g.fb.skipcnt = 0;
 		}
-		if (!skipRun)
-		{
-      var t1 = g.timenow()
-			if(g.tvc.runForAFrame())
+		if (!skipRun) {
+			var t1 = g.timenow()
+			if (g.tvc.runForAFrame())
 				emuBreak();
-      var t2 = g.timenow();
-      var tdiff = t2 - t1;
+			var t2 = g.timenow();
+			var tdiff = t2 - t1;
 		}
 		if (g.isRunning)
 			emuContinue();
