@@ -5,7 +5,6 @@
 	<meta http-equiv="Content-type" content="text/html; charset=utf-8">
 	<title>jstvc - Videoton TV Computer Emulator</title>
 	<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
-	<script src="3rdparty/jquery-2.1.0.min.js"></script>
 	<script src="3rdparty/jszip.js"></script>
 	<script src="3rdparty/jszip-inflate.js"></script>
 	<script src="3rdparty/jszip-load.js"></script>
@@ -14,21 +13,21 @@
 		import { appStart } from './frontend.js';
 		appStart();
 	</script>
+	<link rel="shortcut icon" type="image/png" href="/jstvcico.png" />
 	<link rel="stylesheet" type="text/css" href="style/view.css">
 </head>
 
 <body>
 	<div id="app">
 		<!-- tvc monitor -->
-		<div id="monitor" tabindex="0">
-			<canvas id="tvcanvas" width="608" height="288"></canvas>
+		<div class="monitor" tabindex="0" ref="monitor">
+			<canvas class="tvcanvas" ref="tvcanvas" width="608" height="288" v-on:selectstart.prevent></canvas>
 		</div>
 		<!-- mode -->
 		<div class="rightcolumn">
-			<a id="modemain">main</a>
-			<a id="modedebug">debug</a>
-			<a id="modeeditor">editor</a>
-			<a id="modeeditor2">{{ message }}</a>
+			<a>main</a>
+			<a>debug</a>
+			<a>editor</a>
 		</div>
 		<!-- header -->
 		<div id="header" class="rightcolumn">
@@ -45,8 +44,12 @@
 		</div>
 		<!-- common toolbar -->
 		<div class="rightcolumn">
-			Disks: <select id="disks"></select>
-			<button id="breset">reset</button>
+			Disks: <select v-model="selectedDisk">
+				<option v-for="disk in disks" v-bind:value="disk">
+					{{ disk }}
+				</option>
+			</select>
+			<button v-on:click="emuReset">reset</button>
 		</div>
 		<!-- help -->
 		<div id="help" class="rightcolumn">
@@ -65,14 +68,19 @@
 		</div>
 		<!-- dev toolbar -->
 		<div class="rightcolumn">
-			status: <span id="statusline">ok</span><br />
-			<button id="bstop">stop</button>
+			status: <span>{{ statusTxt }}</span><br />
+			<button id="bstop" v-on:click="emuToggleRun"><span v-if="isRunning">stop</span><span
+					v-else="isRunning">cont</span></button>
 			local: <select id="slocal"></select>
 			<button id="loadlocal">load</button>
-			ROM: <select id="smach"></select>
+			ROM: <select v-model="emuSelected">
+				<option v-for="emu in emuDefs" v-bind:value="emu">
+					{{ emu }}
+				</option>
+			</select>
 		</div>
 		<!-- debugger -->
-		<div id="debugger" class="rightcolumn">
+		<div class="debugger" class="rightcolumn">
 			debugger here!
 		</div>
 		<!-- -------- -->

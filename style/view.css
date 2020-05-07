@@ -35,11 +35,11 @@ body {
 	border-bottom: 1px solid black;
 }
 
-#debugger {
+.debugger {
 	display: none;
 }
 
-#monitor {
+.monitor {
 	width: 608px;
 	height: 460px;
 	float: left;
@@ -47,7 +47,8 @@ body {
 	transform-origin: left top 0;
 	-webkit-transform-origin: left top 0;
 }
-#tvcanvas {
+
+.tvcanvas {
 	transform-origin: left top 0;
 	transform: scaleY(1.6);
 	-webkit-transform-origin: left top 0;
