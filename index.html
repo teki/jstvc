@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html>
+<html lang="en">
 
 <head>
 	<meta http-equiv="Content-type" content="text/html; charset=utf-8">
@@ -19,19 +19,16 @@
 
 <body>
 	<div id="app">
-		<!-- tvc monitor -->
-		<div class="monitor" tabindex="0" ref="monitor">
-			<canvas class="tvcanvas" ref="tvcanvas" width="608" height="288" v-on:selectstart.prevent></canvas>
-		</div>
-		<!-- mode -->
-		<div class="rightcolumn">
-			<a>main</a>
-			<a>debug</a>
-			<a>editor</a>
-		</div>
 		<!-- header -->
 		<div id="header" class="rightcolumn">
 			<img src="vtvc.jpg" />
+			<ul>
+				<li><button class="ctrlbutton" v-on:click="showDialog('disk')">💾</button>
+					<button class="ctrlbutton" v-on:click="showDialog('settings')">🛠</button></li>
+				<li><button class="ctrlbutton" v-on:click="emuToggleRun"><span v-if="isRunning">🛑</span><span
+							v-else="isRunning">▶</span></button>
+					<button class="ctrlbutton" v-on:click="emuReset">♻</button></li>
+			</ul>
 			<ul>
 				<li><a href="https://github.com/teki/jstvc">jstvc VVEERR</a></li>
 				<li><a href="http://tvc.hu/html/inenglish.html">TVC (en)</a></li>
@@ -42,48 +39,51 @@
 				<li><a href="https://github.com/teki/jstvc">project (hu)</a></li>
 			</ul>
 		</div>
-		<!-- common toolbar -->
-		<div class="rightcolumn">
-			Disks: <select v-model="selectedDisk">
-				<option v-for="disk in disks" v-bind:value="disk">
-					{{ disk }}
-				</option>
-			</select>
-			<button v-on:click="emuReset">reset</button>
+		<!-- tvc monitor -->
+		<div id="monitor" class="monitor" tabindex="0" ref="monitor">
+			<canvas class="tvcanvas" ref="tvcanvas" width="608" height="288" v-on:selectstart.prevent
+				v-on:click="handleMonitorClicked"></canvas>
 		</div>
-		<!-- help -->
-		<div id="help" class="rightcolumn">
+		<!-- mode -->
+		<div id="footer">
+			status: <span>{{ statusMsg }}</span><br />
+		</div>
+		<!-- common toolbar -->
+		<div class="popuppanel" v-show="showDlg == 'disk'">
 			<strong>To load a disk:</strong>
 			<ul style="margin-left: 2em;">
 				<li>Select a disk. (this will insert the selected disk into the A: drive).</li>
 				<li>Type: load "*" then Enter.</li>
 				<li>Most programs will run automatically, just type "run" if you got an "ok" after load.</li>
 			</ul>
-			<strong>Keyboard mapping:</strong>
-			<ul style="margin-left: 2em;">
-				<li>The PC keyboard is automatically mapped to the right TVC keys (it can fail on some browser + OS
-					combinations).</li>
-				<li>The built in joystick is mapped to the cursor keys, fire => TAB.</li>
-			</ul>
-		</div>
-		<!-- dev toolbar -->
-		<div class="rightcolumn">
-			status: <span>{{ statusTxt }}</span><br />
-			<button id="bstop" v-on:click="emuToggleRun"><span v-if="isRunning">stop</span><span
-					v-else="isRunning">cont</span></button>
-			local: <select id="slocal"></select>
-			<button id="loadlocal">load</button>
-			ROM: <select v-model="emuSelected">
-				<option v-for="emu in emuDefs" v-bind:value="emu">
-					{{ emu }}
+			Disks: <select v-model="selectedDisk">
+				<option v-for="disk in disks" v-bind:value="disk">
+					{{ disk }}
 				</option>
 			</select>
 		</div>
-		<!-- debugger -->
-		<div class="debugger" class="rightcolumn">
-			debugger here!
+		<!-- help -->
+		<div class="popuppanel" v-show="showDlg == 'settings'">
+			<div id="help">
+				<strong>Keyboard mapping:</strong>
+				<ul style="margin-left: 2em;">
+					<li>The PC keyboard is automatically mapped to the right TVC keys (it can fail on some browser + OS
+						combinations).</li>
+					<li>The built in joystick is mapped to the cursor keys, fire => TAB.</li>
+				</ul>
+			</div>
+			<!-- dev toolbar -->
+			<div>
+				local: <select id="slocal"></select>
+				<button id="loadlocal">load</button>
+				ROM: <select v-model="emuSelected">
+					<option v-for="emu in emuDefs" v-bind:value="emu">
+						{{ emu }}
+					</option>
+				</select>
+			</div>
 		</div>
-		<!-- -------- -->
+
 	</div>
 </body>
 

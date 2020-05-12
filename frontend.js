@@ -10,6 +10,7 @@ let g = {
 
 let appData = {
 	statusTxt: '',
+	fpsTxt: '',
 	disks: gamelist,
 	selectedDisk: '',
 	emuDefs: [
@@ -21,6 +22,7 @@ let appData = {
 	],
 	emuSelected: '',
 	isRunning: true, /* run the emu in the animation callback */
+	showDlg: '',
 };
 appData.emuSelected = appData.emuDefs[0];
 
@@ -41,7 +43,7 @@ let tvcInfoCallback = function (e) {
 			res = g.fb;
 			break;
 		case "notify":
-			app.statusTxt = e.str;
+			app.setStatusTxt(e.str);
 			break;
 		case "aud":
 			if (window.webkitAudioContext) {
@@ -68,7 +70,7 @@ let appMethods = {
 	},
 
 	emuCreate: async function (type) {
-		this.statusTxt = "loading roms";
+		this.setStatusTxt("creating emu: " + type + ", loading roms...");
 		this.isRunning = false;
 		g.tvc = new TVC(type, tvcInfoCallback);
 		var roms;
@@ -83,7 +85,8 @@ let appMethods = {
 		// start
 		this.isRunning = true;
 		this.emuContinue();
-		this.loadDiskByName(this.disks[0]);
+		//this.loadDiskByName(this.disks[0]);
+		this.setStatusTxt(type + " started");
 	},
 
 	refreshGui: function () {
@@ -104,19 +107,20 @@ let appMethods = {
 
 			g.fb.fpsv = ~~(cntdiff / (timediff / 1000));
 			//console.log(g.fb.updates,g.fb.fpsv);
-			this.statusTxt = "running " + g.fb.fpsv.toString(10) + "fps";
+			this.fpsTxt = " [" + g.fb.fpsv.toString(10) + "fps]";
 		}
 	},
 
 	loadDiskByName: async function (name) {
+		this.setStatusTxt("loading " + name);
 		let resp = await fetch("games/" + name);
 		g.tvc.loadImg(name, new Uint8Array(await resp.arrayBuffer()));
 		this.$refs.monitor.focus();
-		this.statusTxt = "loaded", name;
+		this.setStatusTxt("loaded " + name);
 	},
 
 	emuInit: function () {
-		this.statusTxt = "init page";
+		this.setStatusTxt("init page");
 		/* init */
 		// frame buffer
 		g.canvas = this.$refs.tvcanvas;
@@ -197,6 +201,10 @@ let appMethods = {
 		if (g.tvc)
 			g.tvc.focusChange(false);
 	},
+	handleMonitorClicked: function (e) {
+		this.showDialog('');
+		this.$refs.monitor.focus();
+	},
 	// emulator functions
 	emuContinue: function () {
 		window.requestAnimationFrame(function () { app.emuRunFrame(); });
@@ -226,11 +234,24 @@ let appMethods = {
 	emuToggleRun: function () {
 		this.isRunning = !this.isRunning;
 		if (this.isRunning) {
+			this.setStatusTxt("running");
 			this.emuContinue();
 		}
 		else {
-			this.statusTxt = "stopped";
+			this.setStatusTxt("stopped");
 		}
+	},
+	showDialog(dlgName) {
+		if (this.showDlg == dlgName) {
+			this.showDlg = '';
+		}
+		else {
+			this.showDlg = dlgName;
+		}
+	},
+	setStatusTxt(msg) {
+		this.statusTxt = msg;
+		console.log(msg);
 	}
 };
 
@@ -239,7 +260,16 @@ export function appStart() {
 		el: '#app',
 		data: appData,
 		watch: appDataWatch,
-		methods: appMethods
+		methods: appMethods,
+		computed: {
+			statusMsg: function () {
+				let msg = this.statusTxt;
+				if (this.isRunning) {
+					msg += this.fpsTxt;
+				}
+				return msg;
+			}
+		}
 	});
 	Utils.dbInit();
 	app.emuInit();

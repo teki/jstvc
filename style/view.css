@@ -27,12 +27,20 @@ body {
 	font-size: 12px;
 }
 
-.rightcolumn {
-	float: left;
-	width: 600px;
-	margin-left: 5px;
-	padding: 3px;
-	border-bottom: 1px solid black;
+#app {
+	display: grid;
+}
+
+.popuppanel {
+	position: fixed;
+	width: 500px;
+	left: 60px;
+	top: 100px;
+	background-color: white;
+	border: 5px solid black;
+	word-break: normal;
+	overflow-wrap: anywhere;
+	padding: 0.5em;
 }
 
 .debugger {
@@ -58,6 +66,7 @@ body {
 #toolbar {
 }
 #header {
+	grid-row: 1;
 	height: 5em;
 }
 #header img {
@@ -81,8 +90,12 @@ body {
 #header a:hover { color: black; text-decoration: none; }
 #header a:active { color: black; text-decoration: none; }
 
-#fps {
-	color: white;
+#monitor {
+	grid-row: 2;
+}
+
+#footer {
+	grid-row: 3;	
 }
 /* dbg */
 #regs {
@@ -104,6 +117,7 @@ body {
 #bpoints {
 	width: 400px;
 }
-#bstop {
-	width: 65px;
+
+.ctrlbutton  {
+	width: 3em;
 }
