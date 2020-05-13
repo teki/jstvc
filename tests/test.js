@@ -1,7 +1,7 @@
 import { Z80 } from "../scripts/z80.js";
 import { Utils } from "../scripts/utils.js";
 import { VID } from "../scripts/vid.js";
-import { Dasm } from "../scripts/dasm.js";
+import { Dasm, Asm } from "../scripts/dasm.js";
 import { readFileSync } from "fs";
 
 /*
@@ -16,6 +16,12 @@ import { readFileSync } from "fs";
 */
 
 /* FakeMMU ######################################### */
+
+function assert(expression, message) {
+	if (!expression) {
+		throw (message);
+	}
+}
 
 function FakeMMU(logIntoThis) {
 	this._mem = new Uint8Array(0x10000);
@@ -364,6 +370,20 @@ function testVid() {
 	}
 }
 
+function testAsm() {
+	let asm = new Asm();
+
+	asm.asm("org $F000");
+	assert(asm.addr == 0xf000, "bad address");
+	asm.asm("NOP");
+	assert(asm.last[0] == 0, "NOP failed");
+	assert(asm.last.length == 1, "NOP failed");
+	asm.asm("RRD");
+	assert(asm.last[0] == 0xed, "RRD failed 1");
+	assert(asm.last[1] == 0x67, "RRD failed 2");
+	assert(asm.last.length == 2, "RRD failed 3");
+}
+
 /* exec ######################################### */
 
 var tests = {
@@ -384,6 +404,9 @@ var tests = {
 	"vid": function () {
 		testVid();
 	},
+	"asm": function () {
+		testAsm();
+	}
 };
 
 process.on('uncaughtException', function (err) {
