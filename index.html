@@ -20,7 +20,7 @@
 <body>
 	<div id="app">
 		<!-- header -->
-		<div id="header" class="rightcolumn">
+		<div id="header" class="rightcolumn magiclist">
 			<img src="vtvc.jpg" />
 			<ul>
 				<li><button class="ctrlbutton" v-on:click="showDialog('disk')">💾</button>
@@ -44,11 +44,20 @@
 			<canvas class="tvcanvas" ref="tvcanvas" width="608" height="288" v-on:selectstart.prevent
 				v-on:click="handleMonitorClicked"></canvas>
 		</div>
-		<!-- mode -->
+		<!-- footer -->
 		<div id="footer">
 			status: <span>{{ statusMsg }}</span><br />
 		</div>
-		<!-- common toolbar -->
+		<!-- debugger -->
+		<div id="debugger" class="magiclist" v-show="showDbg">
+			<div>
+				<button class="ctrlbutton" v-on:click="dbgCont">▶</button>
+				<button class="ctrlbutton" v-on:click="dbgStop">🛑</button>
+				<button class="ctrlbutton" v-on:click="dbgStep">➡</button>
+			</div>
+			<div style="white-space: pre;">{{ dbgRegs }}</div>
+		</div>
+		<!-- dialog: disk -->
 		<div class="popuppanel" v-show="showDlg == 'disk'">
 			<strong>To load a disk:</strong>
 			<ul style="margin-left: 2em;">
@@ -62,8 +71,9 @@
 				</option>
 			</select>
 		</div>
-		<!-- help -->
-		<div class="popuppanel" v-show="showDlg == 'settings'">
+		<!-- dialog: settings -->
+		<div class="popuppanel magiclist" v-show="showDlg == 'settings'">
+			<!-- help -->
 			<div id="help">
 				<strong>Keyboard mapping:</strong>
 				<ul style="margin-left: 2em;">
@@ -74,13 +84,22 @@
 			</div>
 			<!-- dev toolbar -->
 			<div>
-				local: <select id="slocal"></select>
-				<button id="loadlocal">load</button>
-				ROM: <select v-model="emuSelected">
-					<option v-for="emu in emuDefs" v-bind:value="emu">
-						{{ emu }}
-					</option>
-				</select>
+				<div>
+					Local disks: <select id="slocal"></select>
+					<button id="loadlocal">load</button>
+				</div>
+				<div>
+					ROM: <select v-model="emuSelected">
+						<option v-for="emu in emuDefs" v-bind:value="emu">
+							{{ emu }}
+						</option>
+					</select>
+				</div>
+				<div>
+					<ul>
+						<li><button class="ctrlbutton" v-on:click="toggleDebugger">🕷</button></li>
+					</ul>
+				</div>
 			</div>
 		</div>
 

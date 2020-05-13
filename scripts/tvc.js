@@ -1,4 +1,4 @@
-import { Utils } from "./utils.js";
+import { Utils, LocalSetting } from "./utils.js";
 import { Z80 } from "./z80.js";
 import { KEY } from "./key.js";
 import { AUD } from "./aud.js";
@@ -6,6 +6,9 @@ import { VID } from "./vid.js";
 import { HBF } from "./hbf.js";
 import { MMU } from "./mmu.js";
 import { Dasm } from "./dasm.js";
+
+const SettingBreakPoints = new LocalSetting("tvc~breakpoints", null);
+const SettingMemBreakPoints = new LocalSetting("tvc~memory-breakpoints", null);
 
 ////////////////////////////////////////////
 // TVC
@@ -18,7 +21,7 @@ export function TVC(type, callback) {
 	this._clockfreq = 3125000;
 	this._clockperline = this._clockfreq * 0.000064;// 64us = 200
 	this._clockperframe = this._clockfreq / 50; // 62500, for interrupt
-	this._breakpoints = Utils.loadLocal("tvc~breakpoints", null);
+	this._breakpoints = SettingBreakPoints.get();
 	this._pendIt = 0x1F;	// b4: curs/aud, b3-0 cards , 0 active
 	this._ext0 = null;
 	this._ext0ite = 0; // disabled
@@ -41,7 +44,7 @@ export function TVC(type, callback) {
 	});
 	//this._z80._logdasm = true;
 
-	this._mmu.breakAddr = Utils.loadLocal("tvc~memory-breakpoints", null);
+	this._mmu.breakAddr = SettingMemBreakPoints.get();
 }
 
 TVC.prototype.reset = function () {
@@ -49,13 +52,13 @@ TVC.prototype.reset = function () {
 	this._mmu.reset();
 };
 
-TVC.prototype.addRom = function (name, data) {
+TVC.prototype.addRom = function (name, data, patched) {
 	console.log("ADD ROM: ", name);
 	if (/DOS/.test(name)) {
 		this.extensionAttach(0, new HBF(data));
 	}
 	else {
-		this._mmu.addRom(name, data);
+		this._mmu.addRom(name, data, patched);
 	}
 };
 
@@ -338,7 +341,7 @@ TVC.prototype.dbm = function (bps) {
 			this._mmu.breakAddr[addr & 0xFFFF] = 1;
 		}
 	}
-	Utils.saveLocal("tvc~memory-breakpoints", this._mmu.breakAddr);
+	SettingMemBreakPoints.set(this._mmu.breakAddr);
 	this.dbm();
 };
 
@@ -353,10 +356,13 @@ TVC.prototype.ddm = function (bp) {
 			this._mmu.breakAddr = null;
 		}
 	}
-	Utils.saveLocal("tvc~memory-breakpoints", this._mmu.breakAddr);
+	SettingMemBreakPoints.set(this._mmu.breakAddr);
 	this.dbm();
 };
-
+// set breakpoints: 
+// db("FFFF,FEFE,DEDE") add breakpoints to these addresses
+// db(8192) add breakpoint to this address, base 10
+// db() print breakpoints
 TVC.prototype.db = function (bps) {
 	if (typeof (bps) == "number") {
 		bps = bps.toString(16);
@@ -384,10 +390,14 @@ TVC.prototype.db = function (bps) {
 			this._breakpoints[addr & 0xFFFF] = 1;
 		}
 	}
-	Utils.saveLocal("tvc~breakpoints", this._breakpoints);
+	SettingBreakPoints.set(this._breakpoints);
 	this.db();
 };
 
+// remove breakpoints: 
+// db("FFFF")
+// db(8192)
+// db("all") or dd(-1) delete all breakpoints
 TVC.prototype.dd = function (bp) {
 	if (typeof (bp) == "number") {
 		if (bp == -1) bp = "all";
@@ -403,7 +413,7 @@ TVC.prototype.dd = function (bp) {
 			this._breakpoints = null;
 		}
 	}
-	Utils.saveLocal("tvc~breakpoints", this._breakpoints);
+	SettingBreakPoints.set(this._breakpoints);
 	this.db();
 };
 
@@ -429,6 +439,32 @@ TVC.prototype.dreg = function () {
 		console.log(Utils.toHex16(addr) + " " + line[0]);
 		addr += line[1];
 	}
+};
+
+TVC.prototype.dregGet = function () {
+	let res = [];
+	var l = 3;
+	var arr = [];
+	var addr = this._z80.getRegVal("PC");
+	var line;
+	var arr = [];
+	var self = this;
+	var r = function (addrr) {
+		return self._mmu.r8(addrr);
+	};
+	res.push(this._z80.toString());
+	res.push(this._mmu.toString());
+	this.dmem("SP");
+	res = res.concat(this._z80.btToString(5).slice(0, -1));
+	line = Dasm([r, addr]);
+	res.push(Utils.toHex16(addr) + "*" + line[0]);
+	addr += line[1];
+	while (l--) {
+		line = Dasm([r, addr]);
+		res.push(Utils.toHex16(addr) + " " + line[0]);
+		addr += line[1];
+	}
+	return res;
 };
 
 TVC.prototype.dbt = function () {
@@ -502,7 +538,7 @@ TVC.prototype.dasm = function (addrP, l) {
 	};
 	l = l || 1;
 	while (l--) {
-		line = DASM.Dasm([r, addr]);
+		line = Dasm([r, addr]);
 		arr.push(Utils.toHex16(addr) + " " + line[0]);
 		addr += line[1];
 	}

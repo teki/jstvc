@@ -23,3 +23,18 @@
 
 
 	last good addr: db45
+
+
+# fastboot patch
+
+C34A E5 5D 54
+
+0E 00  LD C,0
+06 40  LD B,40
+09     ADD HL,BC
+AF     XOR A
+C9     RET
+
+DA19 11 15 DC
+
+18 5C JR DA77

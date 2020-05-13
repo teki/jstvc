@@ -147,7 +147,8 @@ Z80State.prototype.toString = function () {
 	arr.push(" HL:"); arr.push(Utils.toHex88(this.R8[R_H], this.R8[R_L]));
 	arr.push(" IX:"); arr.push(Utils.toHex88(this.R8[R_Xh], this.R8[R_Xl]));
 	arr.push(" IY:"); arr.push(Utils.toHex88(this.R8[R_Yh], this.R8[R_Yl]));
-	arr.push(" AFa:"); arr.push(Utils.toHex88(this.R8[R_Aa], this.R8[R_Fa]));
+	arr.push("\n");
+	arr.push("AFa:"); arr.push(Utils.toHex88(this.R8[R_Aa], this.R8[R_Fa]));
 	arr.push(" BCa:"); arr.push(Utils.toHex88(this.R8[R_Ba], this.R8[R_Ca]));
 	arr.push(" DEa:"); arr.push(Utils.toHex88(this.R8[R_Da], this.R8[R_Ea]));
 	arr.push(" HLa:"); arr.push(Utils.toHex88(this.R8[R_Ha], this.R8[R_La]));
@@ -396,7 +397,7 @@ function bit_n_ihl_fuse(n) {
 		this._s.R8[R_F] =
 			(val & F_S) |
 			((val) ? (0) : (F_Z | F_PV)) |
-			(srcval & (F_3|F_5)) |
+			(srcval & (F_3 | F_5)) |
 			F_H |
 			(this._s.R8[R_F] & F_C);
 	}
@@ -5765,7 +5766,7 @@ Z80.prototype.step = function (runFor) {
 		}
 		if (this._logdasm) {
 			var o = [btpc, opcode, this._op_n, this._op_nn, this._op_e, this._op_displ];
-			var strinn = Utils.toHex16(o[0]) + " " + Dasm.Dasm(o)[0] + "\n";
+			var strinn = Utils.toHex16(o[0]) + " " + Dasm(o)[0] + "\n";
 			this._dasmtxt += strinn;
 		}
 		if (this._op_t === 0) {
@@ -5827,12 +5828,12 @@ Z80.prototype.btToString = function (limit) {
 	}
 	for (; i < this.bt.length; i++) {
 		var o = this.bt[i];
-		arr.push(Utils.toHex16(o[0]) + " " + Dasm.Dasm(o)[0]);
+		arr.push(Utils.toHex16(o[0]) + " " + Dasm(o)[0]);
 	}
 	var r = function (addr) {
 		return self._mmu.r8(addr);
 	}
-	arr.push(Utils.toHex16(this._s.R16[R_PC]) + " " + Dasm.Dasm([r, this._s.R16[R_PC]])[0]);
+	arr.push(Utils.toHex16(this._s.R16[R_PC]) + " " + Dasm([r, this._s.R16[R_PC]])[0]);
 	return arr;
 };
 

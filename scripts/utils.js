@@ -86,7 +86,7 @@ Utils.crc32 = function (bytes, crc) {
   crc = crc || 0;
   crc = crc ^ (-1);
   for (i = 0, iTop = bytes.length; i < iTop; i++) {
-    crc = ( crc >>> 8 ) ^ table[(crc ^ bytes[i]) & 0xFF];
+    crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xFF];
   }
   crc = crc ^ (-1);
   if (crc < 0) crc += 4294967296;
@@ -94,7 +94,7 @@ Utils.crc32 = function (bytes, crc) {
 };
 
 Utils.isBrowser = function () {
-  return typeof(window) != "undefined";
+  return typeof (window) != "undefined";
 };
 
 Utils.removeLocal = function (key) {
@@ -141,7 +141,7 @@ Utils.dbInit = function (cb) {
     var request = window.indexedDB.open("tvc-db", 3);
     request.onupgradeneeded = function (event) {
       Utils.db = event.target.result;
-      var os = Utils.db.createObjectStore("disks", {keyPath: "name"});
+      var os = Utils.db.createObjectStore("disks", { keyPath: "name" });
     };
     request.onsuccess = function (event) {
       Utils.db = event.target.result;
@@ -164,7 +164,7 @@ Utils.dbLoadDisk = function (name, cb) {
 };
 Utils.dbSaveDisk = function (name, data, cb) {
   if (!Utils.db) return;
-  Utils.db.transaction(["disks"], "readwrite").objectStore("disks").put({name: name, data: data}).onsuccess = function (event) {
+  Utils.db.transaction(["disks"], "readwrite").objectStore("disks").put({ name: name, data: data }).onsuccess = function (event) {
     if (cb)
       cb(name, data);
   };
@@ -322,4 +322,20 @@ Utils.Emscripten.fsGet = function (FS, path) {
   if (node.isFile)
     return new Uint8Array(node.contents);
   return node.contents;
+}
+
+export class LocalSetting {
+  constructor(name, def) {
+    this.name = name;
+    this.def = def;
+  }
+  get() {
+    let res = Utils.loadLocal(this.name, this.def);
+    console.log("settings: read " + this.name + " = " + res);
+    return res;
+  }
+  set(value) {
+    console.log("settings: write " + this.name + " = " + value);
+    Utils.saveLocal(this.name, value);
+  }
 }

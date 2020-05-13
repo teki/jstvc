@@ -1277,13 +1277,18 @@ function toHex8(x) {
 }
 
 export function Dasm(data) {
-	var op, n, nn, d, e;
+	let op = 0;
+	let n = 0;
+	let nn = 0;
+	let d = 0;
+	let e = 0;
+	let isFDorDD = false;
 	if (data.length <= 2) {
-		var reader = data[0];
-		var pc = data[1];
-		var opcodeb2;
-		var op_displ = -1;
-		var opcode = reader(pc++);
+		let reader = data[0];
+		let pc = data[1];
+		let opcodeb2;
+		let op_displ = -1;
+		let opcode = reader(pc++);
 		if (opcode == 0xDD || opcode == 0xFD) {
 			do {
 				// DD* FD*
@@ -1309,7 +1314,7 @@ export function Dasm(data) {
 		else if (opcode == 0xED || opcode == 0xCB) {
 			opcode = (opcode << 8) | reader(pc++);
 		}
-		var op = OpCodes[opcode];
+		op = OpCodes[opcode];
 		if (!op) {
 			if (isFDorDD) {
 				op = OpCodes[opcode & 0xFF];
@@ -1321,8 +1326,8 @@ export function Dasm(data) {
 			return;
 		}
 		n = -300;
-		for (var chi in op[0]) {
-			var chc = op[0][chi];
+		for (let chi in op[0]) {
+			let chc = op[0][chi];
 			switch (chc) {
 				case 'd':
 					d = reader(pc++);
@@ -1348,8 +1353,8 @@ export function Dasm(data) {
 		e = data[4];
 		d = data[5];
 	}
-	var rescode = op[0];
-	var restxt = op[1];
+	let rescode = op[0];
+	let restxt = op[1];
 	if (rescode.indexOf("d") != -1) {
 		d = d & 0xFF;
 		rescode = rescode.replace("d", toHex8(d));

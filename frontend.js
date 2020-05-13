@@ -1,4 +1,4 @@
-import { Utils } from "./scripts/utils.js";
+import { Utils, LocalSetting } from "./scripts/utils.js";
 import { TVC } from "./scripts/tvc.js";
 
 let app = undefined;
@@ -8,6 +8,8 @@ let g = {
 	fb: undefined, /* frame buffer object */
 };
 
+const SettingShowDebugger = new LocalSetting("tvc~showdebugger", false);
+
 let appData = {
 	statusTxt: '',
 	fpsTxt: '',
@@ -15,6 +17,7 @@ let appData = {
 	selectedDisk: '',
 	emuDefs: [
 		"64k+ 1.2, VT-DOS",
+		"64k+ 1.2, VT-DOS (fastboot)",
 		"64k+ 2.2, VT-DOS",
 		"64k  1.2",
 		"64k+ 1.2",
@@ -23,7 +26,10 @@ let appData = {
 	emuSelected: '',
 	isRunning: true, /* run the emu in the animation callback */
 	showDlg: '',
+	showDbg: SettingShowDebugger.get(),
+	dbgRegs: '',
 };
+const SettingDefaultEmuType = new LocalSetting("tvc~defmachtype", appData.emuDefs[0]);
 appData.emuSelected = appData.emuDefs[0];
 
 let appDataWatch = {
@@ -31,7 +37,7 @@ let appDataWatch = {
 		this.loadDiskByName(newDisk);
 	},
 	emuSelected: function (newEmu, oldEmu) {
-		Utils.saveLocal("tvc~defmachtype", newEmu);
+		SettingDefaultEmuType.set(newEmu);
 		this.emuCreate(newEmu);
 	},
 };
@@ -74,13 +80,46 @@ let appMethods = {
 		this.isRunning = false;
 		g.tvc = new TVC(type, tvcInfoCallback);
 		var roms;
-		if (/2\.2/.test(type)) roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
-		else roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
+		if (/2\.2/.test(type)) {
+			roms = ["TVC22_D4.64K", "TVC22_D6.64K", "TVC22_D7.64K"];
+		}
+		else {
+			roms = ["TVC12_D3.64K", "TVC12_D4.64K", "TVC12_D7.64K"];
+		}
 		if (/DOS/.test(type)) roms.push("D_TVCDOS.128");
+		let fastboot = /fastboot/.test(type);
 		// load roms
 		for (const romName of roms) {
 			let resp = await fetch("roms/" + romName);
-			g.tvc.addRom(romName, new Uint8Array(await resp.arrayBuffer()));
+			let romData = new Uint8Array(await resp.arrayBuffer());
+			let isPatched = false;
+			if (fastboot && romName == "TVC12_D4.64K") {
+				/* fastboot patch
+				C34A E5 5D 54 <- original
+				0E 00  LD C,0	// disable memtest
+				06 40  LD B,40
+				09     ADD HL,BC
+				AF     XOR A
+				C9     RET
+				*/
+				let addr = 0x34a;
+				romData[addr] = 0x0e; addr++;
+				romData[addr] = 0x00; addr++;
+				romData[addr] = 0x06; addr++;
+				romData[addr] = 0x40; addr++;
+				romData[addr] = 0x09; addr++;
+				romData[addr] = 0xaf; addr++;
+				romData[addr] = 0xc9; addr++;
+				/*
+				DA19 11 15 DC <- original
+				18 5C JR DA77  // disable tvc logo
+				*/
+				addr = 0x1a19;
+				romData[addr] = 0x18; addr++;
+				romData[addr] = 0x5c; addr++;
+				isPatched = true;
+			}
+			g.tvc.addRom(romName, romData, isPatched);
 		}
 		// start
 		this.isRunning = true;
@@ -138,7 +177,7 @@ let appMethods = {
 		g.fb.buf8 = new Uint8ClampedArray(g.fb.buf);
 		g.fb.buf32 = new Uint32Array(g.fb.buf);
 		g.fb.refresh = function () { app.refreshGui(); };
-		let defaultType = Utils.loadLocal("tvc~defmachtype", this.emuDefs[0]);
+		let defaultType = SettingDefaultEmuType.get();
 		this.emuCreate(defaultType);
 		// gui
 		/* TODO
@@ -241,7 +280,7 @@ let appMethods = {
 			this.setStatusTxt("stopped");
 		}
 	},
-	showDialog(dlgName) {
+	showDialog: function (dlgName) {
 		if (this.showDlg == dlgName) {
 			this.showDlg = '';
 		}
@@ -249,9 +288,35 @@ let appMethods = {
 			this.showDlg = dlgName;
 		}
 	},
-	setStatusTxt(msg) {
+	setStatusTxt: function (msg) {
 		this.statusTxt = msg;
 		console.log(msg);
+	},
+	// debugger
+	toggleDebugger: function () {
+		this.showDbg = !this.showDbg;
+		SettingShowDebugger.set(this.showDbg);
+	},
+	dbgStop: function () {
+		if (this.isRunning) {
+			this.emuToggleRun();
+			this.dbgRefreshRegs();
+		}
+	},
+	dbgCont: function () {
+		if (!this.isRunning) {
+			this.emuToggleRun();
+		}
+	},
+	dbgStep: function () {
+		if (!this.isRunning) {
+			g.tvc.dstep(true);
+			this.dbgRefreshRegs();
+		}
+	},
+	dbgRefreshRegs: function () {
+		let regs = g.tvc.dregGet();
+		this.dbgRegs = regs.join("\n");
 	}
 };
 

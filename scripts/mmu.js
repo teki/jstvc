@@ -51,7 +51,7 @@ MMU.prototype.init = function () {
 	this.setMap(0);
 };
 
-MMU.prototype.addRom = function (name, data) {
+MMU.prototype.addRom = function (name, data, patched) {
 	var i;
 	var dataCrc = Utils.crc32(data);
 	switch (name) {
@@ -61,7 +61,7 @@ MMU.prototype.addRom = function (name, data) {
 			break;
 
 		case "TVC12_D4.64K":
-			if (dataCrc != 0x834ca9be) throw ("invalid rom (" + name + ")!");
+			if (!patched && dataCrc != 0x834ca9be) throw ("invalid rom (" + name + ")!");
 			for (i = 0; i < data.length; i++) this._sys.m[i] = data[i];
 			break;
 
