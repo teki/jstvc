@@ -375,13 +375,27 @@ function testAsm() {
 
 	asm.asm("org $F000");
 	assert(asm.addr == 0xf000, "bad address");
-	asm.asm("NOP");
+	assert(asm.asm("NOP") == 1, "NOP length");
 	assert(asm.last[0] == 0, "NOP failed");
-	assert(asm.last.length == 1, "NOP failed");
-	asm.asm("RRD");
-	assert(asm.last[0] == 0xed, "RRD failed 1");
-	assert(asm.last[1] == 0x67, "RRD failed 2");
-	assert(asm.last.length == 2, "RRD failed 3");
+	assert(asm.asm("RRD") == 2, "RRD length");
+	assert(asm.last[0] == 0xed, "RRD failed 0");
+	assert(asm.last[1] == 0x67, "RRD failed 1");
+	assert(asm.asm("ld a,#1") == 2, "lda1 length");
+	assert(asm.last[0] == 0x3e, "lda1 failed 0");
+	assert(asm.last[1] == 0x1, "lda1 failed 1");
+	assert(asm.asm("ld a,$ff") == 2, "ldaff length");
+	assert(asm.last[0] == 0x3e, "ldaff failed 0");
+	assert(asm.last[1] == 0xff, "ldaff failed 1");
+	assert(asm.asm("ld (ix+#16),$20") == 4, "ldix length");
+	assert(asm.last[0] == 0xdd, "ldix failed 0");
+	assert(asm.last[1] == 0x36, "ldix failed 1");
+	assert(asm.last[2] == 0x10, "ldix failed 2");
+	assert(asm.last[3] == 0x20, "ldix failed 3");
+	assert(asm.asm("jr #-10") == 2, "jrneg length");
+	assert(asm.last[0] == 0x18, "jrneg failed 0");
+	assert(asm.last[1] == 0xF6, "jrneg failed 1");
+	assert(asm.addr == 0xf00d, "bad address end");
+
 }
 
 /* exec ######################################### */

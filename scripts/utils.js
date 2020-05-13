@@ -5,6 +5,7 @@ Utils.Emscripten = {};
 Utils.db = null;
 
 Utils.toHex8 = function (x) {
+  if (x < 0) x = x + 256;
   var s = x.toString(16).toUpperCase();
   return "0".slice(s.length - 1) + s;
 };
@@ -27,6 +28,22 @@ Utils.toBin8 = function (x) {
     x = (x << 1);
   }
   return arr.join("");
+};
+
+Utils.low16 = function (x) {
+  return x & 0xff;
+};
+
+Utils.high16 = function (x) {
+  return (x >> 8) & 0xff;
+};
+
+Utils.low16H = function (x) {
+  return Utils.toHex8(Utils.low16(x));
+};
+
+Utils.high16H = function (x) {
+  return Utils.toHex8(Utils.high16(x));
 };
 
 Utils.crc32 = function (bytes, crc) {

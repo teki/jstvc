@@ -1,3 +1,5 @@
+import { Utils } from "./utils.js";
+
 let OpCodes = new Map([
 	[0, ["00", "NOP", 1]],
 	[1, ["01 n n", "LD BC,nn", 3]],
@@ -1386,7 +1388,7 @@ export function Dasm(data) {
 	return [rescode + "          ".substr(0, 12 - rescode.length) + restxt, op[2]];
 }
 
-function codeToBytes(code) {
+function numToBytes(code) {
 	if (code == 0) return [0];
 	let res = [];
 	while (code) {
@@ -1395,6 +1397,45 @@ function codeToBytes(code) {
 	}
 	return res;
 }
+function hexToBytes(hexs) {
+	let res = [];
+	hexs = hexs.replace(/ /g, '');
+	while (hexs.length) {
+		res.push(parseInt(hexs.slice(0, 2), 16));
+		hexs = hexs.slice(2);
+	}
+	return res;
+}
+
+function asmTransformInput(line) {
+	line = line.toUpperCase();
+	let elements = line.trim().split(/\s+/);
+	line = elements[0];
+	if (elements.length > 1) {
+		line += ' ' + elements.slice(1).join('');
+	}
+	let numReg = /([$#]-{0,1}[A-F0-9]+)/g;
+	let nums = line.match(numReg);
+	if (nums) {
+		nums = nums.map(v => asmParseNum(v));
+	}
+	line = line.replace(numReg, 'n');
+	return [line, nums];
+}
+function asmTransformMnem(mnem) {
+	mnem = mnem.replace('(PC+e)', 'n');
+	mnem = mnem.replace('nn', 'n');
+	mnem = mnem.replace('d', 'n');
+	mnem = mnem.replace('e', 'n');
+	return mnem;
+}
+function asmParseNum(num) {
+	if (num.startsWith('#')) {
+		return parseInt(num.slice(1), 10);
+	}
+	return parseInt(num.slice(1), 16);
+}
+
 export class Asm {
 	constructor() {
 
@@ -1402,46 +1443,63 @@ export class Asm {
 		this.bytes = [];
 		this.orgs = [];
 		this.last = [];
-		this.instr = {};
+		this.instr = new Map();
 		// 	16632654: ["FDCB d 4E", "BIT 1,(IY+d)", 4],
 		// matchers
-		this.mOrg = /^\s*org\s+(?<addr>[a-fA-F0-9]{1,4})\s*$/;
-		this.mInstr = /^\s*(?<instr>[a-zA-Z]+)\s*$/;
+		this.mOrg = /^\s*org\s+(?<addr>[$#][a-fA-F0-9]{1,4})\s*$/;
 
 		// build a search tree from the opcodes
 		OpCodes.forEach((v, k, _) => this.storeMnem(k, v));
 	}
 	storeMnem(code, mnem) {
-		let iCode, iTxt, iBytes;
-		[iCode, iTxt, iBytes] = mnem;
-		let r;
-		if (r = iTxt.match(this.mInstr)) {
-			this.instr[r.groups.instr] = {
-				bytes: codeToBytes(code),
-				full: mnem,
-			}
-		}
-		else {
-			//throw ("unrecognised instr: " + iTxt);
-			return;
-		}
+		let iCode, iTxt, iLength;
+		[iCode, iTxt, iLength] = mnem;
+		let iTxtGood = asmTransformMnem(iTxt);
+		this.instr.set(iTxtGood, {
+			bytes: numToBytes(code),
+			length: iLength,
+			code: iCode,
+		});
 	}
 	asm(txt) {
 		this.last = [];
 		let r;
 		if (r = txt.match(this.mOrg)) {
-			this.addr = parseInt(r.groups.addr, 16);
+			this.addr = asmParseNum(r.groups.addr);
 			this.orgs.push([this.addr, this.bytes.length]);
+			return;
 		}
-		else if (r = txt.match(this.mInstr)) {
-			let instr = this.instr[r.groups.instr];
-			this.last = instr.bytes.slice();
+		let guess, nums;
+		[guess, nums] = asmTransformInput(txt);
+		console.log("asm guess: " + txt + ' => ' + guess + " nums: " + nums);
+		if (r = this.instr.get(guess)) {
+			// n n is always alone
+			let code = r.code.slice();
+			if (code.includes(' n n')) {
+				if (nums.length != 1) {
+					return 'wrong number: ' + nums;
+				}
+				code = code.replace('n', Utils.high16H(nums[0]));
+				code = code.replace('n', Utils.low16H(nums[0]));
+			}
+			else {
+				let numsIdx = 0;
+				let numLetters = code.match(/([dne]{1})/g);
+				if (numLetters) {
+					for (const numLetterIdx in numLetters) {
+						code = code.replace(numLetters[numLetterIdx], Utils.toHex8(nums[numsIdx]));
+						numsIdx++;
+					}
+				}
+			}
+			this.last = hexToBytes(code);
 		}
 		else {
 			return 'unkown instruction';
 		}
 		if (this.last.length) {
 			this.bytes = this.bytes.concat(this.last);
+			this.addr += this.last.length;
 		}
 		return this.last.length;
 	}
