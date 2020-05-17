@@ -247,7 +247,7 @@ TVC.prototype.writePort = function (addr, val) {
 				this._ext1.writePort(addr & 0x0F, val);
 			}
 			else {
-				debugger;
+				//debugger;
 				console.warn("Unhandled port write: " + Utils.toHex8(addr) + " " + Utils.toHex8(val), " (PC:", Utils.toHex16(this._z80.getRegVal("PC")), ")");
 			}
 	}
