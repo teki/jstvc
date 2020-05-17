@@ -74,20 +74,14 @@
 		<!-- dialog: settings -->
 		<div class="popuppanel magiclist" v-show="showDlg == 'settings'">
 			<!-- help -->
-			<div id="help">
+			<div>
 				<strong>Keyboard mapping:</strong>
-				<ul style="margin-left: 2em;">
-					<li>The PC keyboard is automatically mapped to the right TVC keys (it can fail on some browser + OS
-						combinations).</li>
-					<li>The built in joystick is mapped to the cursor keys, fire => TAB.</li>
-				</ul>
+				The PC keyboard is automatically mapped to the right TVC keys (it can fail on some browser + OS
+				combinations).<br />
+				The built in joystick is mapped to the cursor keys, fire => TAB.
 			</div>
 			<!-- dev toolbar -->
 			<div>
-				<div>
-					Local disks: <select id="slocal"></select>
-					<button id="loadlocal">load</button>
-				</div>
 				<div>
 					ROM: <select v-model="emuSelected">
 						<option v-for="emu in emuDefs" v-bind:value="emu">
@@ -96,9 +90,11 @@
 					</select>
 				</div>
 				<div>
-					<ul>
-						<li><button class="ctrlbutton" v-on:click="toggleDebugger">🕷</button></li>
-					</ul>
+					<input type="checkbox" v-model="showDbg"><label for="checkbox">debugger</label>
+				</div>
+				<div>
+					Local disks: <select id="slocal"></select>
+					<button id="loadlocal">load</button>
 				</div>
 			</div>
 		</div>

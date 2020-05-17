@@ -8,6 +8,15 @@ let g = {
 	fb: undefined, /* frame buffer object */
 };
 
+const emuConfigs = [
+	"64k+ 1.2, VT-DOS",
+	"64k+ 1.2, VT-DOS (fastboot)",
+	"64k+ 2.2, VT-DOS",
+	"64k  1.2",
+	"64k+ 1.2",
+	"64k+ 2.2"
+];
+const SettingDefaultEmuType = new LocalSetting("tvc~defmachtype", emuConfigs[0]);
 const SettingShowDebugger = new LocalSetting("tvc~showdebugger", false);
 
 let appData = {
@@ -15,30 +24,25 @@ let appData = {
 	fpsTxt: '',
 	disks: gamelist,
 	selectedDisk: '',
-	emuDefs: [
-		"64k+ 1.2, VT-DOS",
-		"64k+ 1.2, VT-DOS (fastboot)",
-		"64k+ 2.2, VT-DOS",
-		"64k  1.2",
-		"64k+ 1.2",
-		"64k+ 2.2"
-	],
-	emuSelected: '',
+	emuDefs: emuConfigs,
+	emuSelected: SettingDefaultEmuType.get(),
 	isRunning: true, /* run the emu in the animation callback */
 	showDlg: '',
 	showDbg: SettingShowDebugger.get(),
 	dbgRegs: '',
 };
-const SettingDefaultEmuType = new LocalSetting("tvc~defmachtype", appData.emuDefs[0]);
-appData.emuSelected = appData.emuDefs[0];
 
 let appDataWatch = {
 	selectedDisk: function (newDisk, oldDisk) {
-		this.loadDiskByName(newDisk);
+		this.loadDiskByNameAndPlay(newDisk);
 	},
 	emuSelected: function (newEmu, oldEmu) {
 		SettingDefaultEmuType.set(newEmu);
 		this.emuCreate(newEmu);
+	},
+	showDbg: (showDebugger) => {
+		SettingShowDebugger.set(showDebugger);
+		console.log(showDebugger);
 	},
 };
 
@@ -94,6 +98,7 @@ let appMethods = {
 			let romData = new Uint8Array(await resp.arrayBuffer());
 			let isPatched = false;
 			if (fastboot && romName == "TVC12_D4.64K") {
+				//TODO: do thsi with asm()
 				/* fastboot patch
 				C34A E5 5D 54 <- original
 				0E 00  LD C,0	// disable memtest
@@ -156,6 +161,52 @@ let appMethods = {
 		g.tvc.loadImg(name, new Uint8Array(await resp.arrayBuffer()));
 		this.$refs.monitor.focus();
 		this.setStatusTxt("loaded " + name);
+	},
+
+	loadDiskByNameAndPlay: async function (name) {
+		this.setStatusTxt("loading " + name);
+		if (!this.emuSelected.includes('fastboot')) {
+			let fastBootEmu = this.emuDefs.find(e => e.includes('fastboot'));
+			SettingDefaultEmuType.set(fastBootEmu);
+			await this.emuCreate(fastBootEmu);
+		}
+		let resp = await fetch("games/" + name);
+		g.tvc.loadImg(name, new Uint8Array(await resp.arrayBuffer()));
+		this.$refs.monitor.focus();
+		this.setStatusTxt("loaded " + name);
+		this.showDialog('');
+		this.emuTypeString([
+			[108, 76, 0],
+			[111, 79, 0],
+			[97, 65, 0],
+			[100, 68, 0],
+			[34, 222, 16],
+			[42, 56, 16],
+			[34, 222, 16],
+			[0, 13, 0],
+		], 700);
+	},
+
+	emuTypeString: function (str, delay) {
+		const intDelay = 50;
+		for (let c of str) {
+			if (c[2]) {
+				setTimeout(() => g.tvc.keyDown(c[2]), delay);
+				delay += intDelay;
+			}
+			setTimeout(() => g.tvc.keyDown(c[1]), delay);
+			delay += intDelay;
+			if (c[0]) {
+				setTimeout(() => g.tvc.keyPress(c[0]), delay);
+				delay += intDelay;
+			}
+			setTimeout(() => g.tvc.keyUp(c[1]), delay);
+			delay += intDelay;
+			if (c[2]) {
+				setTimeout(() => g.tvc.keyUp(c[2]), delay);
+				delay += intDelay;
+			}
+		}
 	},
 
 	emuInit: function () {
@@ -292,11 +343,6 @@ let appMethods = {
 		this.statusTxt = msg;
 		console.log(msg);
 	},
-	// debugger
-	toggleDebugger: function () {
-		this.showDbg = !this.showDbg;
-		SettingShowDebugger.set(this.showDbg);
-	},
 	dbgStop: function () {
 		if (this.isRunning) {
 			this.emuToggleRun();
@@ -306,6 +352,7 @@ let appMethods = {
 	dbgCont: function () {
 		if (!this.isRunning) {
 			this.emuToggleRun();
+			this.dbgRefreshRegs();
 		}
 	},
 	dbgStep: function () {
@@ -315,8 +362,13 @@ let appMethods = {
 		}
 	},
 	dbgRefreshRegs: function () {
-		let regs = g.tvc.dregGet();
-		this.dbgRegs = regs.join("\n");
+		if (this.isRunning) {
+			this.dbgRegs = '';
+		}
+		else {
+			let regs = g.tvc.dregGet();
+			this.dbgRegs = regs.join("\n");
+		}
 	}
 };
 
