@@ -128,3 +128,11 @@ body {
 .ctrlbutton  {
 	width: 3em;
 }
+.smallbutton {
+	background-color: white;
+	border: none;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	font-size: 5px;
+}

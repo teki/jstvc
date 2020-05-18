@@ -1,6 +1,8 @@
 import { Utils, LocalSetting } from "./scripts/utils.js";
 import { TVC } from "./scripts/tvc.js";
 
+const SettingDebuggerMemWatch = new LocalSetting("tvc~dbgmemwatch", []);
+
 let app = undefined;
 let g = {
 	canvas: undefined, /* canvas dom object */
@@ -8,6 +10,8 @@ let g = {
 	fb: undefined, /* frame buffer object */
 	animPrevFrame: 0,
 	screenFps: 0,
+	memWatch: SettingDebuggerMemWatch.get(),
+	dbgUpdateTime: 0,
 };
 
 const emuConfigs = [
@@ -32,6 +36,8 @@ let appData = {
 	showDlg: '',
 	showDbg: SettingShowDebugger.get(),
 	dbgRegs: '',
+	dbgMemInput: '',
+	dbgMemWatchOut: '',
 };
 
 let appDataWatch = {
@@ -269,28 +275,28 @@ let appMethods = {
 	},
 	// event handlers
 	handleKeyPress: function (e) {
-		if (g.tvc) {
+		if (g.tvc && this.isRunning) {
 			g.tvc.keyPress(e.which);
 			e.preventDefault();
 		}
 	},
 	handleKeyDown: function (e) {
-		if (g.tvc) {
+		if (g.tvc && this.isRunning) {
 			if (g.tvc.keyDown(e.which))
 				e.preventDefault();
 		}
 	},
 	handleKeyUp: function (e) {
-		if (g.tvc) {
+		if (g.tvc && this.isRunning) {
 			g.tvc.keyUp(e.which);
 		}
 	},
 	handleFocus: function (e) {
-		if (g.tvc)
+		if (g.tvc && this.isRunning)
 			g.tvc.focusChange(true);
 	},
 	handleFocusLost: function (e) {
-		if (g.tvc)
+		if (g.tvc && this.isRunning)
 			g.tvc.focusChange(false);
 	},
 	handleMonitorClicked: function (e) {
@@ -316,6 +322,7 @@ let appMethods = {
 		if (this.isRunning) {
 			skipRun = false;
 			g.fb.skipcnt++;
+			//TODO: this is hard coded for 60fps
 			if (g.fb.skipcnt == 6) {
 				skipRun = g.fb.fpsv > 49;
 				g.fb.skipcnt = 0;
@@ -330,6 +337,12 @@ let appMethods = {
 			}
 			if (this.isRunning)
 				this.emuContinue();
+		}
+		if (this.showDbg) {
+			if (now - g.dbgUpdateTime > 300) {
+				g.dbgUpdateTime = now;
+				this.dbgRefreshDbgInfo();
+			}
 		}
 	},
 	emuToggleRun: function () {
@@ -357,30 +370,52 @@ let appMethods = {
 	dbgStop: function () {
 		if (this.isRunning) {
 			this.emuToggleRun();
-			this.dbgRefreshRegs();
+			this.dbgRefreshDbgInfo();
 		}
 	},
 	dbgCont: function () {
 		if (!this.isRunning) {
 			this.emuToggleRun();
-			this.dbgRefreshRegs();
+			this.dbgRefreshDbgInfo();
 		}
 	},
 	dbgStep: function () {
 		if (!this.isRunning) {
 			g.tvc.dstep(true, false);
-			this.dbgRefreshRegs();
+			this.dbgRefreshDbgInfo();
 		}
 	},
-	dbgRefreshRegs: function () {
-		if (this.isRunning) {
-			this.dbgRegs = '';
+	dbgRefreshDbgInfo: function () {
+		let regs = g.tvc.dregGet();
+		this.dbgRegs = regs.join("\n");
+		let memInfo = [];
+		for (const m of g.memWatch) {
+			memInfo = memInfo.concat(g.tvc.dmemGet(m));
 		}
-		else {
-			let regs = g.tvc.dregGet();
-			this.dbgRegs = regs.join("\n");
+		this.dbgMemWatchOut = memInfo;
+	},
+	dbgMemWatch: function () {
+		if (!this.dbgMemInput)
+			return;
+		// normalize address, accepts registers too
+		let addr = Utils.toHex16(g.tvc.resolveAddr(this.dbgMemInput));
+		if (!g.memWatch.includes(addr)) {
+			g.memWatch.push(addr);
+			g.memWatch.sort();
+			SettingDebuggerMemWatch.set(g.memWatch);
+			this.dbgRefreshDbgInfo();
 		}
-	}
+	},
+	dbgMemWatchDel: function (m) {
+		let addr = Utils.toHex16(g.tvc.resolveAddr(m.split(" ", 1)[0]));
+		console.log(addr);
+		g.memWatch = g.memWatch.filter(e => e != addr);
+		SettingDebuggerMemWatch.set(g.memWatch);
+		this.dbgRefreshDbgInfo();
+	},
+	dbgMemBreak: function () {
+
+	},
 };
 
 export function appStart() {

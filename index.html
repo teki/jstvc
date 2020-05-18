@@ -55,7 +55,14 @@
 				<button class="ctrlbutton" v-on:click="dbgStop">🛑</button>
 				<button class="ctrlbutton" v-on:click="dbgStep">➡</button>
 			</div>
-			<div style="white-space: pre;">{{ dbgRegs }}</div>
+			<div style=" white-space: pre;">{{ dbgRegs }}</div>
+			<div>
+				Mem:<input type="text" size=8 minlenght=1 maxlength=8 v-model="dbgMemInput">
+				<button v-on:click="dbgMemWatch">watch</button>
+				<button v-on:click="dbgMemBreak">break</button>
+				<div style="white-space: pre;"><span v-for="m in dbgMemWatchOut"><button class="smallbutton"
+							v-on:click="dbgMemWatchDel(m)">🔴</button>{{ m + '\n' }}</span></div>
+			</div>
 		</div>
 		<!-- dialog: disk -->
 		<div class="popuppanel" v-show="showDlg == 'disk'">
