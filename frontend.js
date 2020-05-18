@@ -6,6 +6,8 @@ let g = {
 	canvas: undefined, /* canvas dom object */
 	tvc: undefined, /* TVC object */
 	fb: undefined, /* frame buffer object */
+	animPrevFrame: 0,
+	screenFps: 0,
 };
 
 const emuConfigs = [
@@ -151,7 +153,7 @@ let appMethods = {
 
 			g.fb.fpsv = ~~(cntdiff / (timediff / 1000));
 			//console.log(g.fb.updates,g.fb.fpsv);
-			this.fpsTxt = " [" + g.fb.fpsv.toString(10) + "fps]";
+			this.fpsTxt = " [" + g.fb.fpsv.toString(10) + "/" + g.screenFps + " fps]";
 		}
 	},
 
@@ -301,6 +303,15 @@ let appMethods = {
 	},
 
 	emuRunFrame: function () {
+		let now = performance.now();
+		if (g.animPrevFrame > 0) {
+			let timeDiff = now - g.animPrevFrame;
+			if (timeDiff <= 18 && timeDiff >= 14) g.screenFps = 60;
+			else if (timeDiff <= 35 && timeDiff >= 31) g.screenFps = 30;
+			else if (timeDiff <= 9 && timeDiff >= 5) g.screenFps = 144;
+			else g.screenFps = Math.floor(1 / timeDiff);
+		}
+		g.animPrevFrame = now;
 		var skipRun;
 		if (this.isRunning) {
 			skipRun = false;
@@ -357,7 +368,7 @@ let appMethods = {
 	},
 	dbgStep: function () {
 		if (!this.isRunning) {
-			g.tvc.dstep(true);
+			g.tvc.dstep(true, false);
 			this.dbgRefreshRegs();
 		}
 	},

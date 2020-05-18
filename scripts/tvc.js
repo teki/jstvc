@@ -454,7 +454,7 @@ TVC.prototype.dregGet = function () {
 	};
 	res.push(this._z80.toString());
 	res.push(this._mmu.toString());
-	this.dmem("SP");
+	res.push(this.dmemGet("SP"));
 	res = res.concat(this._z80.btToString(5).slice(0, -1));
 	line = Dasm([r, addr]);
 	res.push(Utils.toHex16(addr) + "*" + line[0]);
@@ -472,7 +472,7 @@ TVC.prototype.dbt = function () {
 	console.log(arr.join("\n"));
 };
 
-TVC.prototype.dstep = function (breakOnNext) {
+TVC.prototype.dstep = function (breakOnNext, showRegs = true) {
 	var cpuTime = 0;
 	var drawInfo = [false, false];
 	var self = this;
@@ -496,21 +496,27 @@ TVC.prototype.dstep = function (breakOnNext) {
 				this._fb.refresh();
 			}
 		}
-		if (!breakOnNext || (this._z80.getRegVal("PC") == dstPC))
+		if (breakOnNext || (this._z80.getRegVal("PC") == dstPC))
 			break;
 	}
-	this.dreg();
+	if (showRegs)
+		this.dreg();
 };
 
 TVC.prototype.dmem = function (addrP, lines, bytesPerLine) {
+	console.log(this.dmemGet(addrP, lines, bytesPerLine).join("\n"));
+}
+
+TVC.prototype.dmemGet = function (addrP, lines, bytesPerLine) {
+	let res = [];
 	bytesPerLine = bytesPerLine || 16;
 	lines = lines || 1;
 	var addr = this.resolveAddr(addrP);
 	if (isNaN(addr)) {
 		console.log("dumpMem: Invalid address:", addrP);
-		return;
+		return "";
 	}
-	do {
+	while (res.length < lines) {
 		var lineStr = Utils.toHex16(addr);
 		var chars = "";
 		for (var i = 0; i < bytesPerLine; i++) {
@@ -523,9 +529,9 @@ TVC.prototype.dmem = function (addrP, lines, bytesPerLine) {
 				chars += String.fromCharCode(v);
 			}
 		}
-		console.log(lineStr + " |" + chars + "|");
-		lines--;
-	} while (lines);
+		res.push(lineStr + " |" + chars + "|");
+	}
+	return res;
 };
 
 TVC.prototype.dasm = function (addrP, l) {
